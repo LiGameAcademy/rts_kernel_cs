@@ -1,5 +1,4 @@
 using Rts.Kernel;
-using Rts.Content;
 using Rts.Kernel.Navigation;
 
 var checks = 0;
@@ -99,11 +98,8 @@ Check(!grid.IsWalkable(new GridCell(2, 0)), "out of bounds blocked");
 Check(grid.TryWorldToCell(new SimVector2(-0.01, -0.01), out var cell) && cell == new GridCell(0, 0), "negative origin and floor semantics");
 Check(!grid.TryWorldToCell(new SimVector2(32, 0), out _), "upper edge excluded");
 Check(!grid.TryWorldToCell(new SimVector2(double.NaN, 0), out _), "nonfinite coordinate rejected");
-var fromArray = ParsedTerrainReader.ReadPathing("""{"width":2,"height":2,"cells":[0,2,4,8]}""");
-var fromBase64 = ParsedTerrainReader.ReadPathing("""{"width":2,"height":2,"cellsBase64":"AAIECA=="}""");
-Check(fromArray.FlagsAt(new GridCell(1, 1)) == fromBase64.FlagsAt(new GridCell(1, 1)), "pathing encodings equivalent");
 CheckThrows<ArgumentException>(() => new PathingGrid(2, 2, 32, default, new byte[3]), "truncated map rejected");
-var terrain = ParsedTerrainReader.ReadHeights("""{"tilepointWidth":2,"tilepointHeight":2,"tileSize":128,"centerOffset":{"x":-128,"y":-128},"heights":[0,10,20,30]}""");
+var terrain = new TerrainHeights(2, 2, 128, new SimVector2(-128, -128), new double[] { 0, 10, 20, 30 });
 Check(terrain.TrySample(new SimVector2(-64, -64), out var altitude) && altitude == 15, "bilinear height sample");
 Check(terrain.TrySample(SimVector2.Zero, out altitude) && altitude == 30, "last corner samples final quad");
 Check(!terrain.TrySample(new SimVector2(1, 0), out _), "height outside map explicitly missing");
