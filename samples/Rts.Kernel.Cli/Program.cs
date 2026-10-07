@@ -1,5 +1,7 @@
 using Rts.Kernel;
 
+if (args.Contains("--navigation")) { NavigationSample.Run(); return; }
+
 var match = new RtsMatch(MatchConfig.Default, seed: 0xC0FFEEUL);
 match.SubmitCommand(CommandEnvelope.Spawn(1, playerId: 0, sequence: 0, new SimVector2(128, 256)));
 match.Step();

@@ -25,7 +25,22 @@ internal sealed class NavigationState
 
     internal PathResult FindPath(GridCell start, GridCell goal, int clearanceCells, int maxExpandedNodes) =>
         GridPathfinder.FindPathCore(_grid, start, goal, maxExpandedNodes, clearanceCells,
-            cell => _grid.IsWalkable(cell) && _occupancy[cell.Y * _grid.Width + cell.X] == 0);
+            IsWalkable);
+
+    private bool IsWalkable(GridCell cell) => _grid.IsWalkable(cell)
+        && _occupancy[cell.Y * _grid.Width + cell.X] == 0;
+
+    internal bool TryWorldToCell(SimVector2 position, out GridCell cell) => _grid.TryWorldToCell(position, out cell);
+    internal SimVector2 CellCenter(GridCell cell) => new(
+        _grid.Origin.X + (cell.X + 0.5) * _grid.CellSize,
+        _grid.Origin.Y + (cell.Y + 0.5) * _grid.CellSize);
+    internal bool CanOccupy(GridCell cell, int clearance) =>
+        GridPathfinder.HasClearance(_grid, cell, clearance, IsWalkable);
+    internal bool CanTraverse(GridCell from, GridCell to, int clearance) =>
+        Math.Abs(from.X - to.X) <= 1 && Math.Abs(from.Y - to.Y) <= 1
+        && CanOccupy(from, clearance) && CanOccupy(to, clearance)
+        && (from.X == to.X || from.Y == to.Y ||
+            (CanOccupy(new GridCell(from.X, to.Y), clearance) && CanOccupy(new GridCell(to.X, from.Y), clearance)));
 
     internal bool TrySetObstacle(ulong id, GridArea area)
     {

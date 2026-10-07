@@ -107,5 +107,6 @@ CheckThrows<ArgumentException>(() => new TerrainHeights(2, 2, 128, default, new 
 
 PathfindingChecks.Run(Check);
 NavigationChecks.Run(Check);
+MovementChecks.Run(Check);
 
 Console.WriteLine($"Rts.Kernel.Tests PASS ({checks} checks)");

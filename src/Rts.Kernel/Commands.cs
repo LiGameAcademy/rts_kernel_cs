@@ -9,6 +9,7 @@ public enum CommandKind
     Stop = 3,
     SetObstacle = 4,
     RemoveObstacle = 5,
+    MoveTo = 6,
 }
 
 public sealed record CommandEnvelope(
@@ -19,7 +20,8 @@ public sealed record CommandEnvelope(
     EntityId EntityId,
     SimVector2 Position,
     SimVector2 Velocity,
-    ObstacleCommand? Obstacle = null)
+    ObstacleCommand? Obstacle = null,
+    MoveRequest? Move = null)
 {
     /// <summary>Diagnostic navigation command; building ownership rules are not implemented yet.</summary>
     public static CommandEnvelope SetObstacle(long executeFrame, int playerId, long sequence,
@@ -38,6 +40,16 @@ public sealed record CommandEnvelope(
             && Position == SimVector2.Zero && Velocity == SimVector2.Zero,
         _ => Obstacle is null,
     };
+
+    public static CommandEnvelope MoveTo(long executeFrame, int playerId, long sequence,
+        EntityId entityId, SimVector2 goal, double speed, int clearanceCells = 0) =>
+        new(executeFrame, playerId, sequence, CommandKind.MoveTo, entityId, SimVector2.Zero, SimVector2.Zero,
+            Move: new MoveRequest(goal, speed, clearanceCells));
+
+    internal bool HasValidMovePayload => Kind == CommandKind.MoveTo
+        ? Move is { IsValid: true } && !EntityId.IsNone && Obstacle is null
+            && Position == SimVector2.Zero && Velocity == SimVector2.Zero
+        : Move is null;
 
     public static CommandEnvelope Spawn(
         long executeFrame,
@@ -73,6 +85,8 @@ public enum MatchEventKind
 {
     EntitySpawned = 1,
     CommandRejected = 2,
+    MoveCompleted = 3,
+    MoveFailed = 4,
 }
 
 public sealed record MatchEvent(

@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Rts.Kernel;
 
-public sealed class RtsMatch
+public sealed partial class RtsMatch
 {
     private readonly SortedDictionary<EntityId, EntityState> _entities = [];
     private readonly List<QueuedCommand> _pendingCommands = [];
@@ -50,6 +50,8 @@ public sealed class RtsMatch
         if (!command.HasValidObstaclePayload)
             return CommandAcceptance.Reject("invalid_obstacle_payload");
 
+        if (!command.HasValidMovePayload) return CommandAcceptance.Reject("invalid_move_payload");
+
         _pendingCommands.Add(new QueuedCommand(_nextArrivalOrder++, command));
         return CommandAcceptance.Accept();
     }
@@ -59,15 +61,7 @@ public sealed class RtsMatch
         Frame++;
         ExecuteCommandsForCurrentFrame();
 
-        var secondsPerTick = 1.0 / Config.TickRate;
-        foreach (var pair in _entities.ToArray())
-        {
-            var state = pair.Value;
-            _entities[pair.Key] = state with
-            {
-                Position = state.Position + (state.Velocity * secondsPerTick),
-            };
-        }
+        AdvanceMovement(1.0 / Config.TickRate);
     }
 
     public bool TryGetEntity(EntityId entityId, out EntityState? state) =>
@@ -110,7 +104,8 @@ public sealed class RtsMatch
             Rng.State,
             entities,
             pending,
-            _navigation?.CaptureSnapshot());
+            _navigation?.CaptureSnapshot(),
+            ReadMoveOrders());
     }
 
     public static RtsMatch Restore(MatchSnapshot snapshot, PathingGrid? pathingGrid = null)
@@ -148,6 +143,7 @@ public sealed class RtsMatch
 
         match._pendingCommands.AddRange(snapshot.PendingCommands.Select(
             item => new QueuedCommand(item.ArrivalOrder, item.Command)));
+        match.RestoreMoveOrders(snapshot);
         return match;
     }
 
@@ -180,10 +176,15 @@ public sealed class RtsMatch
             case CommandKind.SetObstacle:
                 if (_navigation is null || !_navigation.TrySetObstacle(command.Obstacle!.Id, command.Obstacle.Area!.Value))
                     AddEvent(MatchEventKind.CommandRejected, EntityId.None, "invalid_obstacle_or_navigation_disabled");
+                else _pathsDirty = true;
                 break;
             case CommandKind.RemoveObstacle:
                 if (_navigation is null || !_navigation.RemoveObstacle(command.Obstacle!.Id))
                     AddEvent(MatchEventKind.CommandRejected, EntityId.None, "obstacle_missing_or_navigation_disabled");
+                else _pathsDirty = true;
+                break;
+            case CommandKind.MoveTo:
+                ExecuteMove(command);
                 break;
             case CommandKind.SpawnEntity:
             {
@@ -199,11 +200,17 @@ public sealed class RtsMatch
                     break;
                 }
 
+                if (_navigation is not null)
+                {
+                    AddEvent(MatchEventKind.CommandRejected, command.EntityId, "use_move_to_with_navigation");
+                    break;
+                }
                 _entities[command.EntityId] = entity with { Velocity = command.Velocity };
                 break;
             case CommandKind.Stop:
                 if (_entities.TryGetValue(command.EntityId, out var stopped) && stopped.OwnerId == command.PlayerId)
                 {
+                    _moveOrders.Remove(command.EntityId);
                     _entities[command.EntityId] = stopped with { Velocity = SimVector2.Zero };
                 }
                 else
