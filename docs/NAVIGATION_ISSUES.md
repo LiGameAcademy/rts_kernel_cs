@@ -1,6 +1,6 @@
-# 导航开发 Issues 草稿
+# 导航开发 Issues
 
-日期：2026-10-07。发布目标：Liweimin0512/rts_kernel_cs。GitHub 连接器未实际创建记录，现有 Git 登录用于 API 创建返回 401；以下尚未取得 Issue 编号，不视为已发布。
+日期：2026-10-07。发布仓库：LiGameAcademy/rts_kernel_cs（原仓库已迁移）。任务已发布：[#1 静态寻路](https://github.com/LiGameAcademy/rts_kernel_cs/issues/1)、[#2 动态障碍与净空](https://github.com/LiGameAcademy/rts_kernel_cs/issues/2)、[#3 移动接入](https://github.com/LiGameAcademy/rts_kernel_cs/issues/3)。
 
 ## 1. 在纯 C# 内核中实现可重复的静态网格寻路
 
