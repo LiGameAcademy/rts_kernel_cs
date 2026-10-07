@@ -105,4 +105,6 @@ Check(terrain.TrySample(SimVector2.Zero, out altitude) && altitude == 30, "last 
 Check(!terrain.TrySample(new SimVector2(1, 0), out _), "height outside map explicitly missing");
 CheckThrows<ArgumentException>(() => new TerrainHeights(2, 2, 128, default, new double[] {0, 0, 0, double.NaN}), "nonfinite height rejected");
 
+PathfindingChecks.Run(Check);
+
 Console.WriteLine($"Rts.Kernel.Tests PASS ({checks} checks)");
