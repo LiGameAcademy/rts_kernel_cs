@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 namespace Rts.Kernel.Navigation;
 
 public readonly record struct GridCell(int X, int Y);
@@ -6,6 +8,7 @@ public readonly record struct GridCell(int X, int Y);
 public sealed class PathingGrid
 {
     private readonly byte[] _flags;
+    public string ContentHash { get; }
     public int Width { get; }
     public int Height { get; }
     public double CellSize { get; }
@@ -25,6 +28,22 @@ public sealed class PathingGrid
         _flags = flags.ToArray();
         for (var i = 0; i < obstacleFlags.Length; i++)
             _flags[i] |= obstacleFlags[i];
+        ContentHash = ComputeContentHash();
+    }
+
+    private string ComputeContentHash()
+    {
+        using var data = new MemoryStream();
+        using (var writer = new BinaryWriter(data, System.Text.Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write(Width);
+            writer.Write(Height);
+            writer.Write(CellSize);
+            writer.Write(Origin.X);
+            writer.Write(Origin.Y);
+            writer.Write(_flags);
+        }
+        return Convert.ToHexString(SHA256.HashData(data.ToArray())).ToLowerInvariant();
     }
 
     public bool Contains(GridCell cell) => cell.X >= 0 && cell.Y >= 0 && cell.X < Width && cell.Y < Height;

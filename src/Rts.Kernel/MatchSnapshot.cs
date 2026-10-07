@@ -1,3 +1,4 @@
+using Rts.Kernel.Navigation;
 using System.Text.Json;
 using System.Globalization;
 
@@ -22,7 +23,8 @@ public sealed record MatchSnapshot(
     long NextEventSequence,
     ulong RngState,
     IReadOnlyList<EntitySnapshot> Entities,
-    IReadOnlyList<QueuedCommandSnapshot> PendingCommands);
+    IReadOnlyList<QueuedCommandSnapshot> PendingCommands,
+    NavigationSnapshot? Navigation = null);
 
 public readonly record struct SnapshotDifference(string Path, string Expected, string Actual);
 
@@ -47,6 +49,8 @@ public static class SnapshotValidator
         {
             throw new InvalidDataException("Snapshot collections cannot be null.");
         }
+
+        if (snapshot.Navigation is not null) NavigationState.ValidateSnapshot(snapshot.Navigation);
 
         var entityIds = new HashSet<ulong>();
         ulong maximumEntityId = 0;
@@ -79,7 +83,7 @@ public static class SnapshotValidator
             }
 
             if (command.ExecuteFrame <= snapshot.Frame || command.PlayerId < 0 || command.Sequence < 0
-                || !Enum.IsDefined(command.Kind)
+                || !Enum.IsDefined(command.Kind) || !command.HasValidObstaclePayload
                 || !double.IsFinite(command.Position.X) || !double.IsFinite(command.Position.Y)
                 || !double.IsFinite(command.Velocity.X) || !double.IsFinite(command.Velocity.Y))
             {
@@ -159,7 +163,7 @@ public static class SnapshotDiff
             }
         }
 
-        return null;
+        return NavigationSnapshotDiff.FindFirst(expected, actual);
     }
 
     private static SnapshotDifference? Compare<T>(string path, T expected, T actual)
@@ -183,7 +187,7 @@ public static class SnapshotDiff
 
 public static class SnapshotJson
 {
-    public const int CurrentFormatVersion = 1;
+    public const int CurrentFormatVersion = 2;
 
     private static readonly JsonSerializerOptions Options = new()
     {
