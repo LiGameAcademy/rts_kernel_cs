@@ -11,11 +11,29 @@ public static class GridPathfinder
     private const double DiagonalCost = 1.4142135;
 
     public static PathResult FindPath(PathingGrid grid, GridCell start, GridCell goal,
-        int maxExpandedNodes = int.MaxValue)
+        int maxExpandedNodes = int.MaxValue, int clearanceCells = 0)
     {
         ArgumentNullException.ThrowIfNull(grid);
+        return FindPathCore(grid, start, goal, maxExpandedNodes, clearanceCells, grid.IsWalkable);
+    }
+
+    internal static PathResult FindPathCore(PathingGrid grid, GridCell start, GridCell goal,
+        int maxExpandedNodes, int clearanceCells, Func<GridCell, bool> isWalkable)
+    {
+        if (clearanceCells < 0) throw new ArgumentOutOfRangeException(nameof(clearanceCells));
+        // Existing game semantics: every cell in the Chebyshev neighborhood must be free.
+        bool CanOccupy(GridCell cell)
+        {
+            if ((long)cell.X - clearanceCells < 0 || (long)cell.Y - clearanceCells < 0
+                || (long)cell.X + clearanceCells >= grid.Width || (long)cell.Y + clearanceCells >= grid.Height)
+                return false;
+            for (var y = cell.Y - clearanceCells; y <= cell.Y + clearanceCells; y++)
+            for (var x = cell.X - clearanceCells; x <= cell.X + clearanceCells; x++)
+                if (!isWalkable(new GridCell(x, y))) return false;
+            return true;
+        }
         if (maxExpandedNodes <= 0) throw new ArgumentOutOfRangeException(nameof(maxExpandedNodes));
-        if (!grid.IsWalkable(start) || !grid.IsWalkable(goal))
+        if (!CanOccupy(start) || !CanOccupy(goal))
             return Failure(PathStatus.InvalidEndpoint, 0);
 
         var count = checked(grid.Width * grid.Height);
@@ -46,10 +64,10 @@ public static class GridPathfinder
             {
                 if (dx == 0 && dy == 0) continue;
                 var next = new GridCell(cell.X + dx, cell.Y + dy);
-                if (!grid.IsWalkable(next)) continue;
+                if (!CanOccupy(next)) continue;
                 var diagonal = dx != 0 && dy != 0;
-                if (diagonal && (!grid.IsWalkable(new GridCell(cell.X, next.Y))
-                    || !grid.IsWalkable(new GridCell(next.X, cell.Y)))) continue;
+                if (diagonal && (!CanOccupy(new GridCell(cell.X, next.Y))
+                    || !CanOccupy(new GridCell(next.X, cell.Y)))) continue;
                 var nextIndex = next.Y * grid.Width + next.X;
                 var candidate = costs[index] + (diagonal ? DiagonalCost : 1);
                 if (closed[nextIndex] || candidate >= costs[nextIndex]) continue;

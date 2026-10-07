@@ -1,3 +1,4 @@
+using Rts.Kernel.Navigation;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -8,15 +9,17 @@ public sealed class RtsMatch
     private readonly SortedDictionary<EntityId, EntityState> _entities = [];
     private readonly List<QueuedCommand> _pendingCommands = [];
     private readonly List<MatchEvent> _events = [];
+    private NavigationState? _navigation;
     private ulong _nextEntityId = 1;
     private long _nextArrivalOrder;
     private long _nextEventSequence;
 
-    public RtsMatch(MatchConfig config, ulong seed)
+    public RtsMatch(MatchConfig config, ulong seed, PathingGrid? pathingGrid = null)
     {
         config.Validate();
         Config = config;
         Rng = new DeterministicRng(seed);
+        _navigation = pathingGrid is null ? null : new NavigationState(pathingGrid);
     }
 
     public MatchConfig Config { get; }
@@ -26,6 +29,11 @@ public sealed class RtsMatch
     public DeterministicRng Rng { get; }
 
     public IReadOnlyCollection<EntityState> Entities => _entities.Values;
+
+    public PathResult FindPath(GridCell start, GridCell goal, int clearanceCells = 0,
+        int maxExpandedNodes = int.MaxValue) =>
+        (_navigation ?? throw new InvalidOperationException("Match has no pathing grid."))
+        .FindPath(start, goal, clearanceCells, maxExpandedNodes);
 
     public CommandAcceptance SubmitCommand(CommandEnvelope command)
     {
@@ -38,6 +46,9 @@ public sealed class RtsMatch
         {
             return CommandAcceptance.Reject("invalid_command_identity");
         }
+
+        if (!command.HasValidObstaclePayload)
+            return CommandAcceptance.Reject("invalid_obstacle_payload");
 
         _pendingCommands.Add(new QueuedCommand(_nextArrivalOrder++, command));
         return CommandAcceptance.Accept();
@@ -98,12 +109,18 @@ public sealed class RtsMatch
             _nextEventSequence,
             Rng.State,
             entities,
-            pending);
+            pending,
+            _navigation?.CaptureSnapshot());
     }
 
-    public static RtsMatch Restore(MatchSnapshot snapshot)
+    public static RtsMatch Restore(MatchSnapshot snapshot, PathingGrid? pathingGrid = null)
     {
         SnapshotValidator.Validate(snapshot);
+
+        if (snapshot.Navigation is not null && pathingGrid is null)
+            throw new InvalidDataException("Static pathing grid required to restore navigation.");
+        if (snapshot.Navigation is null && pathingGrid is not null)
+            throw new InvalidDataException("Cannot add navigation while restoring a match without navigation.");
 
         var match = new RtsMatch(new MatchConfig(snapshot.TickRate), snapshot.RngState)
         {
@@ -112,6 +129,9 @@ public sealed class RtsMatch
             _nextArrivalOrder = snapshot.NextArrivalOrder,
             _nextEventSequence = snapshot.NextEventSequence,
         };
+
+        if (snapshot.Navigation is not null)
+            match._navigation = NavigationState.Restore(pathingGrid!, snapshot.Navigation);
 
         foreach (var entity in snapshot.Entities.OrderBy(item => item.Id))
         {
@@ -157,6 +177,14 @@ public sealed class RtsMatch
     {
         switch (command.Kind)
         {
+            case CommandKind.SetObstacle:
+                if (_navigation is null || !_navigation.TrySetObstacle(command.Obstacle!.Id, command.Obstacle.Area!.Value))
+                    AddEvent(MatchEventKind.CommandRejected, EntityId.None, "invalid_obstacle_or_navigation_disabled");
+                break;
+            case CommandKind.RemoveObstacle:
+                if (_navigation is null || !_navigation.RemoveObstacle(command.Obstacle!.Id))
+                    AddEvent(MatchEventKind.CommandRejected, EntityId.None, "obstacle_missing_or_navigation_disabled");
+                break;
             case CommandKind.SpawnEntity:
             {
                 var id = new EntityId(_nextEntityId++);

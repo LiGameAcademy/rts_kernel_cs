@@ -2,25 +2,28 @@
 
 [English](README.en.md)
 
-不依赖游戏引擎的纯 C# RTS 模拟内核。从 [Godot Warcraft3 学习项目](https://github.com/Liweimin0512/godot_warcraft3)中提取，围绕该项目的战术与操作需求逐步开发。
+不依赖游戏引擎的纯 C# RTS 模拟内核。从 [Godot Warcraft3 学习项目](https://github.com/LiGameAcademy/godot_warcraft3)中提取，围绕该项目的战术与操作需求逐步开发。
 
-**项目处于早期开发阶段。API、数据结构和快照格式可能发生不兼容变化；尚不承诺生产可用、跨版本存档兼容或跨平台确定性。** 当前是可运行的模拟骨架，不是完整 RTS 框架；网络通信、寻路、战斗、经济、技能等仍有待开发。
+**项目处于早期开发阶段。API、数据结构和快照格式可能发生不兼容变化；尚不承诺生产可用、跨版本存档兼容或跨平台确定性。** 当前是可运行的模拟骨架，不是完整 RTS 框架；网络通信、实际路径跟随、战斗、经济、技能等仍有待开发。
 
 ## 当前能力
 
 - 独立对局实例、固定逻辑帧、实体 ID、命令队列与事件。
 - 简单速度积分示例；JSON 帧快照、恢复、状态哈希和字段级差异报告。
 - 可保存的随机流、静态网格阻挡查询与高度场双线性采样。
+- 静态与对局动态障碍的八方向寻路、格子净空、帧命令增删占地；导航快照校验静态地图身份。
 - Windows 优先；确定性验证仅限相同代码、输入、内容和受控运行环境。
 
 永久不引入 ECS 框架。设计以实际游戏需求为依据，不预先构建通用引擎。宿主负责输入、资源读取、渲染和网络；内核不引用 Godot，也不依赖场景树或节点生命周期。
+
+导航 API 与快照 v2 的使用及兼容边界见 [导航说明](docs/NAVIGATION.md)。v1 快照不再接受；本项目尚不支持跨版本存档迁移。
 
 ## 构建与运行
 
 安装 .NET 10 SDK（用于构建、测试和 CLI）。核心类库目标为 `net8.0`，测试及 CLI 目标为 `net10.0`；首次恢复需取得 net8 targeting pack，CI 同时安装 .NET 8/10 SDK。
 
 ```powershell
-git clone https://github.com/Liweimin0512/rts_kernel_cs.git
+git clone https://github.com/LiGameAcademy/rts_kernel_cs.git
 cd rts_kernel_cs
 ./Test.ps1
 ```
@@ -48,7 +51,7 @@ dotnet run --project samples/Rts.Kernel.Cli --no-build -c Release
 ## 作为子模块使用
 
 ```text
-git submodule add https://github.com/Liweimin0512/rts_kernel_cs.git external/rts_kernel
+git submodule add https://github.com/LiGameAcademy/rts_kernel_cs.git external/rts_kernel
 git submodule update --init --recursive
 ```
 

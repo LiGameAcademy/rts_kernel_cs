@@ -1,3 +1,5 @@
+using Rts.Kernel.Navigation;
+
 namespace Rts.Kernel;
 
 public enum CommandKind
@@ -5,6 +7,8 @@ public enum CommandKind
     SpawnEntity = 1,
     SetVelocity = 2,
     Stop = 3,
+    SetObstacle = 4,
+    RemoveObstacle = 5,
 }
 
 public sealed record CommandEnvelope(
@@ -14,8 +18,27 @@ public sealed record CommandEnvelope(
     CommandKind Kind,
     EntityId EntityId,
     SimVector2 Position,
-    SimVector2 Velocity)
+    SimVector2 Velocity,
+    ObstacleCommand? Obstacle = null)
 {
+    /// <summary>Diagnostic navigation command; building ownership rules are not implemented yet.</summary>
+    public static CommandEnvelope SetObstacle(long executeFrame, int playerId, long sequence,
+        ulong obstacleId, GridArea area) => new(executeFrame, playerId, sequence, CommandKind.SetObstacle,
+            EntityId.None, SimVector2.Zero, SimVector2.Zero, new ObstacleCommand(obstacleId, area));
+
+    public static CommandEnvelope RemoveObstacle(long executeFrame, int playerId, long sequence,
+        ulong obstacleId) => new(executeFrame, playerId, sequence, CommandKind.RemoveObstacle,
+            EntityId.None, SimVector2.Zero, SimVector2.Zero, new ObstacleCommand(obstacleId));
+
+    internal bool HasValidObstaclePayload => Kind switch
+    {
+        CommandKind.SetObstacle => Obstacle is { Id: > 0, Area: { } area } && area.IsValid && EntityId.IsNone
+            && Position == SimVector2.Zero && Velocity == SimVector2.Zero,
+        CommandKind.RemoveObstacle => Obstacle is { Id: > 0, Area: null } && EntityId.IsNone
+            && Position == SimVector2.Zero && Velocity == SimVector2.Zero,
+        _ => Obstacle is null,
+    };
+
     public static CommandEnvelope Spawn(
         long executeFrame,
         int playerId,

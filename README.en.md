@@ -2,9 +2,9 @@
 
 [中文](README.md)
 
-An engine-independent C# RTS simulation kernel extracted from the [Godot Warcraft3 learning project](https://github.com/Liweimin0512/godot_warcraft3). Development follows that game's tactical and control requirements.
+An engine-independent C# RTS simulation kernel extracted from the [Godot Warcraft3 learning project](https://github.com/LiGameAcademy/godot_warcraft3). Development follows that game's tactical and control requirements.
 
-**Early development:** APIs, data structures and snapshot formats may change incompatibly. This is not a complete RTS framework and does not promise production readiness, cross-version save compatibility or cross-platform determinism. Networking, pathfinding, combat, economy and abilities remain future work.
+**Early development:** APIs, data structures and snapshot formats may change incompatibly. This is not a complete RTS framework and does not promise production readiness, cross-version save compatibility or cross-platform determinism. Networking, actual path following, combat, economy and abilities remain future work.
 
 ## Available today
 
@@ -12,12 +12,14 @@ Independent match instances, fixed simulation steps, entity IDs, queued commands
 
 Windows is the initial target. Determinism checks apply only to matching code, input, content and controlled runtime environments. The project will not adopt an ECS framework. Hosts own input, assets, rendering and networking; the kernel has no Godot reference or scene-tree dependency.
 
+Navigation now supports eight-neighbor paths, cell clearance and match-owned dynamic obstacles edited through frame commands. Snapshot v2 includes obstacle state and validates the supplied static grid identity. Version 1 snapshots are rejected; cross-version migration remains unsupported. See [navigation contracts](docs/NAVIGATION.md) for API details (Chinese).
+
 ## Build and run
 
 Install the .NET 10 SDK. The library targets `net8.0`; the test and CLI hosts target `net10.0`. Initial restore needs the net8 targeting pack; CI installs both .NET 8 and 10 SDKs.
 
 ```powershell
-git clone https://github.com/Liweimin0512/rts_kernel_cs.git
+git clone https://github.com/LiGameAcademy/rts_kernel_cs.git
 cd rts_kernel_cs
 ./Test.ps1
 ```
@@ -44,7 +46,7 @@ Godot adapters, WC3 JSON/SLK conversion, game assets and integration tests stay 
 ## Host integration
 
 ```text
-git submodule add https://github.com/Liweimin0512/rts_kernel_cs.git external/rts_kernel
+git submodule add https://github.com/LiGameAcademy/rts_kernel_cs.git external/rts_kernel
 git submodule update --init --recursive
 ```
 
