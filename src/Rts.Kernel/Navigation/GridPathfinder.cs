@@ -21,17 +21,7 @@ public static class GridPathfinder
         int maxExpandedNodes, int clearanceCells, Func<GridCell, bool> isWalkable)
     {
         if (clearanceCells < 0) throw new ArgumentOutOfRangeException(nameof(clearanceCells));
-        // Existing game semantics: every cell in the Chebyshev neighborhood must be free.
-        bool CanOccupy(GridCell cell)
-        {
-            if ((long)cell.X - clearanceCells < 0 || (long)cell.Y - clearanceCells < 0
-                || (long)cell.X + clearanceCells >= grid.Width || (long)cell.Y + clearanceCells >= grid.Height)
-                return false;
-            for (var y = cell.Y - clearanceCells; y <= cell.Y + clearanceCells; y++)
-            for (var x = cell.X - clearanceCells; x <= cell.X + clearanceCells; x++)
-                if (!isWalkable(new GridCell(x, y))) return false;
-            return true;
-        }
+        bool CanOccupy(GridCell cell) => HasClearance(grid, cell, clearanceCells, isWalkable);
         if (maxExpandedNodes <= 0) throw new ArgumentOutOfRangeException(nameof(maxExpandedNodes));
         if (!CanOccupy(start) || !CanOccupy(goal))
             return Failure(PathStatus.InvalidEndpoint, 0);
@@ -77,6 +67,16 @@ public static class GridPathfinder
             }
         }
         return Failure(PathStatus.Unreachable, expanded);
+    }
+
+    internal static bool HasClearance(PathingGrid grid, GridCell cell, int clearance, Func<GridCell, bool> isWalkable)
+    {
+        if ((long)cell.X - clearance < 0 || (long)cell.Y - clearance < 0
+            || (long)cell.X + clearance >= grid.Width || (long)cell.Y + clearance >= grid.Height) return false;
+        for (var y = cell.Y - clearance; y <= cell.Y + clearance; y++)
+        for (var x = cell.X - clearance; x <= cell.X + clearance; x++)
+            if (!isWalkable(new GridCell(x, y))) return false;
+        return true;
     }
 
     private static double Heuristic(GridCell from, GridCell to)

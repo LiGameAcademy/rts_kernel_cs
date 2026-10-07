@@ -4,7 +4,7 @@
 
 An engine-independent C# RTS simulation kernel extracted from the [Godot Warcraft3 learning project](https://github.com/LiGameAcademy/godot_warcraft3). Development follows that game's tactical and control requirements.
 
-**Early development:** APIs, data structures and snapshot formats may change incompatibly. This is not a complete RTS framework and does not promise production readiness, cross-version save compatibility or cross-platform determinism. Networking, actual path following, combat, economy and abilities remain future work.
+**Early development:** APIs, data structures and snapshot formats may change incompatibly. This is not a complete RTS framework and does not promise production readiness, cross-version save compatibility or cross-platform determinism. Networking, complete movement rules, combat, economy and abilities remain future work.
 
 ## Available today
 
@@ -12,7 +12,7 @@ Independent match instances, fixed simulation steps, entity IDs, queued commands
 
 Windows is the initial target. Determinism checks apply only to matching code, input, content and controlled runtime environments. The project will not adopt an ECS framework. Hosts own input, assets, rendering and networking; the kernel has no Godot reference or scene-tree dependency.
 
-Navigation now supports eight-neighbor paths, cell clearance and match-owned dynamic obstacles edited through frame commands. Snapshot v2 includes obstacle state and validates the supplied static grid identity. Version 1 snapshots are rejected; cross-version migration remains unsupported. See [navigation contracts](docs/NAVIGATION.md) for API details (Chinese).
+Navigation now supports eight-neighbor paths, cell clearance and match-owned dynamic obstacles edited through frame commands. Goal-based path following supports stop, replacement, replanning after dynamic obstacle edits and restoration during movement. Snapshot v3 stores move progress and validates the supplied static grid identity. Version 1/2 snapshots are rejected; cross-version migration remains unsupported. See [navigation contracts](docs/NAVIGATION.md) and [movement contracts](docs/MOVEMENT.md) for API details (Chinese).
 
 ## Build and run
 

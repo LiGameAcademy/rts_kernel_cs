@@ -24,7 +24,8 @@ public sealed record MatchSnapshot(
     ulong RngState,
     IReadOnlyList<EntitySnapshot> Entities,
     IReadOnlyList<QueuedCommandSnapshot> PendingCommands,
-    NavigationSnapshot? Navigation = null);
+    NavigationSnapshot? Navigation = null,
+    IReadOnlyList<MoveOrderSnapshot>? Moves = null);
 
 public readonly record struct SnapshotDifference(string Path, string Expected, string Actual);
 
@@ -71,6 +72,8 @@ public static class SnapshotValidator
             throw new InvalidDataException("Next entity id must be greater than every existing entity id.");
         }
 
+        MovementSnapshot.Validate(snapshot, entityIds);
+
         var arrivalOrders = new HashSet<long>();
         foreach (var queued in snapshot.PendingCommands)
         {
@@ -83,14 +86,14 @@ public static class SnapshotValidator
             }
 
             if (command.ExecuteFrame <= snapshot.Frame || command.PlayerId < 0 || command.Sequence < 0
-                || !Enum.IsDefined(command.Kind) || !command.HasValidObstaclePayload
+                || !Enum.IsDefined(command.Kind) || !command.HasValidObstaclePayload || !command.HasValidMovePayload
                 || !double.IsFinite(command.Position.X) || !double.IsFinite(command.Position.Y)
                 || !double.IsFinite(command.Velocity.X) || !double.IsFinite(command.Velocity.Y))
             {
                 throw new InvalidDataException("Invalid pending command.");
             }
 
-            var expectsEntity = command.Kind is CommandKind.SetVelocity or CommandKind.Stop;
+            var expectsEntity = command.Kind is CommandKind.SetVelocity or CommandKind.Stop or CommandKind.MoveTo;
             if (expectsEntity == command.EntityId.IsNone)
             {
                 throw new InvalidDataException("Pending command entity id does not match its kind.");
@@ -163,7 +166,7 @@ public static class SnapshotDiff
             }
         }
 
-        return NavigationSnapshotDiff.FindFirst(expected, actual);
+        return NavigationSnapshotDiff.FindFirst(expected, actual) ?? MovementSnapshot.FindFirst(expected, actual);
     }
 
     private static SnapshotDifference? Compare<T>(string path, T expected, T actual)
@@ -187,7 +190,7 @@ public static class SnapshotDiff
 
 public static class SnapshotJson
 {
-    public const int CurrentFormatVersion = 2;
+    public const int CurrentFormatVersion = 3;
 
     private static readonly JsonSerializerOptions Options = new()
     {
