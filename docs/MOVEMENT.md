@@ -1,6 +1,6 @@
 # 目标移动与帧快照
 
-Issue #3 的第一批实现。内核计算路径和位置，宿主提交命令并消费状态与事件；Godot 示例由游戏仓库维护。
+Issue #3 的分步骤实现。内核计算路径、位置和朝向，宿主提交命令并消费状态与事件；Godot 示例由游戏仓库维护。
 
 ```csharp
 var match = new RtsMatch(MatchConfig.Default, seed: 7, pathingGrid: grid);
@@ -20,17 +20,36 @@ var restored = RtsMatch.Restore(snapshot, grid);
 
 实体移动、路径索引与障碍更新只发生在 Step。ReadMoveOrders 返回路径副本，不能修改对局。启用导航的对局拒绝 SetVelocity，避免绕过寻路；无地图的速度积分骨架仍可运行。出生仍是诊断命令，没有合法落点与生产规则。
 
-## 快照 v3
+## 转向与真实坡度
 
-保存每个在途实体的目标、速度、净空、路径世界坐标和下一路点索引，包含未执行的 MoveTo 载荷，状态哈希与差异报告覆盖这些字段。移动过程中每帧快照可恢复并继续相同模拟。静态地图不嵌入快照，恢复仍需提供身份完全一致的 PathingGrid。
+MoveTo 的可选 `motion` 参数启用 MotionParameters；默认 null 保持直接路径跟随、不主动更新朝向。带运动参数的命令以 EntityState.Facing 为权威，单位为弧度，范围 [-π, π)。TurnRate 使用圈/秒，诊断参数最小0.05，非法参数在提交时拒绝。
 
-恢复校验路径点有效性、相邻格、穿墙角与当前位置所在路径段；失败只丢弃新实例。v1/v2 快照不再接受，未提供迁移。没有导航的快照也使用 v3。CLI 默认示例位置/帧号保持不变，哈希随新字段改变；验证宿主时从当前 CLI 取得期望值，不加载旧程序集或硬编码旧哈希。
+```csharp
+var match = new RtsMatch(MatchConfig.Default, seed: 7, pathingGrid: grid, terrain: terrain);
+match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new SimVector2(15, 15)));
+match.Step();
+match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 1, new EntityId(1),
+    new SimVector2(65, 15), 45, motion: new MotionParameters()));
+match.Step();
+var restored = RtsMatch.Restore(match.CaptureSnapshot(), grid, terrain);
+```
+
+每个路径段先用当前朝向计算速度倍率，再按耗时转向、平移。多个路径段共享整帧时间，不能重复取得整帧转角；位置仍沿路径方向推进，不通过表现朝向反算移动。25/140度为全速/最低倍率阈值，最低0.12，使用 smoothstep 曲线。倍率为零时仍可转向；停止和抵达后保留朝向。
+
+默认启用坡度：高度场必须覆盖完整导航网格；采样当前位置与下一路点的真实高度差，按高度差/平面距离取坡度。30度封顶，上坡最低0.6、下坡最低0.85，等高线/平地不降速。缺少高度时，执行帧返回 `motion_requires_height_field`，保留旧订单；非有限几何或高度计算失败停止并发 MoveFailed。禁用 ScaleSlopeSpeed 时无需高度场。运动参数仍是诊断入口，正式参数须来自权威单位定义。
+
+## 快照 v4
+
+保存实体朝向，以及每个在途实体的目标、速度、净空、运动参数、路径世界坐标和下一路点索引，包含未执行的 MoveTo 载荷，状态哈希与差异报告覆盖这些字段。移动过程中每帧快照可恢复并继续相同模拟。静态地图不嵌入快照，恢复仍需提供身份完全一致的 PathingGrid，以及原局使用的 TerrainHeights；高度哈希包含尺寸、坐标和全部顶点高度。
+
+恢复校验路径点有效性、相邻格、穿墙角与当前位置所在路径段；失败只丢弃新实例。v1/v2/v3 快照不再接受，未提供迁移。没有导航的快照也使用 v4。CLI 默认示例位置/帧号保持不变，哈希随新字段改变；验证宿主时从当前 CLI 取得期望值，不加载旧程序集或硬编码旧哈希。
 
 ```powershell
 ./Test.ps1 -Configuration Release
 dotnet run --project samples/Rts.Kernel.Cli --no-build -c Release -- --navigation
+dotnet run --project samples/Rts.Kernel.Cli --no-build -c Release -- --motion
 ```
 
 ## 本批边界
 
-这一批是直接路径跟随，尚非原游戏的完整移动替代。转向速度、坡度、命令排队、组队落点分配、预约、单位间避让、追击与真实游戏接入留在 Issue #3 的后续批次。速度/净空目前随诊断命令传入，正式玩法必须由权威单位定义约束，不能直接信任联网客户端。未声明跨平台确定性；300/500 单位性能基线与 Windows 导出按计划暂缓。
+这一批包含直接路径跟随及转向/坡度隔离验证，尚非原游戏的完整移动替代。命令排队、组队落点分配、预约、单位间避让、追击与真实游戏接入留在 Issue #3 的后续批次。速度/净空/运动参数目前随诊断命令传入，正式玩法必须由权威单位定义约束，不能直接信任联网客户端。未声明跨平台确定性；300/500 单位性能基线与 Windows 导出按计划暂缓。

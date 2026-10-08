@@ -12,7 +12,7 @@ Independent match instances, fixed simulation steps, entity IDs, queued commands
 
 Windows is the initial target. Determinism checks apply only to matching code, input, content and controlled runtime environments. The project will not adopt an ECS framework. Hosts own input, assets, rendering and networking; the kernel has no Godot reference or scene-tree dependency.
 
-Navigation now supports eight-neighbor paths, cell clearance and match-owned dynamic obstacles edited through frame commands. Goal-based path following supports stop, replacement, replanning after dynamic obstacle edits and restoration during movement. Snapshot v3 stores move progress and validates the supplied static grid identity. Version 1/2 snapshots are rejected; cross-version migration remains unsupported. See [navigation contracts](docs/NAVIGATION.md) and [movement contracts](docs/MOVEMENT.md) for API details (Chinese).
+Navigation now supports eight-neighbor paths, cell clearance and match-owned dynamic obstacles edited through frame commands. Goal-based path following supports stop, replacement, replanning after dynamic obstacle edits and restoration during movement. Motion orders support authoritative facing, bounded turning, turn speed reduction and elevation-based slope scaling. Snapshot v4 stores facing and motion progress, and validates supplied static grid and height field identities. Version 1/2/3 snapshots are rejected; cross-version migration remains unsupported. See [navigation contracts](docs/NAVIGATION.md) and [movement contracts](docs/MOVEMENT.md) for API details (Chinese).
 
 ## Build and run
 
