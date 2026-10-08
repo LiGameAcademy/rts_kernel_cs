@@ -111,6 +111,7 @@ MovementChecks.Run(Check);
 MotionRuleChecks.Run(Check);
 MotionStateChecks.Run(Check);
 MotionIntegrationChecks.Run(Check);
+FormationGeometryChecks.Run(Check);
 OrderQueueChecks.Run(Check);
 OrderSnapshotChecks.Run(Check);
 
