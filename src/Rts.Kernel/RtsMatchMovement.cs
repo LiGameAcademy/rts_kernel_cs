@@ -19,6 +19,11 @@ public sealed partial class RtsMatch
             AddEvent(MatchEventKind.CommandRejected, command.EntityId, "entity_missing_or_not_owned");
             return;
         }
+        if (command.Move!.Motion is { ScaleSlopeSpeed: true } && _navigation?.Terrain is null)
+        {
+            AddEvent(MatchEventKind.CommandRejected, command.EntityId, "motion_requires_height_field");
+            return;
+        }
         if (!TryPlanMove(entity.Position, command.Move!, out var order))
         {
             AddEvent(MatchEventKind.CommandRejected, command.EntityId, "move_path_unavailable");
@@ -61,6 +66,11 @@ public sealed partial class RtsMatch
                     continue;
                 }
                 order = replanned!;
+            }
+            if (order.Request.Motion is not null)
+            {
+                AdvanceMotion(entity, order, seconds);
+                continue;
             }
             var position = entity.Position;
             var remaining = order.Request.Speed * seconds;
@@ -111,6 +121,8 @@ public sealed partial class RtsMatch
     {
         foreach (var item in snapshot.Moves!)
         {
+            if (item.Request.Motion is { ScaleSlopeSpeed: true } && _navigation?.Terrain is null)
+                throw new InvalidDataException("Slope motion requires a height field.");
             var entity = _entities[new EntityId(item.EntityId)];
             var cells = new List<GridCell>();
             foreach (var waypoint in item.Waypoints)
