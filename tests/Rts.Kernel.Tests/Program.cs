@@ -27,6 +27,12 @@ void CheckThrows<TException>(Action action, string message) where TException : E
     throw new InvalidOperationException(message);
 }
 
+if (args.Contains("--perf") || args.Contains("--perf-long"))
+{
+    MovementPerformance.Run(args.Contains("--perf-long"));
+    return;
+}
+
 if (args.Contains("--crowd-only"))
 {
     CrowdMovementChecks.Run(Check);

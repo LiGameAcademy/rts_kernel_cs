@@ -30,10 +30,10 @@ internal static class LocalDetour
                 if (Math.Abs((long)cell.X - start.X) > RadiusCells || Math.Abs((long)cell.Y - start.Y) > RadiusCells
                     || !navigation.CanOccupy(cell, order.Request.ClearanceCells)) return false;
                 var point = navigation.CellCenter(cell);
-                return cell == start || reservations.Safe(entity.Id, definition.Radius, new[] { point, point });
+                return cell == start || reservations.Safe(entity.Id, definition.Radius, point, point);
             }
             bool Edge(GridCell from, GridCell to) =>
-                navigation.CanTraverse(from, to, order.Request.ClearanceCells) && reservations.Safe(entity.Id, definition.Radius, new[] { from == start ? entity.Position : navigation.CellCenter(from), navigation.CellCenter(to) });
+                navigation.CanTraverse(from, to, order.Request.ClearanceCells) && reservations.Safe(entity.Id, definition.Radius, from == start ? entity.Position : navigation.CellCenter(from), navigation.CellCenter(to));
             var path = GridPathfinder.FindPathCore(navigation.Grid, start, goal, remainingNodes, 0, CanUse, Edge, area);
             remainingNodes -= path.ExpandedNodes;
             if (remainingNodes <= 0 && path.Status != PathStatus.Found) return null;
