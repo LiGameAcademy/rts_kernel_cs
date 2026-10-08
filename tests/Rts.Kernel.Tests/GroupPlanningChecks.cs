@@ -7,11 +7,11 @@ internal static class GroupPlanningChecks
     {
         var definitions = new[] { new MovementDefinition(1, 30, 4) };
         var grid = new PathingGrid(64, 64, 10, SimVector2.Zero, new byte[4096]);
-        RtsMatch Create()
+        RtsMatch Create(int count = 100)
         {
             var match = new RtsMatch(MatchConfig.Default, 7, grid, movementDefinitions: definitions);
-            for (var i = 0; i < 100; i++)
-                match.SubmitCommand(CommandEnvelope.Spawn(1, 0, i, new SimVector2(35 + i % 10 * 20, 35 + i / 10 * 20), 1));
+            for (var i = 0; i < count; i++)
+                match.SubmitCommand(CommandEnvelope.Spawn(1, 0, i, new SimVector2(35 + i % (count > 100 ? 20 : 10) * 20, 35 + i / (count > 100 ? 20 : 10) * 20), 1));
             match.Step(); match.DrainEvents();
             return match;
         }
@@ -27,10 +27,10 @@ internal static class GroupPlanningChecks
         var rejected = false;
         try { RtsMatch.Restore(bad, grid, movementDefinitions: definitions); } catch (InvalidDataException) { rejected = true; }
         check(rejected, "malformed matching work state rejected before recovery");
-        var previousVersion = saved with { FormatVersion = 6 };
+        var previousVersion = saved with { FormatVersion = 8 };
         rejected = false;
         try { RtsMatch.Restore(previousVersion, grid, movementDefinitions: definitions); } catch (InvalidDataException) { rejected = true; }
-        check(rejected, "v6 snapshot rejected after planning progress format change");
+        check(rejected, "v8 snapshot rejected after overlapping planning stage change");
         check(SnapshotDiff.FindFirst(saved, saved with { GroupPlans = [] })?.Path == "groupPlans.count", "planning differences are exposed");
         var resumed = RtsMatch.Restore(SnapshotJson.Deserialize(SnapshotJson.Serialize(saved)), grid, movementDefinitions: definitions);
         for (var i = 0; i < 20; i++)
@@ -83,5 +83,19 @@ internal static class GroupPlanningChecks
         var hash = immutable.ComputeStateHash();
         copy.GroupPlans![0].Matching!.U[1] = -100;
         check(immutable.ComputeStateHash() == hash, "captured matching arrays cannot mutate match authority");
+        var preparing = Create(500);
+        preparing.SubmitCommand(CommandEnvelope.MoveGroup(2, 0, 500, Request(preparing, 425)));
+        preparing.Step();
+        var progress = preparing.CaptureSnapshot();
+        check(progress.GroupPlans![0].PreparedCandidates > 0 && progress.GroupPlans[0].Matching!.Row < 500,
+            "candidate preparation overlaps unfinished exact matching");
+        var preparingResume = RtsMatch.Restore(SnapshotJson.Deserialize(SnapshotJson.Serialize(progress)),
+            grid, movementDefinitions: definitions);
+        for (var frame = 0; frame < 4; frame++)
+        {
+            preparing.Step(); preparingResume.Step();
+            check(preparing.ComputeStateHash() == preparingResume.ComputeStateHash(), "overlapping planning stages restore same future frame");
+        }
+
     }
 }

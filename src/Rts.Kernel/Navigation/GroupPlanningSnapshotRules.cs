@@ -20,7 +20,7 @@ internal static class GroupPlanningSnapshotRules
                 || !double.IsFinite(job.Heading) || job.Heading < -Math.PI || job.Heading >= Math.PI
                 || !double.IsFinite(job.Spacing) || job.Spacing <= 0
                 || job.PreparedCandidates < 0 || job.PreparedCandidates > job.Members.Count
-                || (job.PreparedCandidates > 0 && job.Matching?.Row != job.Members.Count))
+                || (job.PreparedCandidates > 0 && job.Matching is null))
                 throw new InvalidDataException("Invalid group planning identity or geometry.");
             previous = job.GroupId;
             ulong last = 0;

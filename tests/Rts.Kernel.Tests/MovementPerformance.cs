@@ -28,8 +28,10 @@ internal static class MovementPerformance
                 planningBytes += GC.GetAllocatedBytesForCurrentThread() - before;
             } while (match.ReadGroupPlans().Count > 0 && planning.Count < 500);
             var outcomes = match.DrainEvents().Where(e => e.Kind == MatchEventKind.GroupMoveAssigned).ToArray();
+            var placement = System.Text.Json.JsonSerializer.Serialize(outcomes.Select(e => new { e.EntityId, e.Group }));
+            var placementHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(placement))).ToLowerInvariant();
             var goals = outcomes.ToDictionary(e => e.EntityId, e => e.Group!.Goal!.Value);
-            Console.WriteLine($"plan count={count} run={run} frames={planning.Count} total_ms={planning.Sum():F3} max_ms={planning.Max():F3} alloc_kb={planningBytes / 1024.0:F1} assigned={goals.Count}");
+            Console.WriteLine($"plan count={count} run={run} frames={planning.Count} total_ms={planning.Sum():F3} max_ms={planning.Max():F3} alloc_kb={planningBytes / 1024.0:F1} assigned={goals.Count} placement_hash={placementHash}");
             var samples = new List<double>();
             var bytes = 0L; var failed = 0; var completed = 0;
             for (var frame = 0; frame < (longRun ? 1800 : 180); frame++)

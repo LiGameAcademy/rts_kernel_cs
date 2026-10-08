@@ -205,7 +205,7 @@ public static class SnapshotDiff
 
 public static class SnapshotJson
 {
-    public const int CurrentFormatVersion = 8;
+    public const int CurrentFormatVersion = 9;
 
     private static readonly JsonSerializerOptions Options = new()
     {

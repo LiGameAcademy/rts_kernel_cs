@@ -5,7 +5,7 @@ namespace Rts.Kernel;
 public sealed partial class RtsMatch
 {
     public const int ImmediateGroupMembers = 64;
-    public const int GroupMatchingColumnsPerFrame = 1048576;
+    public const int GroupMatchingColumnsPerFrame = 2097152;
     public const int MaximumGroupPlans = 16;
     public const int GroupCandidateSlotsPerFrame = 64;
     private readonly List<GroupPlanningJob> _groupPlans = [];
@@ -39,6 +39,7 @@ public sealed partial class RtsMatch
                     remaining -= 2 * (job.Members.Length - 1) * (job.Members.Length - 1);
                 }
                 remaining -= job.Matching!.Advance(Math.Max(1, remaining));
+                PrepareGroupCandidates(job);
             }
             catch (ArgumentException)
             {
@@ -49,9 +50,6 @@ public sealed partial class RtsMatch
                 continue;
             }
             if (!job.Matching!.Complete) break;
-            var end = Math.Min(job.Members.Length, job.Candidates.Count + GroupCandidateSlotsPerFrame);
-            for (var i = job.Candidates.Count; i < end; i++)
-                job.Candidates.Add(GroupPlacementPlanner.Candidates(_navigation!, job.Ideals[i]));
             if (job.Candidates.Count != job.Members.Length) break;
             _groupPlans.RemoveAt(0); // Committing this job must not cancel itself.
             var activeIds = job.Members.Where(member => !job.Canceled.Contains(member.EntityId))
@@ -75,6 +73,14 @@ public sealed partial class RtsMatch
             // At most one full placement/commit in a frame, even if several matchings have completed.
             break;
         }
+    }
+
+    private void PrepareGroupCandidates(GroupPlanningJob job)
+    {
+        // Ideal geometry is frozen, so preparation may overlap matching without reading mutable occupancy.
+        var end = Math.Min(job.Members.Length, job.Candidates.Count + GroupCandidateSlotsPerFrame);
+        for (var i = job.Candidates.Count; i < end; i++)
+            job.Candidates.Add(GroupPlacementPlanner.Candidates(_navigation!, job.Ideals[i]));
     }
 
     private void RestoreGroupPlans(MatchSnapshot snapshot)
