@@ -12,27 +12,6 @@ public sealed partial class RtsMatch
         new MoveOrderSnapshot(pair.Key.Value, pair.Value.Request,
             Array.AsReadOnly(pair.Value.Waypoints.ToArray()), pair.Value.NextWaypoint)).ToArray());
 
-    private void ExecuteMove(CommandEnvelope command)
-    {
-        if (!_entities.TryGetValue(command.EntityId, out var entity) || entity.OwnerId != command.PlayerId)
-        {
-            AddEvent(MatchEventKind.CommandRejected, command.EntityId, "entity_missing_or_not_owned");
-            return;
-        }
-        if (command.Move!.Motion is { ScaleSlopeSpeed: true } && _navigation?.Terrain is null)
-        {
-            AddEvent(MatchEventKind.CommandRejected, command.EntityId, "motion_requires_height_field");
-            return;
-        }
-        if (!TryPlanMove(entity.Position, command.Move!, out var order))
-        {
-            AddEvent(MatchEventKind.CommandRejected, command.EntityId, "move_path_unavailable");
-            return; // Invalid replacement preserves the previous order.
-        }
-        _moveOrders[command.EntityId] = order!;
-        _entities[command.EntityId] = entity with { Velocity = SimVector2.Zero };
-    }
-
     private bool TryPlanMove(SimVector2 position, MoveRequest request, out MoveOrder? order)
     {
         order = null;
@@ -113,6 +92,7 @@ public sealed partial class RtsMatch
     private void FinishMove(EntityId id, SimVector2 position, MatchEventKind kind, string detail)
     {
         _moveOrders.Remove(id);
+        CompleteCurrentOrder(id);
         _entities[id] = _entities[id] with { Position = position, Velocity = SimVector2.Zero };
         AddEvent(kind, id, detail);
     }

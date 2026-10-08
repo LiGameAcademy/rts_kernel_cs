@@ -26,7 +26,8 @@ public sealed record MatchSnapshot(
     IReadOnlyList<EntitySnapshot> Entities,
     IReadOnlyList<QueuedCommandSnapshot> PendingCommands,
     NavigationSnapshot? Navigation = null,
-    IReadOnlyList<MoveOrderSnapshot>? Moves = null);
+    IReadOnlyList<MoveOrderSnapshot>? Moves = null,
+    IReadOnlyList<UnitOrderQueueSnapshot>? Orders = null);
 
 public readonly record struct SnapshotDifference(string Path, string Expected, string Actual);
 
@@ -75,6 +76,7 @@ public static class SnapshotValidator
         }
 
         MovementSnapshot.Validate(snapshot, entityIds);
+        UnitOrdersSnapshot.Validate(snapshot, entityIds);
 
         var arrivalOrders = new HashSet<long>();
         foreach (var queued in snapshot.PendingCommands)
@@ -88,7 +90,7 @@ public static class SnapshotValidator
             }
 
             if (command.ExecuteFrame <= snapshot.Frame || command.PlayerId < 0 || command.Sequence < 0
-                || !Enum.IsDefined(command.Kind) || !command.HasValidObstaclePayload || !command.HasValidMovePayload
+                || !Enum.IsDefined(command.Kind) || !command.HasValidObstaclePayload || !command.HasValidMovePayload || !command.HasValidOrderMetadata
                 || !double.IsFinite(command.Position.X) || !double.IsFinite(command.Position.Y)
                 || !double.IsFinite(command.Velocity.X) || !double.IsFinite(command.Velocity.Y))
             {
@@ -160,6 +162,8 @@ public static class SnapshotDiff
                 || (difference = Compare($"{prefix}.sequence", left.Command.Sequence, right.Command.Sequence)) is not null
                 || (difference = Compare($"{prefix}.kind", left.Command.Kind, right.Command.Kind)) is not null
                 || (difference = Compare($"{prefix}.entityId", left.Command.EntityId, right.Command.EntityId)) is not null
+                || (difference = Compare($"{prefix}.mode", left.Command.Mode, right.Command.Mode)) is not null
+                || (difference = Compare($"{prefix}.source", left.Command.Source, right.Command.Source)) is not null
                 || (difference = Compare($"{prefix}.positionX", left.Command.Position.X, right.Command.Position.X)) is not null
                 || (difference = Compare($"{prefix}.positionY", left.Command.Position.Y, right.Command.Position.Y)) is not null
                 || (difference = Compare($"{prefix}.velocityX", left.Command.Velocity.X, right.Command.Velocity.X)) is not null
@@ -169,7 +173,8 @@ public static class SnapshotDiff
             }
         }
 
-        return NavigationSnapshotDiff.FindFirst(expected, actual) ?? MovementSnapshot.FindFirst(expected, actual);
+        return NavigationSnapshotDiff.FindFirst(expected, actual) ?? MovementSnapshot.FindFirst(expected, actual)
+            ?? UnitOrdersSnapshot.FindFirst(expected, actual);
     }
 
     private static SnapshotDifference? Compare<T>(string path, T expected, T actual)
@@ -193,7 +198,7 @@ public static class SnapshotDiff
 
 public static class SnapshotJson
 {
-    public const int CurrentFormatVersion = 4;
+    public const int CurrentFormatVersion = 5;
 
     private static readonly JsonSerializerOptions Options = new()
     {

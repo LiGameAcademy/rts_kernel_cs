@@ -1,5 +1,6 @@
 using Rts.Kernel;
 
+if (args.Contains("--orders")) { OrdersSample.Run(); return; }
 if (args.Contains("--motion")) { MotionSample.Run(); return; }
 if (args.Contains("--navigation")) { NavigationSample.Run(); return; }
 

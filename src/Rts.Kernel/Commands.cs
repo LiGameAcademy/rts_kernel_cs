@@ -21,7 +21,9 @@ public sealed record CommandEnvelope(
     SimVector2 Position,
     SimVector2 Velocity,
     ObstacleCommand? Obstacle = null,
-    MoveRequest? Move = null)
+    MoveRequest? Move = null,
+    OrderMode Mode = OrderMode.Replace,
+    OrderSource Source = OrderSource.Player)
 {
     /// <summary>Diagnostic navigation command; building ownership rules are not implemented yet.</summary>
     public static CommandEnvelope SetObstacle(long executeFrame, int playerId, long sequence,
@@ -42,14 +44,22 @@ public sealed record CommandEnvelope(
     };
 
     public static CommandEnvelope MoveTo(long executeFrame, int playerId, long sequence,
-        EntityId entityId, SimVector2 goal, double speed, int clearanceCells = 0, MotionParameters? motion = null) =>
+        EntityId entityId, SimVector2 goal, double speed, int clearanceCells = 0, MotionParameters? motion = null,
+        OrderMode mode = OrderMode.Replace, OrderSource source = OrderSource.Player) =>
         new(executeFrame, playerId, sequence, CommandKind.MoveTo, entityId, SimVector2.Zero, SimVector2.Zero,
-            Move: new MoveRequest(goal, speed, clearanceCells, motion));
+            Move: new MoveRequest(goal, speed, clearanceCells, motion), Mode: mode, Source: source);
 
     internal bool HasValidMovePayload => Kind == CommandKind.MoveTo
         ? Move is { IsValid: true } && !EntityId.IsNone && Obstacle is null
             && Position == SimVector2.Zero && Velocity == SimVector2.Zero
         : Move is null;
+
+    internal bool HasValidOrderMetadata => Enum.IsDefined(Mode) && Enum.IsDefined(Source) && (Kind switch
+    {
+        CommandKind.MoveTo => true,
+        CommandKind.Stop => Mode == OrderMode.Replace,
+        _ => Mode == OrderMode.Replace && Source == OrderSource.Player,
+    });
 
     public static CommandEnvelope Spawn(
         long executeFrame,
@@ -70,8 +80,8 @@ public sealed record CommandEnvelope(
         long executeFrame,
         int playerId,
         long sequence,
-        EntityId entityId) =>
-        new(executeFrame, playerId, sequence, CommandKind.Stop, entityId, SimVector2.Zero, SimVector2.Zero);
+        EntityId entityId, OrderSource source = OrderSource.Player) =>
+        new(executeFrame, playerId, sequence, CommandKind.Stop, entityId, SimVector2.Zero, SimVector2.Zero, Source: source);
 }
 
 public readonly record struct CommandAcceptance(bool Accepted, string Error)

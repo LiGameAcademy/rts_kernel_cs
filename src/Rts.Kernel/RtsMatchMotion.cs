@@ -24,6 +24,7 @@ public sealed partial class RtsMatch
             }
             if (distance == 0)
             {
+                position = target;
                 next++;
                 continue;
             }

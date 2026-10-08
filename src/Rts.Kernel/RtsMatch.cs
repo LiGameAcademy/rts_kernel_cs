@@ -54,6 +54,8 @@ public sealed partial class RtsMatch
 
         if (!command.HasValidMovePayload) return CommandAcceptance.Reject("invalid_move_payload");
 
+        if (!command.HasValidOrderMetadata) return CommandAcceptance.Reject("invalid_order_metadata");
+
         _pendingCommands.Add(new QueuedCommand(_nextArrivalOrder++, command));
         return CommandAcceptance.Accept();
     }
@@ -63,6 +65,7 @@ public sealed partial class RtsMatch
         Frame++;
         ExecuteCommandsForCurrentFrame();
 
+        ActivateQueuedMoves();
         AdvanceMovement(1.0 / Config.TickRate);
     }
 
@@ -108,7 +111,8 @@ public sealed partial class RtsMatch
             entities,
             pending,
             _navigation?.CaptureSnapshot(),
-            ReadMoveOrders());
+            ReadMoveOrders(),
+            ReadUnitOrders());
     }
 
     public static RtsMatch Restore(MatchSnapshot snapshot, PathingGrid? pathingGrid = null, TerrainHeights? terrain = null)
@@ -147,6 +151,7 @@ public sealed partial class RtsMatch
         match._pendingCommands.AddRange(snapshot.PendingCommands.Select(
             item => new QueuedCommand(item.ArrivalOrder, item.Command)));
         match.RestoreMoveOrders(snapshot);
+        match.RestoreUnitOrders(snapshot);
         return match;
     }
 
@@ -208,19 +213,11 @@ public sealed partial class RtsMatch
                     AddEvent(MatchEventKind.CommandRejected, command.EntityId, "use_move_to_with_navigation");
                     break;
                 }
+                _unitOrders.Remove(entity.Id);
                 _entities[command.EntityId] = entity with { Velocity = command.Velocity };
                 break;
             case CommandKind.Stop:
-                if (_entities.TryGetValue(command.EntityId, out var stopped) && stopped.OwnerId == command.PlayerId)
-                {
-                    _moveOrders.Remove(command.EntityId);
-                    _entities[command.EntityId] = stopped with { Velocity = SimVector2.Zero };
-                }
-                else
-                {
-                    AddEvent(MatchEventKind.CommandRejected, command.EntityId, "entity_missing_or_not_owned");
-                }
-
+                ExecuteStop(command);
                 break;
             default:
                 AddEvent(MatchEventKind.CommandRejected, command.EntityId, "unknown_command");

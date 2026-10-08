@@ -111,5 +111,7 @@ MovementChecks.Run(Check);
 MotionRuleChecks.Run(Check);
 MotionStateChecks.Run(Check);
 MotionIntegrationChecks.Run(Check);
+OrderQueueChecks.Run(Check);
+OrderSnapshotChecks.Run(Check);
 
 Console.WriteLine($"Rts.Kernel.Tests PASS ({checks} checks)");
