@@ -73,6 +73,7 @@ public sealed partial class RtsMatch
         Frame++;
         ExecuteCommandsForCurrentFrame();
 
+        AdvanceGroupPlanning();
         ActivateQueuedMoves();
         AdvanceMovement(1.0 / Config.TickRate);
     }
@@ -120,7 +121,8 @@ public sealed partial class RtsMatch
             pending,
             _navigation?.CaptureSnapshot(),
             ReadMoveOrders(),
-            ReadUnitOrders(), _movementDefinitions.ContentHash, _nextGroupId);
+            ReadUnitOrders(), _movementDefinitions.ContentHash, _nextGroupId,
+            Array.AsReadOnly(_groupPlans.Select(job => job.Capture()).ToArray()));
     }
 
     public static RtsMatch Restore(MatchSnapshot snapshot, PathingGrid? pathingGrid = null, TerrainHeights? terrain = null,
@@ -163,6 +165,7 @@ public sealed partial class RtsMatch
         match.RestoreMoveOrders(snapshot);
         match.RestoreUnitOrders(snapshot);
         match.ValidateRestoredGroups(snapshot);
+        match.RestoreGroupPlans(snapshot);
         return match;
     }
 

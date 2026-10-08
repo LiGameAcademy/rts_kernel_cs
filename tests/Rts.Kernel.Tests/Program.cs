@@ -114,6 +114,7 @@ MotionIntegrationChecks.Run(Check);
 FormationGeometryChecks.Run(Check);
 GroupMovementChecks.Run(Check);
 GroupEdgeChecks.Run(Check);
+GroupPlanningChecks.Run(Check);
 OrderQueueChecks.Run(Check);
 OrderSnapshotChecks.Run(Check);
 

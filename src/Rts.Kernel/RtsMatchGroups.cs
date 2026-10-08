@@ -37,8 +37,49 @@ public sealed partial class RtsMatch
             return;
         }
         var groupId = _nextGroupId++;
+        var members = PrepareGroupMembers(command, groupId);
+        if (members.Count == 0) return;
+        var anchorMember = members.FirstOrDefault(member => member.Id == request.LeaderId) ?? members[0];
+        var mean = new SimVector2(members.Sum(member => member.Start.X / members.Count),
+            members.Sum(member => member.Start.Y / members.Count));
+        var dx = request.Goal.X - mean.X;
+        var dy = request.Goal.Y - mean.Y;
+        var heading = request.Heading ?? (dx == 0 && dy == 0 ? _entities[anchorMember.Id].Facing : Math.Atan2(dy, dx));
+        heading = MotionRules.Normalize(heading);
+        IReadOnlyList<PlacementGoal> goals;
+        try
+        {
+            if (members.Count > ImmediateGroupMembers)
+            {
+                if (_groupPlans.Count >= MaximumGroupPlans)
+                {
+                    foreach (var member in members)
+                        AddGroupEvent(MatchEventKind.CommandRejected, member.Id, "group_planning_queue_full", new(groupId, -1, null, false));
+                    return;
+                }
+                var spacing = Math.Max(_navigation.Grid.CellSize,
+                    2 * members.Max(member => member.Definition.Radius) + _navigation.Grid.CellSize * 0.1);
+                var job = new GroupPlanningJob(groupId, command, members, heading, spacing);
+                if (command.Mode == OrderMode.Replace)
+                    foreach (var member in members) CancelGroupPlans(member.Id, command.Source);
+                _groupPlans.Add(job);
+                return;
+            }
+            goals = GroupPlacementPlanner.Plan(_navigation, members, request, heading, GroupBodies(members));
+        }
+        catch (ArgumentException)
+        {
+            foreach (var member in members)
+                AddGroupEvent(MatchEventKind.CommandRejected, member.Id, "invalid_group_geometry", new(groupId, -1, null, false));
+            return;
+        }
+        ApplyGroupGoals(command, groupId, heading, goals);
+    }
+
+    private IReadOnlyList<PlacementMember> PrepareGroupMembers(CommandEnvelope command, ulong groupId)
+    {
         var members = new List<PlacementMember>();
-        foreach (var id in request.EntityIds)
+        foreach (var id in command.Group!.EntityIds)
         {
             string? error = null;
             if (!_entities.TryGetValue(id, out var entity) || entity.OwnerId != command.PlayerId)
@@ -48,7 +89,7 @@ public sealed partial class RtsMatch
                 error = "order_queue_full";
             else if (!_movementDefinitions.TryGet(entity.MovementDefinitionId, out var definition))
                 error = "movement_definition_missing";
-            else if (definition!.Motion is { ScaleSlopeSpeed: true } && _navigation.Terrain is null)
+            else if (definition!.Motion is { ScaleSlopeSpeed: true } && _navigation?.Terrain is null)
                 error = "motion_requires_height_field";
             else
             {
@@ -60,7 +101,11 @@ public sealed partial class RtsMatch
             }
             if (error is not null) AddGroupEvent(MatchEventKind.CommandRejected, id, error, new(groupId, -1, null, false));
         }
-        if (members.Count == 0) return;
+        return members;
+    }
+
+    private IReadOnlyList<PlacementBody> GroupBodies(IReadOnlyList<PlacementMember> members)
+    {
         var activeIds = members.Select(member => member.Id).ToHashSet();
         var occupied = new List<PlacementBody>();
         foreach (var entity in _entities.Values.Where(entity => !activeIds.Contains(entity.Id)))
@@ -71,21 +116,12 @@ public sealed partial class RtsMatch
                 foreach (var intent in queue.Pending.Prepend(queue.Current).Where(intent => intent?.Move is not null))
                     occupied.Add(new PlacementBody(intent!.Move!.Goal, radius));
         }
-        var anchorMember = members.FirstOrDefault(member => member.Id == request.LeaderId) ?? members[0];
-        var mean = new SimVector2(members.Sum(member => member.Start.X / members.Count),
-            members.Sum(member => member.Start.Y / members.Count));
-        var dx = request.Goal.X - mean.X;
-        var dy = request.Goal.Y - mean.Y;
-        var heading = request.Heading ?? (dx == 0 && dy == 0 ? _entities[anchorMember.Id].Facing : Math.Atan2(dy, dx));
-        heading = MotionRules.Normalize(heading);
-        IReadOnlyList<PlacementGoal> goals;
-        try { goals = GroupPlacementPlanner.Plan(_navigation, members, request, heading, occupied); }
-        catch (ArgumentException)
-        {
-            foreach (var member in members)
-                AddGroupEvent(MatchEventKind.CommandRejected, member.Id, "invalid_group_geometry", new(groupId, -1, null, false));
-            return;
-        }
+        return occupied;
+    }
+
+    private void ApplyGroupGoals(CommandEnvelope command, ulong groupId, double heading, IReadOnlyList<PlacementGoal> goals, bool committingPlan = false)
+    {
+        var request = command.Group!;
         foreach (var item in goals)
         {
             var outcome = new GroupMoveOutcome(groupId, item.Slot, item.Goal, item.Adjusted);
@@ -98,7 +134,7 @@ public sealed partial class RtsMatch
             var move = CommandEnvelope.MoveTo(command.ExecuteFrame, command.PlayerId, command.Sequence, item.Member.Id,
                 item.Goal.Value, definition.Speed, item.Member.Clearance, definition.Motion, command.Mode, command.Source);
             var slot = new GroupSlot(groupId, item.Slot, request.Formation, request.Goal, heading, item.Adjusted);
-            if (ExecuteMove(move, slot)) AddGroupEvent(MatchEventKind.GroupMoveAssigned, item.Member.Id, string.Empty, outcome);
+            if (ExecuteMove(move, slot, committingPlan)) AddGroupEvent(MatchEventKind.GroupMoveAssigned, item.Member.Id, string.Empty, outcome);
         }
     }
 

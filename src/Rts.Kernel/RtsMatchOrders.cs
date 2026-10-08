@@ -17,11 +17,12 @@ public sealed partial class RtsMatch
     public int GetPendingOrderCount(EntityId id) =>
         _unitOrders.TryGetValue(id, out var queue) ? queue.Pending.Count : 0;
 
-    private bool BlocksUnitAi(EntityId id) => _unitOrders.TryGetValue(id, out var queue)
+    private bool BlocksUnitAi(EntityId id) => (_unitOrders.TryGetValue(id, out var queue)
         && ((queue.Current is not null && queue.Current.Source != OrderSource.UnitAi)
-            || queue.Pending.Any(order => order.Source != OrderSource.UnitAi));
+            || queue.Pending.Any(order => order.Source != OrderSource.UnitAi)))
+        || _groupPlans.Any(job => job.Command.Source != OrderSource.UnitAi && job.Contains(id));
 
-    private bool ExecuteMove(CommandEnvelope command, GroupSlot? group = null)
+    private bool ExecuteMove(CommandEnvelope command, GroupSlot? group = null, bool committingPlan = false)
     {
         if (!_entities.TryGetValue(command.EntityId, out var entity) || entity.OwnerId != command.PlayerId)
         {
@@ -67,6 +68,7 @@ public sealed partial class RtsMatch
             AddEvent(MatchEventKind.CommandRejected, command.EntityId, "move_path_unavailable");
             return false; // Invalid replacement preserves both current and pending orders.
         }
+        if (command.Mode == OrderMode.Replace && !committingPlan) CancelGroupPlans(entity.Id, command.Source);
         _moveOrders[entity.Id] = order!;
         _unitOrders[entity.Id] = new UnitOrderQueue(intent);
         _entities[entity.Id] = entity with { Velocity = SimVector2.Zero };
@@ -81,6 +83,7 @@ public sealed partial class RtsMatch
             AddEvent(MatchEventKind.CommandRejected, entity.Id, "player_order_active");
         else
         {
+            CancelGroupPlans(entity.Id, command.Source);
             _moveOrders.Remove(entity.Id);
             _unitOrders[entity.Id] = new UnitOrderQueue(new UnitOrderIntent(UnitOrderKind.Stop, command.Source));
             _entities[entity.Id] = entity with { Velocity = SimVector2.Zero };

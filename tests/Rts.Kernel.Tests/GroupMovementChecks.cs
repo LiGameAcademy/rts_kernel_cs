@@ -99,9 +99,19 @@ internal static class GroupMovementChecks
         check(blocked.DrainEvents().Any(e => e.Detail == "group_slot_unavailable") && !blocked.IsMoving(new EntityId(1)), "disconnected goal reports failure without teleporting or unbounded search");
         var large = Create(500);
         var watch = System.Diagnostics.Stopwatch.StartNew();
-        large.SubmitCommand(CommandEnvelope.MoveGroup(2, 0, 1, Request(large))); large.Step(); watch.Stop();
+        large.SubmitCommand(CommandEnvelope.MoveGroup(2, 0, 1, Request(large)));
+        var frames = 0;
+        var maximum = 0.0;
+        do
+        {
+            var frameWatch = System.Diagnostics.Stopwatch.StartNew();
+            large.Step();
+            maximum = Math.Max(maximum, frameWatch.Elapsed.TotalMilliseconds);
+            frames++;
+        } while (large.ReadGroupPlans().Count > 0 && frames < 500);
+        watch.Stop();
         var outcomes = large.DrainEvents().Where(e => e.Kind == MatchEventKind.GroupMoveAssigned).ToArray();
         check(outcomes.Length == 500, "500 mixed-size units receive reachable distinct endpoints");
-        Console.WriteLine($"group_plan_500 elapsed_ms={watch.Elapsed.TotalMilliseconds:F3}");
+        Console.WriteLine($"group_plan_500 elapsed_ms={watch.Elapsed.TotalMilliseconds:F3} frames={frames} max_frame_ms={maximum:F3}");
     }
 }

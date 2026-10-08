@@ -13,8 +13,16 @@ internal static class GroupPlacementPlanner
         var anchorIndex = request.LeaderId.IsNone ? 0 : members.ToList().FindIndex(member => member.Id == request.LeaderId);
         if (anchorIndex < 0) anchorIndex = 0;
         var slots = FormationLayout.Match(members.Select(member => member.Start).ToArray(), ideals, anchorIndex);
+        return PlanAssigned(navigation, members, ideals, slots, externalBodies);
+    }
+
+    internal static IReadOnlyList<PlacementGoal> PlanAssigned(NavigationState navigation,
+        IReadOnlyList<PlacementMember> members, IReadOnlyList<SimVector2> ideals, IReadOnlyList<int> slots,
+        IReadOnlyList<PlacementBody>? externalBodies = null, IReadOnlyList<IReadOnlyList<GridCell>>? preparedCandidates = null)
+    {
+        externalBodies ??= [];
         var reachable = new NavigationComponents(navigation);
-        var candidates = ideals.Select(p => Candidates(navigation, p)).ToArray();
+        var candidates = preparedCandidates?.ToArray() ?? new IReadOnlyList<GridCell>?[ideals.Count];
         var failed = new HashSet<EntityId>();
         var result = new List<PlacementGoal>();
         // Failed members retain their old orders. Re-plan remaining placements against their unmoved bodies.
@@ -30,7 +38,7 @@ internal static class GroupPlacementPlanner
                 var slot = slots[index];
                 SimVector2? goal = null;
                 if (!failed.Contains(member.Id) && navigation.TryWorldToCell(member.Start, out var start))
-                    foreach (var cell in candidates[slot])
+                    foreach (var cell in candidates[slot] ??= Candidates(navigation, ideals[slot]))
                     {
                         if (!reachable.Connected(start, cell, member.Clearance)) continue;
                         var center = navigation.CellCenter(cell);
@@ -59,7 +67,7 @@ internal static class GroupPlacementPlanner
             < (separation / scale) * (separation / scale);
     }
 
-    private static IReadOnlyList<GridCell> Candidates(NavigationState navigation, SimVector2 ideal)
+    internal static IReadOnlyList<GridCell> Candidates(NavigationState navigation, SimVector2 ideal)
     {
         var grid = navigation.Grid;
         var rawX = Math.Floor((ideal.X - grid.Origin.X) / grid.CellSize);
@@ -81,7 +89,12 @@ internal static class GroupPlacementPlanner
             if (!double.IsFinite(distance)) throw new ArgumentException("Placement distance overflow.");
             candidates.Add((cell, distance));
         }
-        return candidates.OrderBy(item => item.Distance).ThenBy(item => item.Cell.Y).ThenBy(item => item.Cell.X)
-            .Select(item => item.Cell).ToArray();
+        candidates.Sort((a, b) =>
+        {
+            var order = a.Distance.CompareTo(b.Distance);
+            if (order == 0) order = a.Cell.Y.CompareTo(b.Cell.Y);
+            return order == 0 ? a.Cell.X.CompareTo(b.Cell.X) : order;
+        });
+        return candidates.Select(item => item.Cell).ToArray();
     }
 }

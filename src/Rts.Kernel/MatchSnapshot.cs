@@ -29,7 +29,8 @@ public sealed record MatchSnapshot(
     NavigationSnapshot? Navigation = null,
     IReadOnlyList<MoveOrderSnapshot>? Moves = null,
     IReadOnlyList<UnitOrderQueueSnapshot>? Orders = null,
-    string? MovementHash = null, ulong NextGroupId = 1);
+    string? MovementHash = null, ulong NextGroupId = 1,
+    IReadOnlyList<GroupPlanningSnapshot>? GroupPlans = null);
 
 public readonly record struct SnapshotDifference(string Path, string Expected, string Actual);
 
@@ -106,6 +107,7 @@ public static class SnapshotValidator
             }
         }
         GroupSnapshot.Validate(snapshot);
+        GroupPlanningSnapshotRules.Validate(snapshot);
     }
 }
 
@@ -178,7 +180,8 @@ public static class SnapshotDiff
         }
 
         return NavigationSnapshotDiff.FindFirst(expected, actual) ?? MovementSnapshot.FindFirst(expected, actual)
-            ?? UnitOrdersSnapshot.FindFirst(expected, actual) ?? GroupSnapshot.FindFirst(expected, actual);
+            ?? UnitOrdersSnapshot.FindFirst(expected, actual) ?? GroupSnapshot.FindFirst(expected, actual)
+            ?? GroupPlanningSnapshotRules.FindFirst(expected, actual);
     }
 
     private static SnapshotDifference? Compare<T>(string path, T expected, T actual)
@@ -202,7 +205,7 @@ public static class SnapshotDiff
 
 public static class SnapshotJson
 {
-    public const int CurrentFormatVersion = 6;
+    public const int CurrentFormatVersion = 7;
 
     private static readonly JsonSerializerOptions Options = new()
     {

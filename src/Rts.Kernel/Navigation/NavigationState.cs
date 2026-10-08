@@ -18,6 +18,7 @@ internal sealed class NavigationState
     internal TerrainHeights? Terrain { get; }
     private readonly SortedDictionary<ulong, GridArea> _obstacles = [];
     private readonly int[] _occupancy;
+    private readonly Dictionary<int, byte[]> _clearanceCache = [];
 
     internal NavigationState(PathingGrid grid, TerrainHeights? terrain = null)
     {
@@ -41,8 +42,21 @@ internal sealed class NavigationState
     internal SimVector2 CellCenter(GridCell cell) => new(
         _grid.Origin.X + (cell.X + 0.5) * _grid.CellSize,
         _grid.Origin.Y + (cell.Y + 0.5) * _grid.CellSize);
-    internal bool CanOccupy(GridCell cell, int clearance) =>
-        GridPathfinder.HasClearance(_grid, cell, clearance, IsWalkable);
+    internal bool CanOccupy(GridCell cell, int clearance)
+    {
+        if (clearance < 0 || cell.X < 0 || cell.Y < 0 || cell.X >= _grid.Width || cell.Y >= _grid.Height
+            || clearance >= Math.Max(_grid.Width, _grid.Height)) return false;
+        if (!_clearanceCache.TryGetValue(clearance, out var cache))
+        {
+            if (_clearanceCache.Count == 8) _clearanceCache.Clear();
+            cache = new byte[_occupancy.Length];
+            _clearanceCache.Add(clearance, cache);
+        }
+        var index = cell.Y * _grid.Width + cell.X;
+        if (cache[index] == 0)
+            cache[index] = GridPathfinder.HasClearance(_grid, cell, clearance, IsWalkable) ? (byte)1 : (byte)2;
+        return cache[index] == 1;
+    }
     internal bool CanTraverse(GridCell from, GridCell to, int clearance) =>
         Math.Abs(from.X - to.X) <= 1 && Math.Abs(from.Y - to.Y) <= 1
         && CanOccupy(from, clearance) && CanOccupy(to, clearance)
@@ -56,6 +70,7 @@ internal sealed class NavigationState
             || (long)area.Y + area.Height > _grid.Height) return false;
         if (_obstacles.TryGetValue(id, out var previous)) Apply(previous, -1);
         _obstacles[id] = area;
+        _clearanceCache.Clear();
         Apply(area, 1);
         return true;
     }
@@ -64,6 +79,7 @@ internal sealed class NavigationState
     {
         if (!_obstacles.Remove(id, out var area)) return false;
         Apply(area, -1);
+        _clearanceCache.Clear();
         return true;
     }
 
