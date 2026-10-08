@@ -68,6 +68,7 @@ public sealed class PathingGrid
 public sealed class TerrainHeights
 {
     private readonly double[] _heights;
+    public string ContentHash { get; }
     public int Width { get; }
     public int Height { get; }
     public double TileSize { get; }
@@ -85,6 +86,17 @@ public sealed class TerrainHeights
         TileSize = tileSize;
         Origin = origin;
         _heights = heights.ToArray();
+        using var data = new MemoryStream();
+        using (var writer = new BinaryWriter(data, System.Text.Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write(Width);
+            writer.Write(Height);
+            writer.Write(TileSize);
+            writer.Write(Origin.X);
+            writer.Write(Origin.Y);
+            foreach (var elevation in _heights) writer.Write(elevation);
+        }
+        ContentHash = Convert.ToHexString(SHA256.HashData(data.ToArray())).ToLowerInvariant();
     }
 
     public bool TrySample(SimVector2 position, out double height)

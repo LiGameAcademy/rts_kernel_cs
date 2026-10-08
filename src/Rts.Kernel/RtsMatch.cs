@@ -14,12 +14,14 @@ public sealed partial class RtsMatch
     private long _nextArrivalOrder;
     private long _nextEventSequence;
 
-    public RtsMatch(MatchConfig config, ulong seed, PathingGrid? pathingGrid = null)
+    public RtsMatch(MatchConfig config, ulong seed, PathingGrid? pathingGrid = null, TerrainHeights? terrain = null)
     {
         config.Validate();
+        if (terrain is not null && pathingGrid is null)
+            throw new ArgumentException("A height field requires navigation.");
         Config = config;
         Rng = new DeterministicRng(seed);
-        _navigation = pathingGrid is null ? null : new NavigationState(pathingGrid);
+        _navigation = pathingGrid is null ? null : new NavigationState(pathingGrid, terrain);
     }
 
     public MatchConfig Config { get; }
@@ -83,7 +85,8 @@ public sealed partial class RtsMatch
                 entity.Position.X,
                 entity.Position.Y,
                 entity.Velocity.X,
-                entity.Velocity.Y))
+                entity.Velocity.Y,
+                entity.Facing))
             .ToArray();
 
         var pending = _pendingCommands
@@ -108,13 +111,13 @@ public sealed partial class RtsMatch
             ReadMoveOrders());
     }
 
-    public static RtsMatch Restore(MatchSnapshot snapshot, PathingGrid? pathingGrid = null)
+    public static RtsMatch Restore(MatchSnapshot snapshot, PathingGrid? pathingGrid = null, TerrainHeights? terrain = null)
     {
         SnapshotValidator.Validate(snapshot);
 
         if (snapshot.Navigation is not null && pathingGrid is null)
             throw new InvalidDataException("Static pathing grid required to restore navigation.");
-        if (snapshot.Navigation is null && pathingGrid is not null)
+        if (snapshot.Navigation is null && (pathingGrid is not null || terrain is not null))
             throw new InvalidDataException("Cannot add navigation while restoring a match without navigation.");
 
         var match = new RtsMatch(new MatchConfig(snapshot.TickRate), snapshot.RngState)
@@ -126,7 +129,7 @@ public sealed partial class RtsMatch
         };
 
         if (snapshot.Navigation is not null)
-            match._navigation = NavigationState.Restore(pathingGrid!, snapshot.Navigation);
+            match._navigation = NavigationState.Restore(pathingGrid!, snapshot.Navigation, terrain);
 
         foreach (var entity in snapshot.Entities.OrderBy(item => item.Id))
         {
@@ -135,7 +138,7 @@ public sealed partial class RtsMatch
                     id,
                     entity.OwnerId,
                     new SimVector2(entity.PositionX, entity.PositionY),
-                    new SimVector2(entity.VelocityX, entity.VelocityY))))
+                    new SimVector2(entity.VelocityX, entity.VelocityY), entity.Facing)))
             {
                 throw new InvalidDataException($"Invalid or duplicate entity id {entity.Id}.");
             }

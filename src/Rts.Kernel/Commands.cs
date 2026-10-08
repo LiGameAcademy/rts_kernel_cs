@@ -42,9 +42,9 @@ public sealed record CommandEnvelope(
     };
 
     public static CommandEnvelope MoveTo(long executeFrame, int playerId, long sequence,
-        EntityId entityId, SimVector2 goal, double speed, int clearanceCells = 0) =>
+        EntityId entityId, SimVector2 goal, double speed, int clearanceCells = 0, MotionParameters? motion = null) =>
         new(executeFrame, playerId, sequence, CommandKind.MoveTo, entityId, SimVector2.Zero, SimVector2.Zero,
-            Move: new MoveRequest(goal, speed, clearanceCells));
+            Move: new MoveRequest(goal, speed, clearanceCells, motion));
 
     internal bool HasValidMovePayload => Kind == CommandKind.MoveTo
         ? Move is { IsValid: true } && !EntityId.IsNone && Obstacle is null

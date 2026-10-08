@@ -10,7 +10,8 @@ public sealed record EntitySnapshot(
     double PositionX,
     double PositionY,
     double VelocityX,
-    double VelocityY);
+    double VelocityY,
+    double Facing = 0);
 
 public sealed record QueuedCommandSnapshot(long ArrivalOrder, CommandEnvelope Command);
 
@@ -59,7 +60,8 @@ public static class SnapshotValidator
         {
             if (entity.Id == 0 || entity.OwnerId < 0 || !entityIds.Add(entity.Id)
                 || !double.IsFinite(entity.PositionX) || !double.IsFinite(entity.PositionY)
-                || !double.IsFinite(entity.VelocityX) || !double.IsFinite(entity.VelocityY))
+                || !double.IsFinite(entity.VelocityX) || !double.IsFinite(entity.VelocityY) || !double.IsFinite(entity.Facing)
+                || entity.Facing < -Math.PI || entity.Facing >= Math.PI)
             {
                 throw new InvalidDataException($"Invalid entity snapshot: {entity.Id}.");
             }
@@ -132,7 +134,8 @@ public static class SnapshotDiff
                 || (difference = Compare($"{prefix}.positionX", left.PositionX, right.PositionX)) is not null
                 || (difference = Compare($"{prefix}.positionY", left.PositionY, right.PositionY)) is not null
                 || (difference = Compare($"{prefix}.velocityX", left.VelocityX, right.VelocityX)) is not null
-                || (difference = Compare($"{prefix}.velocityY", left.VelocityY, right.VelocityY)) is not null)
+                || (difference = Compare($"{prefix}.velocityY", left.VelocityY, right.VelocityY)) is not null
+                || (difference = Compare($"{prefix}.facing", left.Facing, right.Facing)) is not null)
             {
                 return difference;
             }
@@ -190,7 +193,7 @@ public static class SnapshotDiff
 
 public static class SnapshotJson
 {
-    public const int CurrentFormatVersion = 3;
+    public const int CurrentFormatVersion = 4;
 
     private static readonly JsonSerializerOptions Options = new()
     {

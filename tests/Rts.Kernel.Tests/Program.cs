@@ -109,5 +109,6 @@ PathfindingChecks.Run(Check);
 NavigationChecks.Run(Check);
 MovementChecks.Run(Check);
 MotionRuleChecks.Run(Check);
+MotionStateChecks.Run(Check);
 
 Console.WriteLine($"Rts.Kernel.Tests PASS ({checks} checks)");

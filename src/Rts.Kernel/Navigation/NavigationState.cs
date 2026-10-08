@@ -8,18 +8,24 @@ public readonly record struct GridArea(int X, int Y, int Width, int Height)
 
 public sealed record NavigationObstacle(ulong Id, GridArea Area);
 public sealed record ObstacleCommand(ulong Id, GridArea? Area = null);
-public sealed record NavigationSnapshot(string MapHash, IReadOnlyList<NavigationObstacle> Obstacles);
+public sealed record NavigationSnapshot(string MapHash, IReadOnlyList<NavigationObstacle> Obstacles, string? HeightHash = null);
 
 /// <summary>Mutable occupancy belongs to one match; static grid data may be shared.</summary>
 internal sealed class NavigationState
 {
     private readonly PathingGrid _grid;
+    internal TerrainHeights? Terrain { get; }
     private readonly SortedDictionary<ulong, GridArea> _obstacles = [];
     private readonly int[] _occupancy;
 
-    internal NavigationState(PathingGrid grid)
+    internal NavigationState(PathingGrid grid, TerrainHeights? terrain = null)
     {
         _grid = grid;
+        Terrain = terrain;
+        var end = new SimVector2(grid.Origin.X + grid.Width * grid.CellSize,
+            grid.Origin.Y + grid.Height * grid.CellSize);
+        if (terrain is not null && (!terrain.TrySample(grid.Origin, out _) || !terrain.TrySample(end, out _)))
+            throw new ArgumentException("Height field must cover the entire navigation grid.");
         _occupancy = new int[checked(grid.Width * grid.Height)];
     }
 
@@ -61,14 +67,14 @@ internal sealed class NavigationState
     }
 
     internal NavigationSnapshot CaptureSnapshot() => new(_grid.ContentHash,
-        Array.AsReadOnly(_obstacles.Select(pair => new NavigationObstacle(pair.Key, pair.Value)).ToArray()));
+        Array.AsReadOnly(_obstacles.Select(pair => new NavigationObstacle(pair.Key, pair.Value)).ToArray()), Terrain?.ContentHash);
 
-    internal static NavigationState Restore(PathingGrid grid, NavigationSnapshot snapshot)
+    internal static NavigationState Restore(PathingGrid grid, NavigationSnapshot snapshot, TerrainHeights? terrain = null)
     {
         ValidateSnapshot(snapshot);
-        if (snapshot.MapHash != grid.ContentHash)
+        if (snapshot.MapHash != grid.ContentHash || snapshot.HeightHash != terrain?.ContentHash)
             throw new InvalidDataException("Navigation snapshot requires the identical static pathing grid.");
-        var state = new NavigationState(grid);
+        var state = new NavigationState(grid, terrain);
         foreach (var obstacle in snapshot.Obstacles)
             if (!state.TrySetObstacle(obstacle.Id, obstacle.Area))
                 throw new InvalidDataException("Obstacle footprint lies outside the static grid.");
@@ -79,6 +85,8 @@ internal sealed class NavigationState
     {
         if (snapshot.MapHash is null || snapshot.MapHash.Length != 64
             || snapshot.MapHash.Any(c => !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))
+            || (snapshot.HeightHash is not null && (snapshot.HeightHash.Length != 64
+                || snapshot.HeightHash.Any(c => !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))))
             || snapshot.Obstacles is null)
             throw new InvalidDataException("Invalid navigation snapshot identity or collection.");
         ulong previousId = 0;
