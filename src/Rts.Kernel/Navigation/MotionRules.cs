@@ -59,7 +59,7 @@ public static class MotionRules
     // Normalize operands first to avoid overflowing subtraction of finite angles.
     private static double AngleDifference(double from, double to) => Normalize(Normalize(to) - Normalize(from));
 
-    private static double Normalize(double angle)
+    internal static double Normalize(double angle)
     {
         var wrapped = angle % Math.Tau;
         if (wrapped >= Math.PI) wrapped -= Math.Tau;

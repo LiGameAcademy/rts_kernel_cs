@@ -16,7 +16,8 @@ public sealed record EntityState(
     int OwnerId,
     SimVector2 Position,
     SimVector2 Velocity,
-    double Facing = 0);
+    double Facing = 0,
+    ulong MovementDefinitionId = 0);
 
 public sealed record MatchConfig(int TickRate)
 {

@@ -19,12 +19,12 @@ public enum UnitOrderKind
     Stop = 2,
 }
 
-public sealed record UnitOrderIntent(UnitOrderKind Kind, OrderSource Source, MoveRequest? Move = null)
+public sealed record UnitOrderIntent(UnitOrderKind Kind, OrderSource Source, MoveRequest? Move = null, GroupSlot? Group = null)
 {
     internal bool IsValid => Enum.IsDefined(Source) && (Kind switch
     {
-        UnitOrderKind.Move => Move is { IsValid: true },
-        UnitOrderKind.Stop => Move is null,
+        UnitOrderKind.Move => Move is { IsValid: true } && (Group is null || Group.IsValid),
+        UnitOrderKind.Stop => Move is null && Group is null,
         _ => false,
     });
 }

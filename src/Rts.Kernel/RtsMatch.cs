@@ -14,11 +14,15 @@ public sealed partial class RtsMatch
     private long _nextArrivalOrder;
     private long _nextEventSequence;
 
-    public RtsMatch(MatchConfig config, ulong seed, PathingGrid? pathingGrid = null, TerrainHeights? terrain = null)
+    public RtsMatch(MatchConfig config, ulong seed, PathingGrid? pathingGrid = null, TerrainHeights? terrain = null,
+        IReadOnlyList<MovementDefinition>? movementDefinitions = null)
     {
         config.Validate();
         if (terrain is not null && pathingGrid is null)
             throw new ArgumentException("A height field requires navigation.");
+        _movementDefinitions = new MovementDefinitions(movementDefinitions);
+        if (_movementDefinitions.ContentHash is not null && pathingGrid is null)
+            throw new ArgumentException("Ground movement definitions require navigation.");
         Config = config;
         Rng = new DeterministicRng(seed);
         _navigation = pathingGrid is null ? null : new NavigationState(pathingGrid, terrain);
@@ -56,7 +60,11 @@ public sealed partial class RtsMatch
 
         if (!command.HasValidOrderMetadata) return CommandAcceptance.Reject("invalid_order_metadata");
 
-        _pendingCommands.Add(new QueuedCommand(_nextArrivalOrder++, command));
+        if (!double.IsFinite(command.Position.X) || !double.IsFinite(command.Position.Y)
+            || !double.IsFinite(command.Velocity.X) || !double.IsFinite(command.Velocity.Y))
+            return CommandAcceptance.Reject("invalid_command_geometry");
+        if (!command.HasValidGroupPayload) return CommandAcceptance.Reject("invalid_group_payload");
+        _pendingCommands.Add(new QueuedCommand(_nextArrivalOrder++, command.Freeze()));
         return CommandAcceptance.Accept();
     }
 
@@ -89,7 +97,7 @@ public sealed partial class RtsMatch
                 entity.Position.Y,
                 entity.Velocity.X,
                 entity.Velocity.Y,
-                entity.Facing))
+                entity.Facing, entity.MovementDefinitionId))
             .ToArray();
 
         var pending = _pendingCommands
@@ -112,10 +120,11 @@ public sealed partial class RtsMatch
             pending,
             _navigation?.CaptureSnapshot(),
             ReadMoveOrders(),
-            ReadUnitOrders());
+            ReadUnitOrders(), _movementDefinitions.ContentHash, _nextGroupId);
     }
 
-    public static RtsMatch Restore(MatchSnapshot snapshot, PathingGrid? pathingGrid = null, TerrainHeights? terrain = null)
+    public static RtsMatch Restore(MatchSnapshot snapshot, PathingGrid? pathingGrid = null, TerrainHeights? terrain = null,
+        IReadOnlyList<MovementDefinition>? movementDefinitions = null)
     {
         SnapshotValidator.Validate(snapshot);
 
@@ -124,9 +133,10 @@ public sealed partial class RtsMatch
         if (snapshot.Navigation is null && (pathingGrid is not null || terrain is not null))
             throw new InvalidDataException("Cannot add navigation while restoring a match without navigation.");
 
-        var match = new RtsMatch(new MatchConfig(snapshot.TickRate), snapshot.RngState)
+        var match = new RtsMatch(new MatchConfig(snapshot.TickRate), snapshot.RngState, pathingGrid, terrain, movementDefinitions)
         {
             Frame = snapshot.Frame,
+            _nextGroupId = snapshot.NextGroupId,
             _nextEntityId = snapshot.NextEntityId,
             _nextArrivalOrder = snapshot.NextArrivalOrder,
             _nextEventSequence = snapshot.NextEventSequence,
@@ -142,16 +152,17 @@ public sealed partial class RtsMatch
                     id,
                     entity.OwnerId,
                     new SimVector2(entity.PositionX, entity.PositionY),
-                    new SimVector2(entity.VelocityX, entity.VelocityY), entity.Facing)))
+                    new SimVector2(entity.VelocityX, entity.VelocityY), entity.Facing, entity.MovementDefinitionId)))
             {
                 throw new InvalidDataException($"Invalid or duplicate entity id {entity.Id}.");
             }
         }
 
         match._pendingCommands.AddRange(snapshot.PendingCommands.Select(
-            item => new QueuedCommand(item.ArrivalOrder, item.Command)));
+            item => new QueuedCommand(item.ArrivalOrder, item.Command.Freeze())));
         match.RestoreMoveOrders(snapshot);
         match.RestoreUnitOrders(snapshot);
+        match.ValidateRestoredGroups(snapshot);
         return match;
     }
 
@@ -191,13 +202,18 @@ public sealed partial class RtsMatch
                     AddEvent(MatchEventKind.CommandRejected, EntityId.None, "obstacle_missing_or_navigation_disabled");
                 else _pathsDirty = true;
                 break;
+            case CommandKind.GroupMove:
+                ExecuteGroupMove(command);
+                break;
             case CommandKind.MoveTo:
                 ExecuteMove(command);
                 break;
             case CommandKind.SpawnEntity:
             {
+                if (command.MovementDefinitionId != 0 && !_movementDefinitions.TryGet(command.MovementDefinitionId, out _))
+                { AddEvent(MatchEventKind.CommandRejected, EntityId.None, "movement_definition_missing"); break; }
                 var id = new EntityId(_nextEntityId++);
-                _entities.Add(id, new EntityState(id, command.PlayerId, command.Position, SimVector2.Zero));
+                _entities.Add(id, new EntityState(id, command.PlayerId, command.Position, SimVector2.Zero, MovementDefinitionId: command.MovementDefinitionId));
                 AddEvent(MatchEventKind.EntitySpawned, id, string.Empty);
                 break;
             }

@@ -12,15 +12,20 @@ public sealed partial class RtsMatch
         new MoveOrderSnapshot(pair.Key.Value, pair.Value.Request,
             Array.AsReadOnly(pair.Value.Waypoints.ToArray()), pair.Value.NextWaypoint)).ToArray());
 
-    private bool TryPlanMove(SimVector2 position, MoveRequest request, out MoveOrder? order)
+    private bool TryPlanMove(SimVector2 position, MoveRequest request, out MoveOrder? order, bool preferDirect = false)
     {
         order = null;
         if (_navigation is null || !_navigation.TryWorldToCell(position, out var start)
             || !_navigation.TryWorldToCell(request.Goal, out var goal)) return false;
-        var path = _navigation.FindPath(start, goal, request.ClearanceCells, int.MaxValue);
-        if (path.Status != PathStatus.Found) return false;
-        var points = path.Cells.Count == 1 ? new List<SimVector2>()
-            : path.Cells.Select(_navigation.CellCenter).ToList();
+        var cells = preferDirect ? DirectGridPath.TryFind(_navigation, start, goal, request.ClearanceCells) : null;
+        if (cells is null)
+        {
+            var path = _navigation.FindPath(start, goal, request.ClearanceCells, int.MaxValue);
+            if (path.Status != PathStatus.Found) return false;
+            cells = path.Cells;
+        }
+        var points = cells.Count == 1 ? new List<SimVector2>()
+            : cells.Select(_navigation.CellCenter).ToList();
         if (points.Count == 0 || points[^1] != request.Goal) points.Add(request.Goal);
         if (points.Any(point => !double.IsFinite(point.X) || !double.IsFinite(point.Y))) return false;
         order = new MoveOrder(request, points.AsReadOnly());
@@ -39,7 +44,7 @@ public sealed partial class RtsMatch
             }
             if (_pathsDirty)
             {
-                if (!TryPlanMove(entity.Position, order.Request, out var replanned))
+                if (!TryPlanMove(entity.Position, order.Request, out var replanned, _unitOrders[entity.Id].Current?.Group is not null))
                 {
                     FinishMove(pair.Key, entity.Position, MatchEventKind.MoveFailed, "path_blocked");
                     continue;

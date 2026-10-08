@@ -21,12 +21,20 @@ public static class GridPathfinder
         int maxExpandedNodes, int clearanceCells, Func<GridCell, bool> isWalkable)
     {
         if (clearanceCells < 0) throw new ArgumentOutOfRangeException(nameof(clearanceCells));
-        bool CanOccupy(GridCell cell) => HasClearance(grid, cell, clearanceCells, isWalkable);
+        var count = checked(grid.Width * grid.Height);
+        var occupancyCache = new byte[count];
+        bool CanOccupy(GridCell cell)
+        {
+            if (cell.X < 0 || cell.Y < 0 || cell.X >= grid.Width || cell.Y >= grid.Height) return false;
+            var index = cell.Y * grid.Width + cell.X;
+            if (occupancyCache[index] == 0)
+                occupancyCache[index] = HasClearance(grid, cell, clearanceCells, isWalkable) ? (byte)1 : (byte)2;
+            return occupancyCache[index] == 1;
+        }
         if (maxExpandedNodes <= 0) throw new ArgumentOutOfRangeException(nameof(maxExpandedNodes));
         if (!CanOccupy(start) || !CanOccupy(goal))
             return Failure(PathStatus.InvalidEndpoint, 0);
 
-        var count = checked(grid.Width * grid.Height);
         var costs = new double[count];
         Array.Fill(costs, double.PositiveInfinity);
         var parents = new int[count];

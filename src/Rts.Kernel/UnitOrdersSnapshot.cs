@@ -76,7 +76,8 @@ internal static class UnitOrdersSnapshot
         if (a is null || b is null) return null;
         if (a.Kind != b.Kind) return Difference(prefix + ".kind", a.Kind, b.Kind);
         if (a.Source != b.Source) return Difference(prefix + ".source", a.Source, b.Source);
-        return a.Move != b.Move ? Difference(prefix + ".move", a.Move, b.Move) : null;
+        if (a.Move != b.Move) return Difference(prefix + ".move", a.Move, b.Move);
+        return a.Group != b.Group ? Difference(prefix + ".group", a.Group, b.Group) : null;
     }
 
     private static SnapshotDifference Difference<T>(string path, T left, T right) =>

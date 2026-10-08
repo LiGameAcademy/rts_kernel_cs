@@ -10,6 +10,7 @@ public enum CommandKind
     SetObstacle = 4,
     RemoveObstacle = 5,
     MoveTo = 6,
+    GroupMove = 7,
 }
 
 public sealed record CommandEnvelope(
@@ -23,7 +24,8 @@ public sealed record CommandEnvelope(
     ObstacleCommand? Obstacle = null,
     MoveRequest? Move = null,
     OrderMode Mode = OrderMode.Replace,
-    OrderSource Source = OrderSource.Player)
+    OrderSource Source = OrderSource.Player,
+    GroupMoveRequest? Group = null, ulong MovementDefinitionId = 0)
 {
     /// <summary>Diagnostic navigation command; building ownership rules are not implemented yet.</summary>
     public static CommandEnvelope SetObstacle(long executeFrame, int playerId, long sequence,
@@ -56,17 +58,28 @@ public sealed record CommandEnvelope(
 
     internal bool HasValidOrderMetadata => Enum.IsDefined(Mode) && Enum.IsDefined(Source) && (Kind switch
     {
-        CommandKind.MoveTo => true,
+        CommandKind.MoveTo or CommandKind.GroupMove => true,
         CommandKind.Stop => Mode == OrderMode.Replace,
         _ => Mode == OrderMode.Replace && Source == OrderSource.Player,
     });
+
+    public static CommandEnvelope MoveGroup(long executeFrame, int playerId, long sequence, GroupMoveRequest group,
+        OrderMode mode = OrderMode.Replace, OrderSource source = OrderSource.Player) =>
+        new(executeFrame, playerId, sequence, CommandKind.GroupMove, EntityId.None, SimVector2.Zero, SimVector2.Zero,
+            Mode: mode, Source: source, Group: group.IsValid ? group.Freeze() : group);
+
+    internal bool HasValidGroupPayload => (Kind == CommandKind.GroupMove
+        ? Group is { IsValid: true } && EntityId.IsNone && Position == SimVector2.Zero && Velocity == SimVector2.Zero
+        : Group is null) && (Kind == CommandKind.SpawnEntity || MovementDefinitionId == 0);
+
+    internal CommandEnvelope Freeze() => Group is null ? this : this with { Group = Group.Freeze() };
 
     public static CommandEnvelope Spawn(
         long executeFrame,
         int playerId,
         long sequence,
-        SimVector2 position) =>
-        new(executeFrame, playerId, sequence, CommandKind.SpawnEntity, EntityId.None, position, SimVector2.Zero);
+        SimVector2 position, ulong movementDefinitionId = 0) =>
+        new(executeFrame, playerId, sequence, CommandKind.SpawnEntity, EntityId.None, position, SimVector2.Zero, MovementDefinitionId: movementDefinitionId);
 
     public static CommandEnvelope SetVelocity(
         long executeFrame,
@@ -97,6 +110,7 @@ public enum MatchEventKind
     CommandRejected = 2,
     MoveCompleted = 3,
     MoveFailed = 4,
+    GroupMoveAssigned = 5,
 }
 
 public sealed record MatchEvent(
@@ -104,6 +118,6 @@ public sealed record MatchEvent(
     long Sequence,
     MatchEventKind Kind,
     EntityId EntityId,
-    string Detail);
+    string Detail, GroupMoveOutcome? Group = null);
 
 internal sealed record QueuedCommand(long ArrivalOrder, CommandEnvelope Command);

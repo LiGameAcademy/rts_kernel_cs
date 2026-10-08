@@ -14,6 +14,7 @@ public sealed record NavigationSnapshot(string MapHash, IReadOnlyList<Navigation
 internal sealed class NavigationState
 {
     private readonly PathingGrid _grid;
+    internal PathingGrid Grid => _grid;
     internal TerrainHeights? Terrain { get; }
     private readonly SortedDictionary<ulong, GridArea> _obstacles = [];
     private readonly int[] _occupancy;

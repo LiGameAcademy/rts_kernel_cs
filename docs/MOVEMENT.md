@@ -53,11 +53,11 @@ var restored = RtsMatch.Restore(match.CaptureSnapshot(), grid, terrain);
 
 默认启用坡度：高度场必须覆盖完整导航网格；采样当前位置与下一路点的真实高度差，按高度差/平面距离取坡度。30度封顶，上坡最低0.6、下坡最低0.85，等高线/平地不降速。缺少高度时，执行帧返回 `motion_requires_height_field`，保留旧订单；非有限几何或高度计算失败停止并发 MoveFailed。禁用 ScaleSlopeSpeed 时无需高度场。运动参数仍是诊断入口，正式参数须来自权威单位定义。
 
-## 快照 v5
+## 快照 v6
 
 保存实体朝向，以及每个在途实体的目标、速度、净空、运动参数、路径世界坐标和下一路点索引，并保存当前订单类型/来源、FIFO 待执行意图及未执行命令的追加模式/来源，状态哈希与差异报告覆盖这些字段。移动过程中每帧快照可恢复并继续相同模拟。静态地图不嵌入快照，恢复仍需提供身份完全一致的 PathingGrid，以及原局使用的 TerrainHeights；高度哈希包含尺寸、坐标和全部顶点高度。
 
-恢复校验路径点有效性、相邻格、穿墙角与当前位置所在路径段；失败只丢弃新实例。v1/v2/v3/v4 快照不再接受，未提供迁移。没有导航的快照也使用 v5。CLI 默认示例位置/帧号保持不变，哈希随新字段改变；验证宿主时从当前 CLI 取得期望值，不加载旧程序集或硬编码旧哈希。
+恢复校验路径点有效性、相邻格、穿墙角与当前位置所在路径段；失败只丢弃新实例。v1/v2/v3/v4/v5 快照不再接受，未提供迁移。没有导航的快照也使用 v6。CLI 默认示例位置/帧号保持不变，哈希随新字段改变；验证宿主时从当前 CLI 取得期望值，不加载旧程序集或硬编码旧哈希。
 
 ```powershell
 ./Test.ps1 -Configuration Release
@@ -69,3 +69,13 @@ dotnet run --project samples/Rts.Kernel.Cli --no-build -c Release -- --orders
 ## 本批边界
 
 这一批包含直接路径跟随及转向/坡度隔离验证，尚非原游戏的完整移动替代。组队落点分配、预约、单位间避让、追击与真实游戏接入留在 Issue #3 的后续批次。速度/净空/运动参数目前随诊断命令传入，正式玩法必须由权威单位定义约束，不能直接信任联网客户端。未声明跨平台确定性；300/500 单位性能基线与 Windows 导出按计划暂缓。
+
+## Group placement and formations
+
+Create a match with frozen MovementDefinition entries and spawn members with their movementDefinitionId. Submit CommandEnvelope.MoveGroup with IDs, goal, FormationKind (Compact/Rectangle/Wedge/Circle), optional leader and heading. Commands do not supply member speeds or radii. Definitions are copied into a canonical catalog; snapshots require the identical content identity. Legacy diagnostic moves cannot override capabilities of profiled entities.
+
+The kernel assigns stable ideal slots using deterministic minimum squared-distance matching, then checks clearance, connectivity, body separation, other known endpoints and stationary units. Local adjustment searches up to eight grid cells around each ideal slot. A failed member keeps its previous orders; other members may succeed. GroupMoveAssigned events carry actual goals and adjustment results. Append keeps current orders and persists resolved slots in the queue. Stop releases them.
+
+Soft formations use individual paths and assemble at their assigned destinations. Open-ground group routes check every cell and corner before using the shortest octile route, otherwise A* applies. This is destination placement, not in-transit avoidance or strict formation following. Large group planning is synchronous; 500-member tests measure one command separately from frame simulation, and the 30 Hz performance gate is still pending.
+
+v6 stores movement content identity, entity definition IDs, group counter, future group commands and current/pending slot metadata. Restore requires definitions as the final RtsMatch.Restore argument. Older snapshots are rejected. Run the CLI with --formation for a host parity example.
