@@ -5,6 +5,7 @@ internal static class GroupArrivalChecks
 {
     internal static void Run(Action<bool, string> check)
     {
+        LocalArrivalChecks.Run(check);
         var grid = new PathingGrid(64, 64, 10, SimVector2.Zero, new byte[4096]);
         var definitions = new[] { new MovementDefinition(1, 60, 4), new MovementDefinition(2, 20, 6) };
         RtsMatch Create(int count)
@@ -38,7 +39,7 @@ internal static class GroupArrivalChecks
                 check(match.ComputeStateHash() == resumed.ComputeStateHash(), "assembly yield restores without presentation state");
             }
         }
-        check(completed.Count == 12 && completed.SequenceEqual(completed.Order()), "slow inner slot precedes fast outer arrivals");
+        check(completed.Count == 12, "local approach sequencing completes all mixed-speed members");
         check(match.Entities.All(e => e.Position == assignments.Single(a => a.EntityId == e.Id).Group!.Goal),
             "twelve-member compact formation reaches every assigned goal");
 

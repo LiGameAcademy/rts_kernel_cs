@@ -38,6 +38,7 @@ public sealed partial class RtsMatch
         var reservations = new CrowdReservations(Math.Max(_navigation!.Grid.CellSize, maximumRadius * 2));
         foreach (var body in bodies)
             reservations.Put(new(body.Id, ReadMovementDefinition(body.Id)!.Radius, new[] { body.Position, body.Position }));
+        RefreshArrivalNeighbors();
         var retries = LocalReplansPerFrame;
         var moving = bodies.Where(entity => _moveOrders.ContainsKey(entity.Id))
             .OrderByDescending(entity => _moveOrders[entity.Id].WaitFrames).ThenBy(entity => entity.Id).ToArray();
