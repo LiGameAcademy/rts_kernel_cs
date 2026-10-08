@@ -11,7 +11,7 @@ public sealed partial class RtsMatch
     private readonly List<GroupPlanningJob> _groupPlans = [];
 
     public IReadOnlyList<GroupPlanningView> ReadGroupPlans() => Array.AsReadOnly(_groupPlans.Select(job =>
-        new GroupPlanningView(job.Id, job.Members.Length, job.Canceled.Count, job.Matching?.Capture().Row ?? 0)).ToArray());
+        new GroupPlanningView(job.Id, job.Members.Length, job.Canceled.Count, job.Matching?.NextRow ?? 0)).ToArray());
 
     private void CancelGroupPlans(EntityId id, OrderSource source)
     {
@@ -54,9 +54,10 @@ public sealed partial class RtsMatch
                 job.Candidates.Add(GroupPlacementPlanner.Candidates(_navigation!, job.Ideals[i]));
             if (job.Candidates.Count != job.Members.Length) break;
             _groupPlans.RemoveAt(0); // Committing this job must not cancel itself.
-            var members = PrepareGroupMembers(job.Command, job.Id)
-                .Where(member => job.Members.Any(saved => saved.EntityId == member.Id.Value)
-                    && !job.Canceled.Contains(member.Id.Value)).ToArray();
+            var activeIds = job.Members.Where(member => !job.Canceled.Contains(member.EntityId))
+                .Select(member => new EntityId(member.EntityId)).ToArray();
+            var activeCommand = job.Command with { Group = job.Command.Group! with { EntityIds = activeIds } };
+            var members = PrepareGroupMembers(activeCommand, job.Id).ToArray();
             if (members.Length == 0) continue;
             var result = job.Matching.Result();
             var slots = members.Select(member => result[Array.FindIndex(job.Members,

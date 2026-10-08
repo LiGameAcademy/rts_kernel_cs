@@ -58,6 +58,7 @@ internal sealed class SlotMatchingWork
     }
 
     internal bool Complete => _row > _n;
+    internal int NextRow => _row;
 
     internal int Advance(int budget)
     {

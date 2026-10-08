@@ -18,15 +18,20 @@ public static class GridPathfinder
     }
 
     internal static PathResult FindPathCore(PathingGrid grid, GridCell start, GridCell goal,
-        int maxExpandedNodes, int clearanceCells, Func<GridCell, bool> isWalkable)
+        int maxExpandedNodes, int clearanceCells, Func<GridCell, bool> isWalkable,
+        Func<GridCell, GridCell, bool>? canTraverse = null, GridArea? searchArea = null)
     {
         if (clearanceCells < 0) throw new ArgumentOutOfRangeException(nameof(clearanceCells));
-        var count = checked(grid.Width * grid.Height);
+        var area = searchArea ?? new GridArea(0, 0, grid.Width, grid.Height);
+        if (!area.IsValid || (long)area.X + area.Width > grid.Width || (long)area.Y + area.Height > grid.Height)
+            throw new ArgumentException("Invalid search area.");
+        var count = checked(area.Width * area.Height);
         var occupancyCache = new byte[count];
         bool CanOccupy(GridCell cell)
         {
-            if (cell.X < 0 || cell.Y < 0 || cell.X >= grid.Width || cell.Y >= grid.Height) return false;
-            var index = cell.Y * grid.Width + cell.X;
+            if (cell.X < area.X || cell.Y < area.Y || cell.X >= (long)area.X + area.Width
+                || cell.Y >= (long)area.Y + area.Height) return false;
+            var index = (cell.Y - area.Y) * area.Width + cell.X - area.X;
             if (occupancyCache[index] == 0)
                 occupancyCache[index] = HasClearance(grid, cell, clearanceCells, isWalkable) ? (byte)1 : (byte)2;
             return occupancyCache[index] == 1;
@@ -40,8 +45,8 @@ public static class GridPathfinder
         var parents = new int[count];
         Array.Fill(parents, -1);
         var closed = new bool[count];
-        var startIndex = start.Y * grid.Width + start.X;
-        var goalIndex = goal.Y * grid.Width + goal.X;
+        var startIndex = (start.Y - area.Y) * area.Width + start.X - area.X;
+        var goalIndex = (goal.Y - area.Y) * area.Width + goal.X - area.X;
         // Index explicitly breaks equal-score ties; queue implementation order is irrelevant.
         var open = new PriorityQueue<(int Index, double Cost), (double Score, int Index)>();
         costs[startIndex] = 0;
@@ -55,8 +60,8 @@ public static class GridPathfinder
             closed[index] = true;
             expanded++;
             if (index == goalIndex)
-                return new PathResult(PathStatus.Found, Reconstruct(parents, index, grid.Width), costs[index], expanded);
-            var cell = new GridCell(index % grid.Width, index / grid.Width);
+                return new PathResult(PathStatus.Found, Reconstruct(parents, index, area.Width, area.X, area.Y), costs[index], expanded);
+            var cell = new GridCell(index % area.Width + area.X, index / area.Width + area.Y);
             for (var dy = -1; dy <= 1; dy++)
             for (var dx = -1; dx <= 1; dx++)
             {
@@ -64,9 +69,10 @@ public static class GridPathfinder
                 var next = new GridCell(cell.X + dx, cell.Y + dy);
                 if (!CanOccupy(next)) continue;
                 var diagonal = dx != 0 && dy != 0;
-                if (diagonal && (!CanOccupy(new GridCell(cell.X, next.Y))
+                if (diagonal && canTraverse is null && (!CanOccupy(new GridCell(cell.X, next.Y))
                     || !CanOccupy(new GridCell(next.X, cell.Y)))) continue;
-                var nextIndex = next.Y * grid.Width + next.X;
+                if (canTraverse is not null && !canTraverse(cell, next)) continue;
+                var nextIndex = (next.Y - area.Y) * area.Width + next.X - area.X;
                 var candidate = costs[index] + (diagonal ? DiagonalCost : 1);
                 if (closed[nextIndex] || candidate >= costs[nextIndex]) continue;
                 costs[nextIndex] = candidate;
@@ -94,12 +100,12 @@ public static class GridPathfinder
         return Math.Max(dx, dy) + (DiagonalCost - 1) * Math.Min(dx, dy);
     }
 
-    private static IReadOnlyList<GridCell> Reconstruct(int[] parents, int index, int width)
+    private static IReadOnlyList<GridCell> Reconstruct(int[] parents, int index, int width, int originX, int originY)
     {
         var cells = new List<GridCell>();
         while (index >= 0)
         {
-            cells.Add(new GridCell(index % width, index / width));
+            cells.Add(new GridCell(index % width + originX, index / width + originY));
             index = parents[index];
         }
         cells.Reverse();

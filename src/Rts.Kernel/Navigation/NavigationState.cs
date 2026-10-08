@@ -57,6 +57,29 @@ internal sealed class NavigationState
             cache[index] = GridPathfinder.HasClearance(_grid, cell, clearance, IsWalkable) ? (byte)1 : (byte)2;
         return cache[index] == 1;
     }
+    internal bool CanStandAt(SimVector2 position, double radius)
+    {
+        var endX = _grid.Origin.X + _grid.Width * _grid.CellSize;
+        var endY = _grid.Origin.Y + _grid.Height * _grid.CellSize;
+        if (!TryWorldToCell(position, out _) || position.X - radius < _grid.Origin.X
+            || position.Y - radius < _grid.Origin.Y || position.X + radius > endX || position.Y + radius > endY)
+            return false;
+        var left = Math.Max(0, (int)Math.Floor((position.X - radius - _grid.Origin.X) / _grid.CellSize));
+        var top = Math.Max(0, (int)Math.Floor((position.Y - radius - _grid.Origin.Y) / _grid.CellSize));
+        var right = Math.Min(_grid.Width - 1, (int)Math.Floor((position.X + radius - _grid.Origin.X) / _grid.CellSize));
+        var bottom = Math.Min(_grid.Height - 1, (int)Math.Floor((position.Y + radius - _grid.Origin.Y) / _grid.CellSize));
+        for (var y = top; y <= bottom; y++)
+        for (var x = left; x <= right; x++)
+        {
+            if (IsWalkable(new GridCell(x, y))) continue;
+            var nearest = new SimVector2(Math.Clamp(position.X, _grid.Origin.X + x * _grid.CellSize,
+                _grid.Origin.X + (x + 1.0) * _grid.CellSize), Math.Clamp(position.Y, _grid.Origin.Y + y * _grid.CellSize,
+                _grid.Origin.Y + (y + 1.0) * _grid.CellSize));
+            if (CrowdGeometry.Overlap(position, position, radius, nearest, nearest, 0)) return false;
+        }
+        return true;
+    }
+
     internal bool CanTraverse(GridCell from, GridCell to, int clearance) =>
         Math.Abs(from.X - to.X) <= 1 && Math.Abs(from.Y - to.Y) <= 1
         && CanOccupy(from, clearance) && CanOccupy(to, clearance)

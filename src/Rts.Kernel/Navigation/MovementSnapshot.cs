@@ -11,6 +11,10 @@ internal static class MovementSnapshot
         {
             if (move is null || move.EntityId <= previous || !entityIds.Contains(move.EntityId)
                 || move.Request is not { IsValid: true } || move.Waypoints is null || move.Waypoints.Count == 0
+                || move.WaitFrames < 0 || move.WaitFrames >= RtsMatch.CrowdBlockedSeconds * snapshot.TickRate
+                || move.RetryAfterFrame < 0 || move.RetryAfterFrame > snapshot.Frame + 6
+                || (snapshot.Entities.Single(entity => entity.Id == move.EntityId).MovementDefinitionId == 0
+                    && (move.WaitFrames != 0 || move.RetryAfterFrame != 0))
                 || move.NextWaypoint < 0 || move.NextWaypoint >= move.Waypoints.Count
                 || move.Waypoints.Any(point => !double.IsFinite(point.X) || !double.IsFinite(point.Y))
                 || move.Waypoints[^1] != move.Request.Goal)
@@ -31,6 +35,8 @@ internal static class MovementSnapshot
             var prefix = $"moves[{i}]";
             if (left.EntityId != right.EntityId) return Difference(prefix + ".entityId", left.EntityId, right.EntityId);
             if (left.Request != right.Request) return Difference(prefix + ".request", left.Request, right.Request);
+            if (left.WaitFrames != right.WaitFrames) return Difference(prefix + ".waitFrames", left.WaitFrames, right.WaitFrames);
+            if (left.RetryAfterFrame != right.RetryAfterFrame) return Difference(prefix + ".retryAfterFrame", left.RetryAfterFrame, right.RetryAfterFrame);
             if (left.NextWaypoint != right.NextWaypoint) return Difference(prefix + ".nextWaypoint", left.NextWaypoint, right.NextWaypoint);
             if (left.Waypoints.Count != right.Waypoints.Count)
                 return Difference(prefix + ".waypoints.count", left.Waypoints.Count, right.Waypoints.Count);

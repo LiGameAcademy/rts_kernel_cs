@@ -10,7 +10,7 @@ public sealed partial class RtsMatch
     public bool IsMoving(EntityId id) => _moveOrders.ContainsKey(id);
     public IReadOnlyList<MoveOrderSnapshot> ReadMoveOrders() => Array.AsReadOnly(_moveOrders.Select(pair =>
         new MoveOrderSnapshot(pair.Key.Value, pair.Value.Request,
-            Array.AsReadOnly(pair.Value.Waypoints.ToArray()), pair.Value.NextWaypoint)).ToArray());
+            Array.AsReadOnly(pair.Value.Waypoints.ToArray()), pair.Value.NextWaypoint, pair.Value.WaitFrames, pair.Value.RetryAfterFrame)).ToArray());
 
     private bool TryPlanMove(SimVector2 position, MoveRequest request, out MoveOrder? order, bool preferDirect = false)
     {
@@ -37,6 +37,7 @@ public sealed partial class RtsMatch
         foreach (var pair in _entities.ToArray())
         {
             var entity = pair.Value;
+            if (entity.MovementDefinitionId != 0) continue;
             if (!_moveOrders.TryGetValue(pair.Key, out var order))
             {
                 _entities[pair.Key] = entity with { Position = entity.Position + entity.Velocity * seconds };
@@ -91,6 +92,7 @@ public sealed partial class RtsMatch
                     (position.X - entity.Position.X) / seconds, (position.Y - entity.Position.Y) / seconds) };
             }
         }
+        AdvanceCrowd(seconds);
         _pathsDirty = false;
     }
 
@@ -138,7 +140,7 @@ public sealed partial class RtsMatch
                     throw new InvalidDataException("Entity position lies outside its saved move segment.");
             }
             _moveOrders.Add(entity.Id, new MoveOrder(item.Request,
-                Array.AsReadOnly(item.Waypoints.ToArray()), item.NextWaypoint));
+                Array.AsReadOnly(item.Waypoints.ToArray()), item.NextWaypoint, item.WaitFrames, item.RetryAfterFrame));
         }
     }
 }

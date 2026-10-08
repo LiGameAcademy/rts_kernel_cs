@@ -42,6 +42,11 @@ public sealed partial class RtsMatch
             AddEvent(MatchEventKind.CommandRejected, entity.Id, "move_does_not_match_definition");
             return false;
         }
+        if (entity.MovementDefinitionId != 0 && !_navigation!.CanStandAt(request.Goal, ReadMovementDefinition(entity.Id)!.Radius))
+        {
+            AddEvent(MatchEventKind.CommandRejected, entity.Id, "move_body_goal_unavailable");
+            return false;
+        }
         if (request.Motion is { ScaleSlopeSpeed: true } && _navigation?.Terrain is null)
         {
             AddEvent(MatchEventKind.CommandRejected, command.EntityId, "motion_requires_height_field");

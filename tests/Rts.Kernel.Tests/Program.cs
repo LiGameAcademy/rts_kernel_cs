@@ -27,6 +27,13 @@ void CheckThrows<TException>(Action action, string message) where TException : E
     throw new InvalidOperationException(message);
 }
 
+if (args.Contains("--crowd-only"))
+{
+    CrowdMovementChecks.Run(Check);
+    Console.WriteLine($"Rts.Kernel crowd checks PASS ({checks} checks)");
+    return;
+}
+
 RtsMatch CreateMovingMatch()
 {
     var match = new RtsMatch(MatchConfig.Default, 1234);
@@ -112,7 +119,9 @@ MotionRuleChecks.Run(Check);
 MotionStateChecks.Run(Check);
 MotionIntegrationChecks.Run(Check);
 FormationGeometryChecks.Run(Check);
+CrowdMovementChecks.Run(Check);
 GroupMovementChecks.Run(Check);
+GroupArrivalChecks.Run(Check);
 GroupEdgeChecks.Run(Check);
 GroupPlanningChecks.Run(Check);
 OrderQueueChecks.Run(Check);

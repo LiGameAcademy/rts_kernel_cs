@@ -11,7 +11,7 @@ internal static class GroupMovementChecks
         {
             var match = new RtsMatch(MatchConfig.Default, 7, grid, movementDefinitions: definitions);
             for (var i = 0; i < count; i++)
-                match.SubmitCommand(CommandEnvelope.Spawn(1, 0, i, new SimVector2(35 + i % 20 * 10, 35 + i / 20 * 20),
+                match.SubmitCommand(CommandEnvelope.Spawn(1, 0, i, new SimVector2(35 + i % 20 * 20, 35 + i / 20 * 20),
                     i % 3 == 0 ? 2UL : 1UL));
             match.Step(); match.DrainEvents(); return match;
         }
@@ -113,5 +113,33 @@ internal static class GroupMovementChecks
         var outcomes = large.DrainEvents().Where(e => e.Kind == MatchEventKind.GroupMoveAssigned).ToArray();
         check(outcomes.Length == 500, "500 mixed-size units receive reachable distinct endpoints");
         Console.WriteLine($"group_plan_500 elapsed_ms={watch.Elapsed.TotalMilliseconds:F3} frames={frames} max_frame_ms={maximum:F3}");
+        var samples = new List<double>();
+        var separatedDuringMotion = true;
+        var failures = 0;
+        for (var i = 0; i < 180; i++)
+        {
+            var frameWatch = System.Diagnostics.Stopwatch.StartNew();
+            large.Step();
+            samples.Add(frameWatch.Elapsed.TotalMilliseconds);
+            failures += large.DrainEvents().Count(e => e.Kind == MatchEventKind.MoveFailed);
+            var entities = large.Entities.ToArray();
+            for (var a = 0; a < entities.Length; a++)
+            for (var b = a + 1; b < entities.Length; b++)
+            {
+                var radius = large.ReadMovementDefinition(entities[a].Id)!.Radius + large.ReadMovementDefinition(entities[b].Id)!.Radius;
+                var dx = entities[a].Position.X - entities[b].Position.X;
+                var dy = entities[a].Position.Y - entities[b].Position.Y;
+                separatedDuringMotion &= dx * dx + dy * dy >= radius * radius - 1e-8;
+            }
+            if (i == 90)
+            {
+                var resumedLarge = RtsMatch.Restore(large.CaptureSnapshot(), grid, movementDefinitions: definitions);
+                resumedLarge.Step(); large.Step();
+                check(resumedLarge.ComputeStateHash() == large.ComputeStateHash(), "500-unit crowd restores same next-frame decisions");
+            }
+        }
+        check(separatedDuringMotion, "500-unit continuous movement preserves body separation each frame");
+        samples.Sort();
+        Console.WriteLine($"crowd_500 frames=180 mean_ms={samples.Average():F3} p95_ms={samples[170]:F3} max_ms={samples[^1]:F3} failures={failures} remaining={large.ReadMoveOrders().Count}");
     }
 }

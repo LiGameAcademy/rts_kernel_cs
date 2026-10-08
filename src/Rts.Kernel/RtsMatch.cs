@@ -166,6 +166,7 @@ public sealed partial class RtsMatch
         match.RestoreUnitOrders(snapshot);
         match.ValidateRestoredGroups(snapshot);
         match.RestoreGroupPlans(snapshot);
+        match.ValidateGroundBodies();
         return match;
     }
 
@@ -215,6 +216,8 @@ public sealed partial class RtsMatch
             {
                 if (command.MovementDefinitionId != 0 && !_movementDefinitions.TryGet(command.MovementDefinitionId, out _))
                 { AddEvent(MatchEventKind.CommandRejected, EntityId.None, "movement_definition_missing"); break; }
+                if (!CanSpawnGround(command))
+                { AddEvent(MatchEventKind.CommandRejected, EntityId.None, "spawn_ground_unavailable"); break; }
                 var id = new EntityId(_nextEntityId++);
                 _entities.Add(id, new EntityState(id, command.PlayerId, command.Position, SimVector2.Zero, MovementDefinitionId: command.MovementDefinitionId));
                 AddEvent(MatchEventKind.EntitySpawned, id, string.Empty);
