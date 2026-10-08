@@ -8,4 +8,7 @@ public sealed record MoveRequest(SimVector2 Goal, double Speed, int ClearanceCel
 
 public sealed record MoveOrderSnapshot(ulong EntityId, MoveRequest Request,
     IReadOnlyList<SimVector2> Waypoints, int NextWaypoint, int WaitFrames = 0, long RetryAfterFrame = 0);
+/// <summary>Detached per-unit movement diagnostics without copying path waypoints.</summary>
+public readonly record struct MovementStatusView(ulong EntityId, int WaitFrames, long RetryAfterFrame);
+
 internal sealed record MoveOrder(MoveRequest Request, IReadOnlyList<SimVector2> Waypoints, int NextWaypoint = 0, int WaitFrames = 0, long RetryAfterFrame = 0);

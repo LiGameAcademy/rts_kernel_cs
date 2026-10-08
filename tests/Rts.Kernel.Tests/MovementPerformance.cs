@@ -32,6 +32,7 @@ internal static class MovementPerformance
             var placementHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(placement))).ToLowerInvariant();
             var goals = outcomes.ToDictionary(e => e.EntityId, e => e.Group!.Goal!.Value);
             Console.WriteLine($"plan count={count} run={run} frames={planning.Count} total_ms={planning.Sum():F3} max_ms={planning.Max():F3} alloc_kb={planningBytes / 1024.0:F1} assigned={goals.Count} placement_hash={placementHash}");
+            if (!longRun && run == 1) MeasureReads(match, count);
             var samples = new List<double>();
             var bytes = 0L; var failed = 0; var completed = 0;
             for (var frame = 0; frame < (longRun ? 1800 : 180); frame++)
@@ -56,6 +57,23 @@ internal static class MovementPerformance
             }
             samples.Sort();
             Console.WriteLine($"move count={count} run={run} frames={samples.Count} mean_ms={samples.Average():F3} p95_ms={samples[(int)(samples.Count * .95) - 1]:F3} max_ms={samples[^1]:F3} alloc_kb_frame={bytes / 1024.0 / samples.Count:F1} failed={failed} completed={completed} remaining={match.ReadMoveOrders().Count} hash={match.ComputeStateHash()}");
+        }
+    }
+
+    private static void MeasureReads(RtsMatch match, int count)
+    {
+        foreach (var kind in new[] { "paths", "status" })
+        {
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            var watch = Stopwatch.StartNew();
+            for (var read = 0; read < 30; read++)
+            {
+                if (kind == "paths") _ = match.ReadMoveOrders();
+                else _ = match.ReadMovementStatuses();
+            }
+            watch.Stop();
+            var bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+            Console.WriteLine($"read count={count} kind={kind} reads=30 mean_ms={watch.Elapsed.TotalMilliseconds / 30:F3} alloc_kb_read={bytes / 1024.0 / 30:F1}");
         }
     }
 }

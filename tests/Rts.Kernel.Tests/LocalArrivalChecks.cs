@@ -35,7 +35,16 @@ internal static class LocalArrivalChecks
                 { NextGroupId = 2, Moves = moves, Orders = queues }, grid, movementDefinitions: definitions);
         }
         var distant = Create([new(65, 65), new(605, 35)], [new(305, 65), new(605, 65)]);
+        var savedViews = distant.ReadMovementStatuses();
+        var savedHash = distant.ComputeStateHash();
+        var immutable = false;
+        try { ((IList<MovementStatusView>)savedViews)[0] = default; }
+        catch (NotSupportedException) { immutable = true; }
+        check(immutable && distant.ComputeStateHash() == savedHash,
+            "lightweight diagnostics cannot modify authoritative movement state");
         for (var i = 0; i < 20; i++) distant.Step();
+        check(savedViews.Count == 2 && distant.ReadMovementStatuses().Count == 1,
+            "retained diagnostics remain detached when a member completes");
         check(distant.IsMoving(new(1)) && !distant.IsMoving(new(2)),
             "distant higher slot completes while earlier member is still moving");
 

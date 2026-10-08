@@ -18,7 +18,7 @@ var restored = RtsMatch.Restore(snapshot, grid);
 
 路径按格子中心逐段移动，再到精确目标；不平滑、不吸附。跨多个路点也按本帧距离预算消费，抵达时精确停在目标、速度归零并只发一次 MoveCompleted。成功增删动态占地后，所有在途移动在本帧重新寻路；失败时停止并发 MoveFailed，不自动重试。单位被新障碍覆盖也会停止，暂不实现挤出。
 
-实体移动、路径索引与障碍更新只发生在 Step。ReadMoveOrders 返回路径副本，不能修改对局。启用导航的对局拒绝 SetVelocity，避免绕过寻路；无地图的速度积分骨架仍可运行。带移动定义的出生校验静态净空、身体边界和现有地面单位重叠；定义为0的旧诊断出生保持原语义。尚未实现生产规则。
+实体移动、路径索引与障碍更新只发生在 Step。ReadMoveOrders 返回路径副本，不能修改对局。只需要实体ID、等待/重试帧时使用 ReadMovementStatuses，返回独立只读视图，避免复制路点。启用导航的对局拒绝 SetVelocity，避免绕过寻路；无地图的速度积分骨架仍可运行。带移动定义的出生校验静态净空、身体边界和现有地面单位重叠；定义为0的旧诊断出生保持原语义。尚未实现生产规则。
 
 ## 追加与来源优先级
 
@@ -53,11 +53,11 @@ var restored = RtsMatch.Restore(match.CaptureSnapshot(), grid, terrain);
 
 默认启用坡度：高度场必须覆盖完整导航网格；采样当前位置与下一路点的真实高度差，按高度差/平面距离取坡度。30度封顶，上坡最低0.6、下坡最低0.85，等高线/平地不降速。缺少高度时，执行帧返回 `motion_requires_height_field`，保留旧订单；非有限几何或高度计算失败停止并发 MoveFailed。禁用 ScaleSlopeSpeed 时无需高度场。运动参数仍是诊断入口，正式参数须来自权威单位定义。
 
-## 快照 v8
+## 快照 v9
 
 保存实体朝向，以及每个在途实体的目标、速度、净空、运动参数、路径世界坐标和下一路点索引，并保存当前订单类型/来源、FIFO 待执行意图及未执行命令的追加模式/来源，状态哈希与差异报告覆盖这些字段。移动过程中每帧快照可恢复并继续相同模拟。静态地图不嵌入快照，恢复仍需提供身份完全一致的 PathingGrid，以及原局使用的 TerrainHeights；高度哈希包含尺寸、坐标和全部顶点高度。
 
-恢复校验路径点有效性、相邻格、穿墙角与当前位置所在路径段；失败只丢弃新实例。v1–v7 快照不再接受，未提供迁移。没有导航的快照也使用 v8。CLI 默认示例位置/帧号保持不变，哈希随新字段改变；验证宿主时从当前 CLI 取得期望值，不加载旧程序集或硬编码旧哈希。
+恢复校验路径点有效性、相邻格、穿墙角与当前位置所在路径段；失败只丢弃新实例。v1–v8 快照不再接受，未提供迁移。没有导航的快照也使用 v9。CLI 默认示例位置/帧号保持不变，哈希随新字段改变；验证宿主时从当前 CLI 取得期望值，不加载旧程序集或硬编码旧哈希。
 
 ```powershell
 ./Test.ps1 -Configuration Release
@@ -76,9 +76,9 @@ Create a match with frozen MovementDefinition entries and spawn members with the
 
 The kernel assigns stable ideal slots using deterministic minimum squared-distance matching, then checks clearance, connectivity, body separation, other known endpoints and stationary units. Local adjustment searches up to eight grid cells around each ideal slot. A failed member keeps its previous orders; other members may succeed. GroupMoveAssigned events carry actual goals and adjustment results. Append keeps current orders and persists resolved slots in the queue. Stop releases them.
 
-Soft formations use individual paths and assemble at their assigned destinations. Open-ground group routes check every cell and corner before using the shortest octile route, otherwise A* applies. Group commands above 64 members enter a FIFO queue of at most 16 plans. Matching advances with a fixed budget of 1,048,576 inspected columns per frame; candidate preparation advances 64 slots per frame. Old orders continue until commit; at most one plan commits per frame. Valid player Replace/Stop cancels the corresponding member, Append preserves pending plans. Planning freezes starts and exact slot identities; commit rechecks current navigation, eligibility and occupied destinations. ReadGroupPlans exposes copied progress views.
+Soft formations use individual paths and assemble at their assigned destinations. Open-ground group routes check every cell and corner before using the shortest octile route, otherwise A* applies. Group commands above 64 members enter a FIFO queue of at most 16 plans. Matching advances with a fixed budget of 2,097,152 inspected columns per frame; candidate preparation advances 64 slots per frame, including while exact matching is incomplete. Candidate coordinates are enumerated lazily in the unchanged distance/Y/X order; a spatial index narrows exact body-overlap checks. Old orders continue until commit; at most one plan commits per frame. Valid player Replace/Stop cancels the corresponding member, Append preserves pending plans. Planning freezes starts and exact slot identities; commit rechecks current navigation, eligibility and occupied destinations. ReadGroupPlans exposes copied progress views.
 
-v8 stores movement content identity, entity definition IDs, group counter, future group commands and current/pending slot metadata. Restore requires definitions as the final RtsMatch.Restore argument. Older snapshots are rejected. Run the CLI with --formation for a host parity example.
+v9 stores movement content identity, entity definition IDs, group counter, future group commands and current/pending slot metadata. Restore requires definitions as the final RtsMatch.Restore argument. Older snapshots are rejected. Run the CLI with --formation for a host parity example.
 
 
 ## Swept-space reservations and compact arrival
@@ -87,6 +87,9 @@ Profiled ground units reserve their full swept path for the current frame, using
 
 Blocked units attempt local routes within eight cells, at most 256 expanded nodes shared across rejoin attempts. The match permits 16 attempts per frame; a unit retries after six frames. Local routes retain the original goal, capabilities and group slot. Stationary and Stop units are never pushed. Continuous physical blockage for three seconds raises MoveFailed with crowd_blocked_timeout; the next queued intent starts on a subsequent frame.
 
-Near the assigned goal (four body radii plus two grid cells), a higher slot waits for lower active slots in the same group. Arrival, failure, Stop or replacement releases the prior slot. This intentional assembly wait does not consume the physical-blockage timeout. Members still navigate independently in transit; this is a soft formation. A complete 500-member arrival under dense congestion is not guaranteed by the bounded local planner; the full movement-quality/performance gate remains open.
+Near the assigned goal (four body radii plus two grid cells), a higher slot yields only when occupying its endpoint would block a nearby lower active slot's remaining final corridor in the same group. The checked corridor ends at that lower goal and spans up to the sum of both radii plus two cells. Nearby endpoints are indexed within twice the sum of both radii plus two cells. Nonconflicting members may arrive concurrently; a cleared corridor, arrival, failure, Stop or replacement releases the dependency. This intentional assembly wait does not consume the physical-blockage timeout. Members still navigate independently in transit; this is a soft formation. A complete 500-member arrival under dense congestion is not guaranteed by the bounded local planner; the full movement-quality/performance gate remains open.
 
-Snapshot v8 adds WaitFrames and RetryAfterFrame to in-flight orders, and stores pending planning jobs, frozen starts, canceled members, Hungarian work state and candidate preparation progress. Derived reservations and navigation caches are rebuilt. Formats 1 through 7 are rejected; no migration is provided. CLI --crowd demonstrates detouring around a stationary Stop unit and provides a current host-parity hash.
+Snapshot v9 retains WaitFrames and RetryAfterFrame to in-flight orders, and stores pending planning jobs, frozen starts, canceled members, Hungarian work state and candidate preparation progress. Candidate preparation may now overlap matching; this changes scheduling and requires the new format. Derived reservations, arrival-neighbor indexes and navigation caches are rebuilt. Formats 1 through 8 are rejected; no migration is provided. CLI --crowd demonstrates detouring around a stationary Stop unit and provides a current host-parity hash.
+
+
+Use `dotnet run --project tests/Rts.Kernel.Tests -c Release -- --perf` for repeated 300/500-member planning, movement and diagnostic-read samples. `--perf-long` samples 1,800 movement frames and reports failures, completions and remaining orders. Wall-clock measurements never control the simulation; the dense reordering fixture is not a completed movement-quality or platform-export acceptance test.

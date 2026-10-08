@@ -12,6 +12,9 @@ public sealed partial class RtsMatch
         new MoveOrderSnapshot(pair.Key.Value, pair.Value.Request,
             Array.AsReadOnly(pair.Value.Waypoints.ToArray()), pair.Value.NextWaypoint, pair.Value.WaitFrames, pair.Value.RetryAfterFrame)).ToArray());
 
+    public IReadOnlyList<MovementStatusView> ReadMovementStatuses() => Array.AsReadOnly(_moveOrders.Select(pair =>
+        new MovementStatusView(pair.Key.Value, pair.Value.WaitFrames, pair.Value.RetryAfterFrame)).ToArray());
+
     private bool TryPlanMove(SimVector2 position, MoveRequest request, out MoveOrder? order, bool preferDirect = false)
     {
         order = null;
