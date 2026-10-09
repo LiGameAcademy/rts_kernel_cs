@@ -137,6 +137,7 @@ CheckThrows<ArgumentException>(() => new TerrainHeights(2, 2, 128, default, new 
 FrameworkTraceChecks.Run(Check);
 EntityReadChecks.Run(Check);
 CommandContractChecks.Run(Check);
+MatchCommandQueueChecks.Run(Check);
 PathfindingChecks.Run(Check);
 NavigationChecks.Run(Check);
 MovementChecks.Run(Check);

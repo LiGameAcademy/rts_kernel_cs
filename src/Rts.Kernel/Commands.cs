@@ -137,5 +137,3 @@ public sealed record MatchEvent(
     MatchEventKind Kind,
     EntityId EntityId,
     string Detail, GroupMoveOutcome? Group = null);
-
-internal sealed record QueuedCommand(long ArrivalOrder, CommandEnvelope Command);
