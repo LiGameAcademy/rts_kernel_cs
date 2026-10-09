@@ -6,12 +6,11 @@ namespace Rts.Kernel;
 
 public sealed partial class RtsMatch
 {
-    private readonly SortedDictionary<EntityId, EntityState> _entities = [];
+    private readonly MatchEntities _entities = new();
     private readonly MatchCommandQueue _commands = new();
     private readonly MatchEventBuffer _events = new();
     private NavigationState? _navigation;
     private readonly DeterministicRng _rng;
-    private ulong _nextEntityId = 1;
 
     public RtsMatch(MatchConfig config, ulong seed, PathingGrid? pathingGrid = null, TerrainHeights? terrain = null,
         IReadOnlyList<MovementDefinition>? movementDefinitions = null)
@@ -32,10 +31,10 @@ public sealed partial class RtsMatch
     public long Frame { get; private set; }
 
     /// <summary>Live read-only view in entity ID order. Enumerate only between Step calls; retained views observe later changes.</summary>
-    public IReadOnlyCollection<EntityState> Entities => _entities.Values;
+    public IReadOnlyCollection<EntityState> Entities => _entities.Live;
 
     /// <summary>Detached read-only entity list in ID order. Later steps do not change its contents.</summary>
-    public IReadOnlyList<EntityState> ReadEntities() => Array.AsReadOnly(_entities.Values.ToArray());
+    public IReadOnlyList<EntityState> ReadEntities() => _entities.ReadAll();
 
     public PathResult FindPath(GridCell start, GridCell goal, int clearanceCells = 0,
         int maxExpandedNodes = int.MaxValue) =>
@@ -55,32 +54,21 @@ public sealed partial class RtsMatch
     }
 
     public bool TryGetEntity(EntityId entityId, out EntityState? state) =>
-        _entities.TryGetValue(entityId, out state);
+        _entities.TryGet(entityId, out state);
 
     public IReadOnlyList<MatchEvent> DrainEvents() => _events.Drain();
 
     public MatchSnapshot CaptureSnapshot()
     {
-        var entities = _entities.Values
-            .Select(entity => new EntitySnapshot(
-                entity.Id.Value,
-                entity.OwnerId,
-                entity.Position.X,
-                entity.Position.Y,
-                entity.Velocity.X,
-                entity.Velocity.Y,
-                entity.Facing, entity.MovementDefinitionId))
-            .ToArray();
-
         return new MatchSnapshot(
             SnapshotJson.CurrentFormatVersion,
             Config.TickRate,
             Frame,
-            _nextEntityId,
+            _entities.NextId,
             _commands.NextArrivalOrder,
             _events.NextSequence,
             _rng.State,
-            entities,
+            _entities.Capture(),
             _commands.Capture(),
             _navigation?.CaptureSnapshot(),
             ReadMoveOrders(),
@@ -101,30 +89,18 @@ public sealed partial class RtsMatch
         var match = new RtsMatch(new MatchConfig(snapshot.TickRate), snapshot.RngState, pathingGrid, terrain, movementDefinitions)
         {
             Frame = snapshot.Frame,
-            _nextEntityId = snapshot.NextEntityId,
         };
 
         if (snapshot.Navigation is not null)
             match._navigation = NavigationState.Restore(pathingGrid!, snapshot.Navigation, terrain);
 
-        foreach (var entity in snapshot.Entities.OrderBy(item => item.Id))
-        {
-            var id = new EntityId(entity.Id);
-            if (id.IsNone || !match._entities.TryAdd(id, new EntityState(
-                    id,
-                    entity.OwnerId,
-                    new SimVector2(entity.PositionX, entity.PositionY),
-                    new SimVector2(entity.VelocityX, entity.VelocityY), entity.Facing, entity.MovementDefinitionId)))
-            {
-                throw new InvalidDataException($"Invalid or duplicate entity id {entity.Id}.");
-            }
-        }
+        match._entities.Restore(snapshot.NextEntityId, snapshot.Entities);
 
         match._commands.Restore(snapshot.NextArrivalOrder, snapshot.PendingCommands);
         match._events.Restore(snapshot.NextEventSequence);
-        match._orders.Restore(snapshot, match._entities, match._navigation);
+        match._orders.Restore(snapshot, match._entities.ById, match._navigation);
         match.ValidateRestoredGroups(snapshot);
-        match._planning.Restore(snapshot, match._entities, match._movementDefinitions, match._navigation);
+        match._planning.Restore(snapshot, match._entities.ById, match._movementDefinitions, match._navigation);
         match.ValidateGroundBodies();
         return match;
     }
@@ -164,18 +140,10 @@ public sealed partial class RtsMatch
                 ExecuteMove(command);
                 break;
             case CommandKind.SpawnEntity:
-            {
-                if (command.MovementDefinitionId != 0 && !_movementDefinitions.TryGet(command.MovementDefinitionId, out _))
-                { AddEvent(MatchEventKind.CommandRejected, EntityId.None, "movement_definition_missing"); break; }
-                if (!CanSpawnGround(command))
-                { AddEvent(MatchEventKind.CommandRejected, EntityId.None, "spawn_ground_unavailable"); break; }
-                var id = new EntityId(_nextEntityId++);
-                _entities.Add(id, new EntityState(id, command.PlayerId, command.Position, SimVector2.Zero, MovementDefinitionId: command.MovementDefinitionId));
-                AddEvent(MatchEventKind.EntitySpawned, id, string.Empty);
+                ExecuteSpawn(command);
                 break;
-            }
             case CommandKind.SetVelocity:
-                if (!_entities.TryGetValue(command.EntityId, out var entity) || entity.OwnerId != command.PlayerId)
+                if (!_entities.TryGet(command.EntityId, out var entity) || entity.OwnerId != command.PlayerId)
                 {
                     AddEvent(MatchEventKind.CommandRejected, command.EntityId, "entity_missing_or_not_owned");
                     break;
@@ -187,7 +155,7 @@ public sealed partial class RtsMatch
                     break;
                 }
                 _orders.Clear(entity.Id);
-                _entities[command.EntityId] = entity with { Velocity = command.Velocity };
+                _entities.Update(entity with { Velocity = command.Velocity });
                 break;
             case CommandKind.Stop:
                 ExecuteStop(command);
@@ -196,6 +164,22 @@ public sealed partial class RtsMatch
                 AddEvent(MatchEventKind.CommandRejected, command.EntityId, "unknown_command");
                 break;
         }
+    }
+
+    private void ExecuteSpawn(CommandEnvelope command)
+    {
+        if (command.MovementDefinitionId != 0 && !_movementDefinitions.TryGet(command.MovementDefinitionId, out _))
+        {
+            AddEvent(MatchEventKind.CommandRejected, EntityId.None, "movement_definition_missing");
+            return;
+        }
+        if (!CanSpawnGround(command))
+        {
+            AddEvent(MatchEventKind.CommandRejected, EntityId.None, "spawn_ground_unavailable");
+            return;
+        }
+        var spawned = _entities.Spawn(command.PlayerId, command.Position, command.MovementDefinitionId);
+        AddEvent(MatchEventKind.EntitySpawned, spawned.Id, string.Empty);
     }
 
     private void AddEvent(MatchEventKind kind, EntityId entityId, string detail) =>

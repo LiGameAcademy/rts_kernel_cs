@@ -32,20 +32,19 @@ public sealed partial class RtsMatch
 
     private void AdvanceMovement(double seconds)
     {
-        foreach (var pair in _entities.ToArray())
+        foreach (var entity in _entities.ReadAll())
         {
-            var entity = pair.Value;
             if (entity.MovementDefinitionId != 0) continue;
-            if (!_orders.TryReadPath(pair.Key, out var order))
+            if (!_orders.TryReadPath(entity.Id, out var order))
             {
-                _entities[pair.Key] = entity with { Position = entity.Position + entity.Velocity * seconds };
+                _entities.Update(entity with { Position = entity.Position + entity.Velocity * seconds });
                 continue;
             }
             if (_pathsDirty)
             {
                 if (!TryPlanMove(entity.Position, order.Request, out var replanned, ReadCurrentOrder(entity.Id)?.Group is not null))
                 {
-                    FinishMove(pair.Key, entity.Position, MatchEventKind.MoveFailed, "path_blocked");
+                    FinishMove(entity.Id, entity.Position, MatchEventKind.MoveFailed, "path_blocked");
                     continue;
                 }
                 order = replanned!;
@@ -59,13 +58,13 @@ public sealed partial class RtsMatch
 
     private void CommitDiagnosticMovement(EntityState entity, MoveOrder order, MovementStep step, double seconds)
     {
-        _entities[entity.Id] = entity with
+        _entities.Update(entity with
         {
             Position = step.Position,
             Facing = step.Facing,
             Velocity = new SimVector2((step.Position.X - entity.Position.X) / seconds,
                 (step.Position.Y - entity.Position.Y) / seconds)
-        };
+        });
         if (step.Failure is not null)
             FinishMove(entity.Id, step.Position, MatchEventKind.MoveFailed, step.Failure);
         else if (step.NextWaypoint == order.Waypoints.Count)
@@ -77,7 +76,7 @@ public sealed partial class RtsMatch
     private void FinishMove(EntityId id, SimVector2 position, MatchEventKind kind, string detail)
     {
         _orders.Complete(id);
-        _entities[id] = _entities[id] with { Position = position, Velocity = SimVector2.Zero };
+        _entities.Update(_entities.Get(id) with { Position = position, Velocity = SimVector2.Zero });
         AddEvent(kind, id, detail);
     }
 

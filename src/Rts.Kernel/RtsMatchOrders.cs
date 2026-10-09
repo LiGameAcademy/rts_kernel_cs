@@ -22,7 +22,7 @@ public sealed partial class RtsMatch
 
     private bool ExecuteMoveCore(CommandEnvelope command, GroupSlot? group, MoveSubmission submission)
     {
-        if (!_entities.TryGetValue(command.EntityId, out var entity) || entity.OwnerId != command.PlayerId)
+        if (!_entities.TryGet(command.EntityId, out var entity) || entity.OwnerId != command.PlayerId)
         {
             AddEvent(MatchEventKind.CommandRejected, command.EntityId, "entity_missing_or_not_owned");
             return false;
@@ -67,13 +67,13 @@ public sealed partial class RtsMatch
         }
         if (command.Mode == OrderMode.Replace && submission == MoveSubmission.Command) CancelGroupPlans(entity.Id, command.Source);
         _orders.ReplaceMove(entity.Id, intent, order!);
-        _entities[entity.Id] = entity with { Velocity = SimVector2.Zero };
+        _entities.Update(entity with { Velocity = SimVector2.Zero });
         return true;
     }
 
     private void ExecuteStop(CommandEnvelope command)
     {
-        if (!_entities.TryGetValue(command.EntityId, out var entity) || entity.OwnerId != command.PlayerId)
+        if (!_entities.TryGet(command.EntityId, out var entity) || entity.OwnerId != command.PlayerId)
             AddEvent(MatchEventKind.CommandRejected, command.EntityId, "entity_missing_or_not_owned");
         else if (command.Source == OrderSource.UnitAi && BlocksUnitAi(entity.Id))
             AddEvent(MatchEventKind.CommandRejected, entity.Id, "player_order_active");
@@ -81,7 +81,7 @@ public sealed partial class RtsMatch
         {
             CancelGroupPlans(entity.Id, command.Source);
             _orders.Stop(entity.Id, command.Source);
-            _entities[entity.Id] = entity with { Velocity = SimVector2.Zero };
+            _entities.Update(entity with { Velocity = SimVector2.Zero });
         }
     }
 
@@ -90,11 +90,11 @@ public sealed partial class RtsMatch
         foreach (var id in _orders.WaitingIds())
         {
             var intent = _orders.PeekWaiting(id);
-            var entity = _entities[id];
+            var entity = _entities.Get(id);
             if (TryPlanMove(entity.Position, intent.Move!, out var move, intent.Group is not null))
             {
                 _orders.ActivateWaiting(id, move!);
-                _entities[id] = entity with { Velocity = SimVector2.Zero };
+                _entities.Update(entity with { Velocity = SimVector2.Zero });
             }
             else
             {
