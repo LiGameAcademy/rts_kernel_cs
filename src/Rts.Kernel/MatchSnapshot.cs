@@ -92,18 +92,9 @@ public static class SnapshotValidator
                 throw new InvalidDataException($"Invalid pending arrival order: {queued.ArrivalOrder}.");
             }
 
-            if (command.ExecuteFrame <= snapshot.Frame || command.PlayerId < 0 || command.Sequence < 0
-                || !Enum.IsDefined(command.Kind) || !command.HasValidObstaclePayload || !command.HasValidMovePayload || !command.HasValidOrderMetadata || !command.HasValidGroupPayload
-                || !double.IsFinite(command.Position.X) || !double.IsFinite(command.Position.Y)
-                || !double.IsFinite(command.Velocity.X) || !double.IsFinite(command.Velocity.Y))
+            if (command.ExecuteFrame <= snapshot.Frame || command.GetStructureError() is not null)
             {
                 throw new InvalidDataException("Invalid pending command.");
-            }
-
-            var expectsEntity = command.Kind is CommandKind.SetVelocity or CommandKind.Stop or CommandKind.MoveTo;
-            if (expectsEntity == command.EntityId.IsNone)
-            {
-                throw new InvalidDataException("Pending command entity id does not match its kind.");
             }
         }
         GroupSnapshot.Validate(snapshot);

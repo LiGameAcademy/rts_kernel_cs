@@ -72,6 +72,24 @@ public sealed record CommandEnvelope(
         ? Group is { IsValid: true } && EntityId.IsNone && Position == SimVector2.Zero && Velocity == SimVector2.Zero
         : Group is null) && (Kind == CommandKind.SpawnEntity || MovementDefinitionId == 0);
 
+    // Shared by command admission and snapshot restore; execution context is checked later.
+    internal string? GetStructureError()
+    {
+        if (PlayerId < 0 || Sequence < 0) return "invalid_command_identity";
+        if (!Enum.IsDefined(Kind)) return "invalid_command_kind";
+        if (!HasValidObstaclePayload) return "invalid_obstacle_payload";
+        if (!HasValidMovePayload) return "invalid_move_payload";
+        if (!HasValidOrderMetadata) return "invalid_order_metadata";
+        if (!double.IsFinite(Position.X) || !double.IsFinite(Position.Y)
+            || !double.IsFinite(Velocity.X) || !double.IsFinite(Velocity.Y))
+            return "invalid_command_geometry";
+        if (!HasValidGroupPayload) return "invalid_group_payload";
+
+        var expectsEntity = Kind is CommandKind.SetVelocity or CommandKind.Stop or CommandKind.MoveTo;
+        if (expectsEntity == EntityId.IsNone) return "invalid_command_entity_id";
+        return null;
+    }
+
     internal CommandEnvelope Freeze() => Group is null ? this : this with { Group = Group.Freeze() };
 
     public static CommandEnvelope Spawn(
