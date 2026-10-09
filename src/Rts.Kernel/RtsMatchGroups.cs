@@ -135,7 +135,7 @@ public sealed partial class RtsMatch
     }
 
     private void AddGroupEvent(MatchEventKind kind, EntityId id, string detail, GroupMoveOutcome outcome) =>
-        _events.Add(new MatchEvent(Frame, _nextEventSequence++, kind, id, detail, outcome));
+        _events.Publish(Frame, kind, id, detail, outcome);
 
     private void ValidateRestoredGroups(MatchSnapshot snapshot)
     {
