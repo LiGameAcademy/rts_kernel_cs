@@ -15,9 +15,8 @@ public sealed partial class RtsMatch
 
     private void CancelGroupPlans(EntityId id, OrderSource source)
     {
-        if (source == OrderSource.UnitAi) return;
         foreach (var job in _groupPlans)
-            if (job.Contains(id))
+            if (job.Contains(id) && (source != OrderSource.UnitAi || job.Command.Source == OrderSource.UnitAi))
             {
                 job.Canceled.Add(id.Value);
                 AddGroupEvent(MatchEventKind.CommandRejected, id, "group_plan_superseded", new(job.Id, -1, null, false));
