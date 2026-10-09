@@ -140,6 +140,7 @@ GroupMovementChecks.Run(Check);
 GroupArrivalChecks.Run(Check);
 GroupEdgeChecks.Run(Check);
 GroupPlanningChecks.Run(Check);
+GroupSupersessionChecks.Run(Check);
 OrderQueueChecks.Run(Check);
 OrderSnapshotChecks.Run(Check);
 
