@@ -93,3 +93,10 @@ Snapshot v9 retains WaitFrames and RetryAfterFrame to in-flight orders, and stor
 
 
 Use `dotnet run --project tests/Rts.Kernel.Tests -c Release -- --perf` for repeated 300/500-member planning, movement and diagnostic-read samples. `--perf-long` samples 1,800 movement frames and reports failures, completions and remaining orders. Wall-clock measurements never control the simulation; the dense reordering fixture is not a completed movement-quality or platform-export acceptance test.
+
+
+## 内部状态边界
+
+`UnitOrderBook` 独占当前/排队订单和活动路径，通过替换、追加、停止、衔接与完成操作维护对应关系；对外只提供不可变意图、路径记录及独立读取结果，不返回可写队列或字典。`GroupPlanningQueue` 独占计划身份、FIFO队列、取消及固定工作量调度，`GroupPlanningJob` 独占每个任务的计算进度。
+
+`RtsMatch` 保留实体状态、帧序、输入与事件协调，先检查命令上下文，再调用模块操作。恢复使用同样的状态所有者；整局快照仍包含实体、订单、路径、规划及随机状态。模块为具体对象组合，不使用通用调度或依赖注入框架。
