@@ -50,48 +50,28 @@ public sealed partial class RtsMatch
                 }
                 order = replanned!;
             }
-            if (order.Request.Motion is not null)
-            {
-                AdvanceMotion(entity, order, seconds);
-                continue;
-            }
-            var position = entity.Position;
-            var remaining = order.Request.Speed * seconds;
-            var next = order.NextWaypoint;
-            while (next < order.Waypoints.Count)
-            {
-                var target = order.Waypoints[next];
-                var dx = target.X - position.X;
-                var dy = target.Y - position.Y;
-                var distance = Math.Sqrt(dx * dx + dy * dy);
-                if (!double.IsFinite(distance))
-                {
-                    FinishMove(pair.Key, position, MatchEventKind.MoveFailed, "invalid_move_geometry");
-                    break;
-                }
-                if (distance <= remaining)
-                {
-                    position = target;
-                    remaining -= distance;
-                    next++;
-                    continue;
-                }
-                if (remaining > 0) position = new SimVector2(position.X + dx / distance * remaining,
-                    position.Y + dy / distance * remaining);
-                break;
-            }
-            if (!_orders.IsMoving(pair.Key)) continue;
-            if (next == order.Waypoints.Count)
-                FinishMove(pair.Key, position, MatchEventKind.MoveCompleted, string.Empty);
-            else
-            {
-                _orders.UpdatePath(pair.Key, order with { NextWaypoint = next });
-                _entities[pair.Key] = entity with { Position = position, Velocity = new SimVector2(
-                    (position.X - entity.Position.X) / seconds, (position.Y - entity.Position.Y) / seconds) };
-            }
+            var step = MovementStepper.ComputeDiagnostic(entity, order, seconds, _navigation?.Terrain);
+            CommitDiagnosticMovement(entity, order, step, seconds);
         }
         AdvanceCrowd(seconds);
         _pathsDirty = false;
+    }
+
+    private void CommitDiagnosticMovement(EntityState entity, MoveOrder order, MovementStep step, double seconds)
+    {
+        _entities[entity.Id] = entity with
+        {
+            Position = step.Position,
+            Facing = step.Facing,
+            Velocity = new SimVector2((step.Position.X - entity.Position.X) / seconds,
+                (step.Position.Y - entity.Position.Y) / seconds)
+        };
+        if (step.Failure is not null)
+            FinishMove(entity.Id, step.Position, MatchEventKind.MoveFailed, step.Failure);
+        else if (step.NextWaypoint == order.Waypoints.Count)
+            FinishMove(entity.Id, step.Position, MatchEventKind.MoveCompleted, string.Empty);
+        else
+            _orders.UpdatePath(entity.Id, order with { NextWaypoint = step.NextWaypoint });
     }
 
     private void FinishMove(EntityId id, SimVector2 position, MatchEventKind kind, string detail)
