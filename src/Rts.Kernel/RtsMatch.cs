@@ -48,22 +48,11 @@ public sealed partial class RtsMatch
             return CommandAcceptance.Reject("execute_frame_must_be_in_the_future");
         }
 
-        if (command.PlayerId < 0 || command.Sequence < 0)
+        if (command.GetStructureError() is { } error)
         {
-            return CommandAcceptance.Reject("invalid_command_identity");
+            return CommandAcceptance.Reject(error);
         }
 
-        if (!command.HasValidObstaclePayload)
-            return CommandAcceptance.Reject("invalid_obstacle_payload");
-
-        if (!command.HasValidMovePayload) return CommandAcceptance.Reject("invalid_move_payload");
-
-        if (!command.HasValidOrderMetadata) return CommandAcceptance.Reject("invalid_order_metadata");
-
-        if (!double.IsFinite(command.Position.X) || !double.IsFinite(command.Position.Y)
-            || !double.IsFinite(command.Velocity.X) || !double.IsFinite(command.Velocity.Y))
-            return CommandAcceptance.Reject("invalid_command_geometry");
-        if (!command.HasValidGroupPayload) return CommandAcceptance.Reject("invalid_group_payload");
         _pendingCommands.Add(new QueuedCommand(_nextArrivalOrder++, command.Freeze()));
         return CommandAcceptance.Accept();
     }
