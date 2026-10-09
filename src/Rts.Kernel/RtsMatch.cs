@@ -7,12 +7,11 @@ namespace Rts.Kernel;
 public sealed partial class RtsMatch
 {
     private readonly SortedDictionary<EntityId, EntityState> _entities = [];
-    private readonly List<QueuedCommand> _pendingCommands = [];
+    private readonly MatchCommandQueue _commands = new();
     private readonly List<MatchEvent> _events = [];
     private NavigationState? _navigation;
     private readonly DeterministicRng _rng;
     private ulong _nextEntityId = 1;
-    private long _nextArrivalOrder;
     private long _nextEventSequence;
 
     public RtsMatch(MatchConfig config, ulong seed, PathingGrid? pathingGrid = null, TerrainHeights? terrain = null,
@@ -44,21 +43,7 @@ public sealed partial class RtsMatch
         (_navigation ?? throw new InvalidOperationException("Match has no pathing grid."))
         .FindPath(start, goal, clearanceCells, maxExpandedNodes);
 
-    public CommandAcceptance SubmitCommand(CommandEnvelope command)
-    {
-        if (command.ExecuteFrame <= Frame)
-        {
-            return CommandAcceptance.Reject("execute_frame_must_be_in_the_future");
-        }
-
-        if (command.GetStructureError() is { } error)
-        {
-            return CommandAcceptance.Reject(error);
-        }
-
-        _pendingCommands.Add(new QueuedCommand(_nextArrivalOrder++, command.Freeze()));
-        return CommandAcceptance.Accept();
-    }
+    public CommandAcceptance SubmitCommand(CommandEnvelope command) => _commands.Submit(command, Frame);
 
     public void Step()
     {
@@ -93,24 +78,16 @@ public sealed partial class RtsMatch
                 entity.Facing, entity.MovementDefinitionId))
             .ToArray();
 
-        var pending = _pendingCommands
-            .OrderBy(item => item.Command.ExecuteFrame)
-            .ThenBy(item => item.Command.PlayerId)
-            .ThenBy(item => item.Command.Sequence)
-            .ThenBy(item => item.ArrivalOrder)
-            .Select(item => new QueuedCommandSnapshot(item.ArrivalOrder, item.Command))
-            .ToArray();
-
         return new MatchSnapshot(
             SnapshotJson.CurrentFormatVersion,
             Config.TickRate,
             Frame,
             _nextEntityId,
-            _nextArrivalOrder,
+            _commands.NextArrivalOrder,
             _nextEventSequence,
             _rng.State,
             entities,
-            pending,
+            _commands.Capture(),
             _navigation?.CaptureSnapshot(),
             ReadMoveOrders(),
             ReadUnitOrders(), _movementDefinitions.ContentHash, _planning.NextId,
@@ -131,7 +108,6 @@ public sealed partial class RtsMatch
         {
             Frame = snapshot.Frame,
             _nextEntityId = snapshot.NextEntityId,
-            _nextArrivalOrder = snapshot.NextArrivalOrder,
             _nextEventSequence = snapshot.NextEventSequence,
         };
 
@@ -151,8 +127,7 @@ public sealed partial class RtsMatch
             }
         }
 
-        match._pendingCommands.AddRange(snapshot.PendingCommands.Select(
-            item => new QueuedCommand(item.ArrivalOrder, item.Command.Freeze())));
+        match._commands.Restore(snapshot.NextArrivalOrder, snapshot.PendingCommands);
         match._orders.Restore(snapshot, match._entities, match._navigation);
         match.ValidateRestoredGroups(snapshot);
         match._planning.Restore(snapshot, match._entities, match._movementDefinitions, match._navigation);
@@ -168,17 +143,9 @@ public sealed partial class RtsMatch
 
     private void ExecuteCommandsForCurrentFrame()
     {
-        var due = _pendingCommands
-            .Where(item => item.Command.ExecuteFrame == Frame)
-            .OrderBy(item => item.Command.PlayerId)
-            .ThenBy(item => item.Command.Sequence)
-            .ThenBy(item => item.ArrivalOrder)
-            .ToArray();
-
-        _pendingCommands.RemoveAll(item => item.Command.ExecuteFrame <= Frame);
-        foreach (var queued in due)
+        foreach (var command in _commands.TakeForFrame(Frame))
         {
-            Execute(queued.Command);
+            Execute(command);
         }
     }
 
