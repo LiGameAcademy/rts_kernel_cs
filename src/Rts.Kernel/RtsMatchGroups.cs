@@ -6,7 +6,7 @@ public sealed partial class RtsMatch
 {
     private readonly MovementDefinitions _movementDefinitions;
 
-    public MovementDefinition? ReadMovementDefinition(EntityId id) => _entities.TryGetValue(id, out var entity)
+    public MovementDefinition? ReadMovementDefinition(EntityId id) => _entities.TryGet(id, out var entity)
         && _movementDefinitions.TryGet(entity.MovementDefinitionId, out var definition) ? definition : null;
 
     private int Clearance(MovementDefinition definition)
@@ -35,7 +35,7 @@ public sealed partial class RtsMatch
             members.Sum(member => member.Start.Y / members.Count));
         var dx = request.Goal.X - mean.X;
         var dy = request.Goal.Y - mean.Y;
-        var heading = request.Heading ?? (dx == 0 && dy == 0 ? _entities[anchorMember.Id].Facing : Math.Atan2(dy, dx));
+        var heading = request.Heading ?? (dx == 0 && dy == 0 ? _entities.Get(anchorMember.Id).Facing : Math.Atan2(dy, dx));
         heading = MotionRules.Normalize(heading);
         IReadOnlyList<PlacementGoal> goals;
         try
@@ -72,7 +72,7 @@ public sealed partial class RtsMatch
         foreach (var id in command.Group!.EntityIds)
         {
             string? error = null;
-            if (!_entities.TryGetValue(id, out var entity) || entity.OwnerId != command.PlayerId)
+            if (!_entities.TryGet(id, out var entity) || entity.OwnerId != command.PlayerId)
                 error = "entity_missing_or_not_owned";
             else if (command.Source == OrderSource.UnitAi && BlocksUnitAi(id)) error = "player_order_active";
             else if (command.Mode == OrderMode.Append && GetPendingOrderCount(id) >= MaximumPendingOrders)
@@ -96,7 +96,7 @@ public sealed partial class RtsMatch
     {
         var activeIds = members.Select(member => member.Id).ToHashSet();
         var occupied = new List<PlacementBody>();
-        foreach (var entity in _entities.Values.Where(entity => !activeIds.Contains(entity.Id)))
+        foreach (var entity in _entities.Live.Where(entity => !activeIds.Contains(entity.Id)))
         {
             var radius = ReadMovementDefinition(entity.Id)?.Radius ?? 0;
             if (!IsMoving(entity.Id)) occupied.Add(new PlacementBody(entity.Position, radius));
@@ -141,7 +141,7 @@ public sealed partial class RtsMatch
     {
         if (snapshot.MovementHash != _movementDefinitions.ContentHash)
             throw new InvalidDataException("Movement definitions do not match snapshot content.");
-        foreach (var entity in _entities.Values)
+        foreach (var entity in _entities.Live)
             if (entity.MovementDefinitionId != 0 && !_movementDefinitions.TryGet(entity.MovementDefinitionId, out _))
                 throw new InvalidDataException("Entity movement definition is missing.");
         foreach (var queue in snapshot.Orders!)

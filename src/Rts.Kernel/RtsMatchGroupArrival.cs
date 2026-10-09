@@ -36,7 +36,7 @@ public sealed partial class RtsMatch
         foreach (var other in _arrivalNeighbors[group.GroupId].Prior(entity.Id))
             if (_orders.TryReadPath(other.Id, out var prior)
                 && ReadCurrentOrder(other.Id)?.Group?.GroupId == group.GroupId
-                && ArrivalNeighbors.BlocksApproach(order.Request.Goal, radius, _entities[other.Id].Position,
+                && ArrivalNeighbors.BlocksApproach(order.Request.Goal, radius, _entities.Get(other.Id).Position,
                     other.Radius, prior, _navigation.Grid.CellSize)) return true;
         return false;
     }

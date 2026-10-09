@@ -15,14 +15,14 @@ public sealed partial class RtsMatch
         if (definition is null || !_navigation!.TryWorldToCell(command.Position, out var cell)
             || !_navigation.CanOccupy(cell, Clearance(definition)) || !_navigation.CanStandAt(command.Position, definition.Radius))
             return false;
-        return !_entities.Values.Where(entity => entity.MovementDefinitionId != 0).Any(entity =>
+        return !_entities.Live.Where(entity => entity.MovementDefinitionId != 0).Any(entity =>
             CrowdGeometry.Overlap(command.Position, command.Position, definition.Radius,
                 entity.Position, entity.Position, ReadMovementDefinition(entity.Id)!.Radius));
     }
 
     private void ValidateGroundBodies()
     {
-        var bodies = _entities.Values.Where(entity => entity.MovementDefinitionId != 0).ToArray();
+        var bodies = _entities.Live.Where(entity => entity.MovementDefinitionId != 0).ToArray();
         for (var i = 0; i < bodies.Length; i++)
         for (var j = i + 1; j < bodies.Length; j++)
             if (CrowdGeometry.Overlap(bodies[i].Position, bodies[i].Position, ReadMovementDefinition(bodies[i].Id)!.Radius,
@@ -32,7 +32,7 @@ public sealed partial class RtsMatch
 
     private void AdvanceCrowd(double seconds)
     {
-        var bodies = _entities.Values.Where(entity => entity.MovementDefinitionId != 0).ToArray();
+        var bodies = _entities.Live.Where(entity => entity.MovementDefinitionId != 0).ToArray();
         if (bodies.Length == 0) return;
         var maximumRadius = bodies.Max(entity => ReadMovementDefinition(entity.Id)!.Radius);
         var reservations = new CrowdReservations(Math.Max(_navigation!.Grid.CellSize, maximumRadius * 2));
@@ -45,7 +45,7 @@ public sealed partial class RtsMatch
             .OrderByDescending(entity => _orders.ReadPath(entity.Id).WaitFrames).ThenBy(entity => entity.Id).ToArray();
         foreach (var initial in moving)
         {
-            var entity = _entities[initial.Id];
+            var entity = _entities.Get(initial.Id);
             var definition = ReadMovementDefinition(entity.Id)!;
             var order = _orders.ReadPath(entity.Id);
             if (_pathsDirty)
@@ -65,7 +65,7 @@ public sealed partial class RtsMatch
             }
             if (YieldAtGroupGoal(entity, order, step))
             {
-                _entities[entity.Id] = entity with { Velocity = SimVector2.Zero };
+                _entities.Update(entity with { Velocity = SimVector2.Zero });
                 _orders.UpdatePath(entity.Id, order with { WaitFrames = 0 });
                 continue; // Assembly sequencing is intentional waiting, not a physical-blockage failure.
             }
@@ -89,7 +89,7 @@ public sealed partial class RtsMatch
                 if (!reservations.Safe(entity.Id, definition.Radius, step.Trace))
                 {
                     var wait = order.WaitFrames + 1;
-                    _entities[entity.Id] = entity with { Velocity = SimVector2.Zero, Facing = step.Facing };
+                    _entities.Update(entity with { Velocity = SimVector2.Zero, Facing = step.Facing });
                     if (wait >= CrowdBlockedSeconds * Config.TickRate)
                         FinishMove(entity.Id, entity.Position, MatchEventKind.MoveFailed, "crowd_blocked_timeout");
                     else
@@ -98,13 +98,13 @@ public sealed partial class RtsMatch
                 }
             }
             // Commit only a safe proposal, then publish its trace for the remaining units this frame.
-            _entities[entity.Id] = entity with
+            _entities.Update(entity with
             {
                 Position = step.Position,
                 Facing = step.Facing,
                 Velocity = new((step.Position.X - entity.Position.X) / seconds,
                     (step.Position.Y - entity.Position.Y) / seconds)
-            };
+            });
             reservations.Put(new(entity.Id, definition.Radius, step.Trace));
             if (step.NextWaypoint == order.Waypoints.Count)
                 FinishMove(entity.Id, step.Position, MatchEventKind.MoveCompleted, string.Empty);
