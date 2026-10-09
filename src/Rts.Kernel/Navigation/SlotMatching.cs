@@ -6,6 +6,8 @@ public sealed record SlotMatchingSnapshot(int Row, int Column, bool Searching,
 /// <summary>Exact Hungarian assignment; each advance charges a fixed number of inspected columns.</summary>
 internal sealed class SlotMatchingWork
 {
+    // Slot 0 belongs to the anchor. _members maps remaining rows back to entity input indices.
+    // Costs use zero-based rows/columns and squared world distance.
     private readonly int[] _members;
     private readonly double[] _costs;
     private readonly int _n;
@@ -13,6 +15,8 @@ internal sealed class SlotMatchingWork
     private int _row = 1;
     private int _column;
     private bool _searching;
+    // Hungarian arrays use indices 1..n; column 0 is the synthetic augmenting-path root.
+    // u/v are row/column potentials, occupant maps columns to rows, previous links the search tree.
     private double[] _u;
     private double[] _v;
     private int[] _occupant;
@@ -28,9 +32,12 @@ internal sealed class SlotMatchingWork
         _costs = new double[_n * _n];
         foreach (var p in positions.Concat(slots))
             if (!double.IsFinite(p.X) || !double.IsFinite(p.Y)) throw new ArgumentException("Nonfinite match point.");
-        _u = new double[_n + 1]; _v = new double[_n + 1];
-        _occupant = new int[_n + 1]; _previous = new int[_n + 1];
-        _minimum = new double[_n + 1]; _used = new bool[_n + 1];
+        _u = new double[_n + 1];
+        _v = new double[_n + 1];
+        _occupant = new int[_n + 1];
+        _previous = new int[_n + 1];
+        _minimum = new double[_n + 1];
+        _used = new bool[_n + 1];
         for (var i = 0; i < _n; i++)
         {
             var minimum = double.PositiveInfinity;
@@ -48,13 +55,22 @@ internal sealed class SlotMatchingWork
         for (var j = 0; j < _n; j++)
         {
             var minimum = double.PositiveInfinity;
-            for (var i = 0; i < _n; i++) minimum = Math.Min(minimum, _costs[i * _n + j] - _u[i + 1]);
+            for (var i = 0; i < _n; i++)
+                minimum = Math.Min(minimum, _costs[i * _n + j] - _u[i + 1]);
             _v[j + 1] = minimum;
         }
+        // Seed exact zero-cost matches in row/column order; tie order is deterministic.
         for (var i = 1; i <= _n; i++)
-        for (var j = 1; j <= _n; j++)
-            if (_occupant[j] == 0 && _costs[(i - 1) * _n + j - 1] - _u[i] - _v[j] == 0)
-            { _occupant[j] = i; break; }
+        {
+            for (var j = 1; j <= _n; j++)
+            {
+                if (_occupant[j] == 0 && _costs[(i - 1) * _n + j - 1] - _u[i] - _v[j] == 0)
+                {
+                    _occupant[j] = i;
+                    break;
+                }
+            }
+        }
     }
 
     internal bool Complete => _row > _n;
@@ -68,7 +84,11 @@ internal sealed class SlotMatchingWork
         {
             if (!_searching)
             {
-                if (Array.IndexOf(_occupant, _row, 1) >= 0) { _row++; continue; }
+                if (Array.IndexOf(_occupant, _row, 1) >= 0)
+                {
+                    _row++;
+                    continue;
+                }
                 _occupant[0] = _row;
                 _column = 0;
                 Array.Fill(_minimum, double.MaxValue);
@@ -85,15 +105,30 @@ internal sealed class SlotMatchingWork
             {
                 if (_used[j]) continue;
                 var reduced = _costs[offset + j - 1] - potential - _v[j];
-                if (reduced < _minimum[j]) { _minimum[j] = reduced; _previous[j] = _column; }
-                if (_minimum[j] < delta) { delta = _minimum[j]; nextColumn = j; }
+                if (reduced < _minimum[j])
+                {
+                    _minimum[j] = reduced;
+                    _previous[j] = _column;
+                }
+                // Strict comparison keeps the first column when costs tie.
+                if (_minimum[j] < delta)
+                {
+                    delta = _minimum[j];
+                    nextColumn = j;
+                }
             }
             if (!double.IsFinite(delta)) throw new ArgumentException("Assignment arithmetic overflow.");
             for (var j = 0; j <= _n; j++)
             {
-                if (_used[j]) { _u[_occupant[j]] += delta; _v[j] -= delta; }
+                if (_used[j])
+                {
+                    _u[_occupant[j]] += delta;
+                    _v[j] -= delta;
+                }
                 else if (_minimum[j] != double.MaxValue) _minimum[j] -= delta;
             }
+            // Charge the whole inspected column batch, even if it crosses the frame budget.
+            // Resume only between batches: these cursor/potential fields are snapshot authority.
             inspected += _n;
             _column = nextColumn;
             if (_occupant[_column] != 0) continue;
@@ -123,9 +158,15 @@ internal sealed class SlotMatchingWork
     internal void Restore(SlotMatchingSnapshot state)
     {
         Validate(state, _n);
-        _row = state.Row; _column = state.Column; _searching = state.Searching;
-        _u = state.U.ToArray(); _v = state.V.ToArray(); _occupant = state.Occupant.ToArray();
-        _previous = state.Previous.ToArray(); _minimum = state.Minimum.ToArray(); _used = state.Used.ToArray();
+        _row = state.Row;
+        _column = state.Column;
+        _searching = state.Searching;
+        _u = state.U.ToArray();
+        _v = state.V.ToArray();
+        _occupant = state.Occupant.ToArray();
+        _previous = state.Previous.ToArray();
+        _minimum = state.Minimum.ToArray();
+        _used = state.Used.ToArray();
     }
 
     internal static void Validate(SlotMatchingSnapshot state, int n)

@@ -28,7 +28,9 @@ internal sealed class GroupPlanningJob
     internal GroupPlanningJob(ulong id, CommandEnvelope command, IReadOnlyList<PlacementMember> members,
         double heading, double spacing)
         : this(id, command, members.Select(member => new GroupPlanningMember(member.Id.Value, member.Start)).ToArray(),
-            heading, spacing) { }
+            heading, spacing)
+    {
+    }
 
     private GroupPlanningJob(ulong id, CommandEnvelope command, GroupPlanningMember[] members,
         double heading, double spacing)
@@ -63,8 +65,13 @@ internal sealed class GroupPlanningJob
         IReadOnlyList<PlacementMember> members, IReadOnlyList<PlacementBody> bodies)
     {
         var result = _matching!.Result();
-        var slots = members.Select(member => result[Array.FindIndex(_members,
-            saved => saved.EntityId == member.Id.Value)]).ToArray();
+        // Cancellation removes active members, not original matching rows or their stable slots.
+        var slots = new int[members.Count];
+        for (var i = 0; i < members.Count; i++)
+        {
+            var originalIndex = Array.FindIndex(_members, saved => saved.EntityId == members[i].Id.Value);
+            slots[i] = result[originalIndex];
+        }
         return GroupPlacementPlanner.PlanAssigned(navigation, members, _ideals, slots, bodies, _candidates);
     }
 
