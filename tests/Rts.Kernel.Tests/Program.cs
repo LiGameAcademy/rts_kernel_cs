@@ -138,6 +138,7 @@ FrameworkTraceChecks.Run(Check);
 EntityReadChecks.Run(Check);
 CommandContractChecks.Run(Check);
 MatchCommandQueueChecks.Run(Check);
+MatchEventBufferChecks.Run(Check);
 PathfindingChecks.Run(Check);
 NavigationChecks.Run(Check);
 MovementChecks.Run(Check);

@@ -8,11 +8,10 @@ public sealed partial class RtsMatch
 {
     private readonly SortedDictionary<EntityId, EntityState> _entities = [];
     private readonly MatchCommandQueue _commands = new();
-    private readonly List<MatchEvent> _events = [];
+    private readonly MatchEventBuffer _events = new();
     private NavigationState? _navigation;
     private readonly DeterministicRng _rng;
     private ulong _nextEntityId = 1;
-    private long _nextEventSequence;
 
     public RtsMatch(MatchConfig config, ulong seed, PathingGrid? pathingGrid = null, TerrainHeights? terrain = null,
         IReadOnlyList<MovementDefinition>? movementDefinitions = null)
@@ -58,12 +57,7 @@ public sealed partial class RtsMatch
     public bool TryGetEntity(EntityId entityId, out EntityState? state) =>
         _entities.TryGetValue(entityId, out state);
 
-    public IReadOnlyList<MatchEvent> DrainEvents()
-    {
-        var drained = _events.ToArray();
-        _events.Clear();
-        return drained;
-    }
+    public IReadOnlyList<MatchEvent> DrainEvents() => _events.Drain();
 
     public MatchSnapshot CaptureSnapshot()
     {
@@ -84,7 +78,7 @@ public sealed partial class RtsMatch
             Frame,
             _nextEntityId,
             _commands.NextArrivalOrder,
-            _nextEventSequence,
+            _events.NextSequence,
             _rng.State,
             entities,
             _commands.Capture(),
@@ -108,7 +102,6 @@ public sealed partial class RtsMatch
         {
             Frame = snapshot.Frame,
             _nextEntityId = snapshot.NextEntityId,
-            _nextEventSequence = snapshot.NextEventSequence,
         };
 
         if (snapshot.Navigation is not null)
@@ -128,6 +121,7 @@ public sealed partial class RtsMatch
         }
 
         match._commands.Restore(snapshot.NextArrivalOrder, snapshot.PendingCommands);
+        match._events.Restore(snapshot.NextEventSequence);
         match._orders.Restore(snapshot, match._entities, match._navigation);
         match.ValidateRestoredGroups(snapshot);
         match._planning.Restore(snapshot, match._entities, match._movementDefinitions, match._navigation);
@@ -205,5 +199,5 @@ public sealed partial class RtsMatch
     }
 
     private void AddEvent(MatchEventKind kind, EntityId entityId, string detail) =>
-        _events.Add(new MatchEvent(Frame, _nextEventSequence++, kind, entityId, detail));
+        _events.Publish(Frame, kind, entityId, detail);
 }
