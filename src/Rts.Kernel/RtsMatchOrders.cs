@@ -22,7 +22,15 @@ public sealed partial class RtsMatch
             || queue.Pending.Any(order => order.Source != OrderSource.UnitAi)))
         || _groupPlans.Any(job => job.Command.Source != OrderSource.UnitAi && job.Contains(id));
 
-    private bool ExecuteMove(CommandEnvelope command, GroupSlot? group = null, bool committingPlan = false)
+    private enum MoveSubmission { Command, PlannedGroup }
+
+    private bool ExecuteMove(CommandEnvelope command, GroupSlot? group = null) =>
+        ExecuteMoveCore(command, group, MoveSubmission.Command);
+
+    private bool ExecutePlannedGroupMove(CommandEnvelope command, GroupSlot group) =>
+        ExecuteMoveCore(command, group, MoveSubmission.PlannedGroup);
+
+    private bool ExecuteMoveCore(CommandEnvelope command, GroupSlot? group, MoveSubmission submission)
     {
         if (!_entities.TryGetValue(command.EntityId, out var entity) || entity.OwnerId != command.PlayerId)
         {
@@ -73,7 +81,7 @@ public sealed partial class RtsMatch
             AddEvent(MatchEventKind.CommandRejected, command.EntityId, "move_path_unavailable");
             return false; // Invalid replacement preserves both current and pending orders.
         }
-        if (command.Mode == OrderMode.Replace && !committingPlan) CancelGroupPlans(entity.Id, command.Source);
+        if (command.Mode == OrderMode.Replace && submission == MoveSubmission.Command) CancelGroupPlans(entity.Id, command.Source);
         _moveOrders[entity.Id] = order!;
         _unitOrders[entity.Id] = new UnitOrderQueue(intent);
         _entities[entity.Id] = entity with { Velocity = SimVector2.Zero };
