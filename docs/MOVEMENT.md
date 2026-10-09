@@ -104,3 +104,10 @@ Use `dotnet run --project tests/Rts.Kernel.Tests -c Release -- --perf` for repea
 ### 运动计算与提交边界
 
 `MovementStepper` 统一计算正式单位和诊断单位的转向、坡度与按时间推进的路径步进。正式单位返回轨迹交给碰撞预约；诊断单位直接提交计算结果，不创建碰撞轨迹。诊断接口无 Motion 时保留原有按距离扣减及保持朝向的约定，避免浮点运算顺序变化影响逐帧快照。失败后是否提交已走距离由调用方决定。
+## 读取数据的所有权
+
+`Entities` 是按实体 ID 排序的实时只读集合；保留集合引用后，其数量和内容会随后续 `Step` 改变。仅在帧推进之间即时遍历，不跨 `Step` 保留枚举器，也不并发读取或推进同一对局。
+
+需要保留一个时间点的实体结果时，调用 `ReadEntities()`；它按需复制为独立只读列表，后续帧不会改变数量或实体状态。`EntityState` 是仅含值类型字段的不可变记录，可以共享；使用 `with` 得到的新记录不会写回对局。该列表仅供读取，不是包含订单、规划与随机状态的完整存档；存档仍使用 `CaptureSnapshot()`。
+
+`ReadMoveOrders`、`ReadMovementStatuses`、`ReadUnitOrders`、`ReadGroupPlans` 返回独立只读结果。路径和订单的嵌套集合在边界复制；宿主按实际需要选择读取 API，不在每帧无条件复制全部数据。`TryGetEntity` 返回读取时的不可变实体记录。
