@@ -33,7 +33,11 @@ public sealed partial class RtsMatch
 
     public long Frame { get; private set; }
 
+    /// <summary>Live read-only view in entity ID order. Enumerate only between Step calls; retained views observe later changes.</summary>
     public IReadOnlyCollection<EntityState> Entities => _entities.Values;
+
+    /// <summary>Detached read-only entity list in ID order. Later steps do not change its contents.</summary>
+    public IReadOnlyList<EntityState> ReadEntities() => Array.AsReadOnly(_entities.Values.ToArray());
 
     public PathResult FindPath(GridCell start, GridCell goal, int clearanceCells = 0,
         int maxExpandedNodes = int.MaxValue) =>
