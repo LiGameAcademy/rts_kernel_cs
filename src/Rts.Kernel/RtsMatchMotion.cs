@@ -75,7 +75,7 @@ public sealed partial class RtsMatch
         if (next == order.Waypoints.Count)
             FinishMove(entity.Id, position, MatchEventKind.MoveCompleted, string.Empty);
         else
-            _moveOrders[entity.Id] = order with { NextWaypoint = next };
+            _orders.UpdatePath(entity.Id, order with { NextWaypoint = next });
     }
 
     private void FailMotion(EntityId id, SimVector2 position, double facing, string detail)

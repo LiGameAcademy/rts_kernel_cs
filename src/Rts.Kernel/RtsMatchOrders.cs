@@ -4,23 +4,13 @@ namespace Rts.Kernel;
 
 public sealed partial class RtsMatch
 {
-    public const int MaximumPendingOrders = 64;
-    private readonly SortedDictionary<EntityId, UnitOrderQueue> _unitOrders = [];
+    public const int MaximumPendingOrders = UnitOrderBook.MaximumPending;
+    private readonly UnitOrderBook _orders = new();
 
-    public IReadOnlyList<UnitOrderQueueSnapshot> ReadUnitOrders() => Array.AsReadOnly(_unitOrders.Select(pair =>
-        new UnitOrderQueueSnapshot(pair.Key.Value, pair.Value.Current,
-            Array.AsReadOnly(pair.Value.Pending.ToArray()))).ToArray());
-
-    public UnitOrderIntent? ReadCurrentOrder(EntityId id) =>
-        _unitOrders.TryGetValue(id, out var queue) ? queue.Current : null;
-
-    public int GetPendingOrderCount(EntityId id) =>
-        _unitOrders.TryGetValue(id, out var queue) ? queue.Pending.Count : 0;
-
-    private bool BlocksUnitAi(EntityId id) => (_unitOrders.TryGetValue(id, out var queue)
-        && ((queue.Current is not null && queue.Current.Source != OrderSource.UnitAi)
-            || queue.Pending.Any(order => order.Source != OrderSource.UnitAi)))
-        || _groupPlans.Any(job => job.Command.Source != OrderSource.UnitAi && job.Contains(id));
+    public IReadOnlyList<UnitOrderQueueSnapshot> ReadUnitOrders() => _orders.ReadQueues();
+    public UnitOrderIntent? ReadCurrentOrder(EntityId id) => _orders.ReadCurrent(id);
+    public int GetPendingOrderCount(EntityId id) => _orders.PendingCount(id);
+    private bool BlocksUnitAi(EntityId id) => _orders.HasProtectedIntent(id) || _planning.HasProtectedMember(id);
 
     private enum MoveSubmission { Command, PlannedGroup }
 
@@ -61,19 +51,13 @@ public sealed partial class RtsMatch
             return false;
         }
         var intent = new UnitOrderIntent(UnitOrderKind.Move, command.Source, request, group);
-        if (command.Mode == OrderMode.Append && _unitOrders.TryGetValue(entity.Id, out var queue)
-            && (queue.Current?.Kind == UnitOrderKind.Move || queue.Pending.Count > 0))
+        if (command.Mode == OrderMode.Append && _orders.CanAppend(entity.Id))
         {
             if (_navigation is null || !_navigation.TryWorldToCell(request.Goal, out var goal)
                 || !_navigation.CanOccupy(goal, request.ClearanceCells))
                 AddEvent(MatchEventKind.CommandRejected, entity.Id, "move_goal_unavailable");
-            else if (queue.Pending.Count >= MaximumPendingOrders)
-                AddEvent(MatchEventKind.CommandRejected, entity.Id, "order_queue_full");
-            else
-            {
-                queue.Pending.Enqueue(intent);
-                return true;
-            }
+            else if (_orders.TryAppend(entity.Id, intent)) return true;
+            else AddEvent(MatchEventKind.CommandRejected, entity.Id, "order_queue_full");
             return false; // No path is frozen for a future order; current movement stays intact.
         }
         if (!TryPlanMove(entity.Position, request, out var order, group is not null))
@@ -82,8 +66,7 @@ public sealed partial class RtsMatch
             return false; // Invalid replacement preserves both current and pending orders.
         }
         if (command.Mode == OrderMode.Replace && submission == MoveSubmission.Command) CancelGroupPlans(entity.Id, command.Source);
-        _moveOrders[entity.Id] = order!;
-        _unitOrders[entity.Id] = new UnitOrderQueue(intent);
+        _orders.ReplaceMove(entity.Id, intent, order!);
         _entities[entity.Id] = entity with { Velocity = SimVector2.Zero };
         return true;
     }
@@ -97,52 +80,28 @@ public sealed partial class RtsMatch
         else
         {
             CancelGroupPlans(entity.Id, command.Source);
-            _moveOrders.Remove(entity.Id);
-            _unitOrders[entity.Id] = new UnitOrderQueue(new UnitOrderIntent(UnitOrderKind.Stop, command.Source));
+            _orders.Stop(entity.Id, command.Source);
             _entities[entity.Id] = entity with { Velocity = SimVector2.Zero };
         }
     }
 
     private void ActivateQueuedMoves()
     {
-        foreach (var pair in _unitOrders.ToArray())
+        foreach (var id in _orders.WaitingIds())
         {
-            var queue = pair.Value;
-            if (queue.Current is not null) continue;
-            var intent = queue.Pending.Dequeue();
-            var entity = _entities[pair.Key];
+            var intent = _orders.PeekWaiting(id);
+            var entity = _entities[id];
             if (TryPlanMove(entity.Position, intent.Move!, out var move, intent.Group is not null))
             {
-                queue.Current = intent;
-                _moveOrders[entity.Id] = move!;
-                _entities[entity.Id] = entity with { Velocity = SimVector2.Zero };
+                _orders.ActivateWaiting(id, move!);
+                _entities[id] = entity with { Velocity = SimVector2.Zero };
             }
             else
             {
-                AddEvent(MatchEventKind.MoveFailed, entity.Id, "queued_move_path_unavailable");
-                if (queue.Pending.Count == 0) _unitOrders.Remove(entity.Id);
+                _orders.ActivateWaiting(id, null);
+                AddEvent(MatchEventKind.MoveFailed, id, "queued_move_path_unavailable");
             }
             // At most one activation per entity per frame, including failed queued goals.
-        }
-    }
-
-    private void CompleteCurrentOrder(EntityId id)
-    {
-        var queue = _unitOrders[id];
-        queue.Current = null;
-        if (queue.Pending.Count == 0) _unitOrders.Remove(id);
-    }
-
-    private void RestoreUnitOrders(MatchSnapshot snapshot)
-    {
-        foreach (var saved in snapshot.Orders!)
-        {
-            foreach (var intent in saved.Pending)
-                if (!_navigation!.TryWorldToCell(intent.Move!.Goal, out _))
-                    throw new InvalidDataException("Queued goal lies outside the navigation grid.");
-            var queue = new UnitOrderQueue(saved.Current);
-            foreach (var intent in saved.Pending) queue.Pending.Enqueue(intent);
-            _unitOrders.Add(new EntityId(saved.EntityId), queue);
         }
     }
 }
