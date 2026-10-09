@@ -14,6 +14,8 @@ Windows is the initial target. Determinism checks apply only to matching code, i
 
 Navigation now supports eight-neighbor paths, cell clearance and match-owned dynamic obstacles edited through frame commands. Goal-based movement supports stop, replacement, FIFO append, dynamic replanning and continuation after a failed queued goal. Player and player-AI orders take precedence over unit AI; persistent Stop orders block unit AI until replaced. Orders and queued intents survive snapshot restoration. Motion orders support authoritative facing, bounded turning, turn speed reduction and elevation-based slope scaling. Snapshot v8 stores facing and motion progress, and validates supplied static grid and height field identities. Version 1/2/3/4 snapshots are rejected; cross-version migration remains unsupported. See [navigation contracts](docs/NAVIGATION.md) and [movement contracts](docs/MOVEMENT.md) for API details (Chinese).
 
+The match owns its random stream. Hosts cannot consume it through a public mutable object. Snapshot `RngState` can be used for diagnostics or a detached stream; the early mutable `RtsMatch.Rng` property has been removed.
+
 ## Build and run
 
 Install the .NET 10 SDK. The library targets `net8.0`; the test and CLI hosts target `net10.0`. Initial restore needs the net8 targeting pack; CI installs both .NET 8 and 10 SDKs.

@@ -22,6 +22,8 @@
 
 导航 API 见 [导航说明](docs/NAVIGATION.md)，目标移动与快照 v9 见 [移动说明](docs/MOVEMENT.md)。v1–v8 快照不再接受；本项目尚不支持跨版本存档迁移。
 
+对局随机流由内核独占，宿主不能通过公开对象消费随机数。快照的 `RngState` 可用于诊断或建立独立随机流；移除了早期的可变 `RtsMatch.Rng` 公开属性。
+
 ## 构建与运行
 
 安装 .NET 10 SDK（用于构建、测试和 CLI）。核心类库目标为 `net8.0`，测试及 CLI 目标为 `net10.0`；首次恢复需取得 net8 targeting pack，CI 同时安装 .NET 8/10 SDK。
