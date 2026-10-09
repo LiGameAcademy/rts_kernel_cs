@@ -118,7 +118,14 @@ public sealed partial class RtsMatch
         return occupied;
     }
 
-    private void ApplyGroupGoals(CommandEnvelope command, ulong groupId, double heading, IReadOnlyList<PlacementGoal> goals, bool committingPlan = false)
+    private void ApplyGroupGoals(CommandEnvelope command, ulong groupId, double heading, IReadOnlyList<PlacementGoal> goals) =>
+        SubmitGroupGoals(command, groupId, heading, goals, MoveSubmission.Command);
+
+    private void CommitPlannedGroupGoals(CommandEnvelope command, ulong groupId, double heading, IReadOnlyList<PlacementGoal> goals) =>
+        SubmitGroupGoals(command, groupId, heading, goals, MoveSubmission.PlannedGroup);
+
+    private void SubmitGroupGoals(CommandEnvelope command, ulong groupId, double heading,
+        IReadOnlyList<PlacementGoal> goals, MoveSubmission submission)
     {
         var request = command.Group!;
         foreach (var item in goals)
@@ -133,7 +140,9 @@ public sealed partial class RtsMatch
             var move = CommandEnvelope.MoveTo(command.ExecuteFrame, command.PlayerId, command.Sequence, item.Member.Id,
                 item.Goal.Value, definition.Speed, item.Member.Clearance, definition.Motion, command.Mode, command.Source);
             var slot = new GroupSlot(groupId, item.Slot, request.Formation, request.Goal, heading, item.Adjusted);
-            if (ExecuteMove(move, slot, committingPlan)) AddGroupEvent(MatchEventKind.GroupMoveAssigned, item.Member.Id, string.Empty, outcome);
+            var accepted = submission == MoveSubmission.PlannedGroup
+                ? ExecutePlannedGroupMove(move, slot) : ExecuteMove(move, slot);
+            if (accepted) AddGroupEvent(MatchEventKind.GroupMoveAssigned, item.Member.Id, string.Empty, outcome);
         }
     }
 
