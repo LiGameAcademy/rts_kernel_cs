@@ -40,6 +40,7 @@ public sealed partial class RtsMatch
             reservations.Put(new(body.Id, ReadMovementDefinition(body.Id)!.Radius, new[] { body.Position, body.Position }));
         RefreshArrivalNeighbors();
         var retries = LocalReplansPerFrame;
+        // Older physical waits go first; entity ID breaks ties. Every body is reserved before proposals.
         var moving = bodies.Where(entity => _orders.IsMoving(entity.Id))
             .OrderByDescending(entity => _orders.ReadPath(entity.Id).WaitFrames).ThenBy(entity => entity.Id).ToArray();
         foreach (var initial in moving)
@@ -50,12 +51,18 @@ public sealed partial class RtsMatch
             if (_pathsDirty)
             {
                 if (!TryPlanMove(entity.Position, order.Request, out var replanned, true))
-                { FinishMove(entity.Id, entity.Position, MatchEventKind.MoveFailed, "path_blocked"); continue; }
+                {
+                    FinishMove(entity.Id, entity.Position, MatchEventKind.MoveFailed, "path_blocked");
+                    continue;
+                }
                 order = replanned! with { WaitFrames = order.WaitFrames, RetryAfterFrame = order.RetryAfterFrame };
             }
             var step = MovementStepper.Compute(entity, order, seconds, _navigation.Terrain);
             if (step.Failure is not null)
-            { FinishMove(entity.Id, entity.Position, MatchEventKind.MoveFailed, step.Failure); continue; }
+            {
+                FinishMove(entity.Id, entity.Position, MatchEventKind.MoveFailed, step.Failure);
+                continue;
+            }
             if (YieldAtGroupGoal(entity, order, step))
             {
                 _entities[entity.Id] = entity with { Velocity = SimVector2.Zero };
@@ -73,7 +80,10 @@ public sealed partial class RtsMatch
                     {
                         var alternative = MovementStepper.Compute(entity, detour, seconds, _navigation.Terrain);
                         if (alternative.Failure is null && reservations.Safe(entity.Id, definition.Radius, alternative.Trace))
-                        { order = detour; step = alternative; }
+                        {
+                            order = detour;
+                            step = alternative;
+                        }
                     }
                 }
                 if (!reservations.Safe(entity.Id, definition.Radius, step.Trace))
@@ -82,16 +92,24 @@ public sealed partial class RtsMatch
                     _entities[entity.Id] = entity with { Velocity = SimVector2.Zero, Facing = step.Facing };
                     if (wait >= CrowdBlockedSeconds * Config.TickRate)
                         FinishMove(entity.Id, entity.Position, MatchEventKind.MoveFailed, "crowd_blocked_timeout");
-                    else _orders.UpdatePath(entity.Id, order with { WaitFrames = wait });
+                    else
+                        _orders.UpdatePath(entity.Id, order with { WaitFrames = wait });
                     continue;
                 }
             }
-            _entities[entity.Id] = entity with { Position = step.Position, Facing = step.Facing,
-                Velocity = new((step.Position.X - entity.Position.X) / seconds, (step.Position.Y - entity.Position.Y) / seconds) };
+            // Commit only a safe proposal, then publish its trace for the remaining units this frame.
+            _entities[entity.Id] = entity with
+            {
+                Position = step.Position,
+                Facing = step.Facing,
+                Velocity = new((step.Position.X - entity.Position.X) / seconds,
+                    (step.Position.Y - entity.Position.Y) / seconds)
+            };
             reservations.Put(new(entity.Id, definition.Radius, step.Trace));
             if (step.NextWaypoint == order.Waypoints.Count)
                 FinishMove(entity.Id, step.Position, MatchEventKind.MoveCompleted, string.Empty);
-            else _orders.UpdatePath(entity.Id, order with { NextWaypoint = step.NextWaypoint, WaitFrames = 0 });
+            else
+                _orders.UpdatePath(entity.Id, order with { NextWaypoint = step.NextWaypoint, WaitFrames = 0 });
         }
     }
 }
