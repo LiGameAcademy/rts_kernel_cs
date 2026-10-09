@@ -113,8 +113,8 @@ public sealed partial class RtsMatch
             pending,
             _navigation?.CaptureSnapshot(),
             ReadMoveOrders(),
-            ReadUnitOrders(), _movementDefinitions.ContentHash, _nextGroupId,
-            Array.AsReadOnly(_groupPlans.Select(job => job.Capture()).ToArray()));
+            ReadUnitOrders(), _movementDefinitions.ContentHash, _planning.NextId,
+            _planning.Capture());
     }
 
     public static RtsMatch Restore(MatchSnapshot snapshot, PathingGrid? pathingGrid = null, TerrainHeights? terrain = null,
@@ -130,7 +130,6 @@ public sealed partial class RtsMatch
         var match = new RtsMatch(new MatchConfig(snapshot.TickRate), snapshot.RngState, pathingGrid, terrain, movementDefinitions)
         {
             Frame = snapshot.Frame,
-            _nextGroupId = snapshot.NextGroupId,
             _nextEntityId = snapshot.NextEntityId,
             _nextArrivalOrder = snapshot.NextArrivalOrder,
             _nextEventSequence = snapshot.NextEventSequence,
@@ -154,10 +153,9 @@ public sealed partial class RtsMatch
 
         match._pendingCommands.AddRange(snapshot.PendingCommands.Select(
             item => new QueuedCommand(item.ArrivalOrder, item.Command.Freeze())));
-        match.RestoreMoveOrders(snapshot);
-        match.RestoreUnitOrders(snapshot);
+        match._orders.Restore(snapshot, match._entities, match._navigation);
         match.ValidateRestoredGroups(snapshot);
-        match.RestoreGroupPlans(snapshot);
+        match._planning.Restore(snapshot, match._entities, match._movementDefinitions, match._navigation);
         match.ValidateGroundBodies();
         return match;
     }
@@ -227,7 +225,7 @@ public sealed partial class RtsMatch
                     AddEvent(MatchEventKind.CommandRejected, command.EntityId, "use_move_to_with_navigation");
                     break;
                 }
-                _unitOrders.Remove(entity.Id);
+                _orders.Clear(entity.Id);
                 _entities[command.EntityId] = entity with { Velocity = command.Velocity };
                 break;
             case CommandKind.Stop:

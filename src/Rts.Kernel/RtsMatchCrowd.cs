@@ -6,7 +6,7 @@ public sealed partial class RtsMatch
 {
     public const int CrowdBlockedSeconds = 3;
     public const int LocalReplansPerFrame = 16;
-    private const int LocalRetryFrames = 6;
+    internal const int LocalRetryFrames = 6;
 
     private bool CanSpawnGround(CommandEnvelope command)
     {
@@ -40,13 +40,13 @@ public sealed partial class RtsMatch
             reservations.Put(new(body.Id, ReadMovementDefinition(body.Id)!.Radius, new[] { body.Position, body.Position }));
         RefreshArrivalNeighbors();
         var retries = LocalReplansPerFrame;
-        var moving = bodies.Where(entity => _moveOrders.ContainsKey(entity.Id))
-            .OrderByDescending(entity => _moveOrders[entity.Id].WaitFrames).ThenBy(entity => entity.Id).ToArray();
+        var moving = bodies.Where(entity => _orders.IsMoving(entity.Id))
+            .OrderByDescending(entity => _orders.ReadPath(entity.Id).WaitFrames).ThenBy(entity => entity.Id).ToArray();
         foreach (var initial in moving)
         {
             var entity = _entities[initial.Id];
             var definition = ReadMovementDefinition(entity.Id)!;
-            var order = _moveOrders[entity.Id];
+            var order = _orders.ReadPath(entity.Id);
             if (_pathsDirty)
             {
                 if (!TryPlanMove(entity.Position, order.Request, out var replanned, true))
@@ -59,7 +59,7 @@ public sealed partial class RtsMatch
             if (YieldAtGroupGoal(entity, order, step))
             {
                 _entities[entity.Id] = entity with { Velocity = SimVector2.Zero };
-                _moveOrders[entity.Id] = order with { WaitFrames = 0 };
+                _orders.UpdatePath(entity.Id, order with { WaitFrames = 0 });
                 continue; // Assembly sequencing is intentional waiting, not a physical-blockage failure.
             }
             if (!reservations.Safe(entity.Id, definition.Radius, step.Trace))
@@ -82,7 +82,7 @@ public sealed partial class RtsMatch
                     _entities[entity.Id] = entity with { Velocity = SimVector2.Zero, Facing = step.Facing };
                     if (wait >= CrowdBlockedSeconds * Config.TickRate)
                         FinishMove(entity.Id, entity.Position, MatchEventKind.MoveFailed, "crowd_blocked_timeout");
-                    else _moveOrders[entity.Id] = order with { WaitFrames = wait };
+                    else _orders.UpdatePath(entity.Id, order with { WaitFrames = wait });
                     continue;
                 }
             }
@@ -91,7 +91,7 @@ public sealed partial class RtsMatch
             reservations.Put(new(entity.Id, definition.Radius, step.Trace));
             if (step.NextWaypoint == order.Waypoints.Count)
                 FinishMove(entity.Id, step.Position, MatchEventKind.MoveCompleted, string.Empty);
-            else _moveOrders[entity.Id] = order with { NextWaypoint = step.NextWaypoint, WaitFrames = 0 };
+            else _orders.UpdatePath(entity.Id, order with { NextWaypoint = step.NextWaypoint, WaitFrames = 0 });
         }
     }
 }

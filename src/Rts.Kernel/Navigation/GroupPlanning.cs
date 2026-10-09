@@ -8,15 +8,22 @@ public sealed record GroupPlanningView(ulong GroupId, int Members, int Canceled,
 
 internal sealed class GroupPlanningJob
 {
-    internal readonly ulong Id;
-    internal readonly CommandEnvelope Command;
-    internal readonly GroupPlanningMember[] Members;
-    internal readonly double Heading;
-    internal readonly double Spacing;
-    internal readonly IReadOnlyList<SimVector2> Ideals;
-    internal readonly HashSet<ulong> Canceled = [];
-    internal SlotMatchingWork? Matching;
-    internal readonly List<IReadOnlyList<GridCell>> Candidates = [];
+    private readonly GroupPlanningMember[] _members;
+    private readonly IReadOnlyList<SimVector2> _ideals;
+    private readonly HashSet<ulong> _canceled = [];
+    private readonly List<IReadOnlyList<GridCell>> _candidates = [];
+    private SlotMatchingWork? _matching;
+
+    internal ulong Id { get; }
+    internal CommandEnvelope Command { get; }
+    internal IReadOnlyList<GroupPlanningMember> Members { get; }
+    internal double Heading { get; }
+    internal double Spacing { get; }
+    internal int CanceledCount => _canceled.Count;
+    internal int MatchingRow => _matching?.NextRow ?? 0;
+    internal bool AllCanceled => _canceled.Count == _members.Length;
+    internal bool Ready => _matching is { Complete: true } && _candidates.Count == _members.Length;
+    internal IEnumerable<GroupPlanningMember> ActiveMembers => _members.Where(member => !_canceled.Contains(member.EntityId));
 
     internal GroupPlanningJob(ulong id, CommandEnvelope command, IReadOnlyList<PlacementMember> members,
         double heading, double spacing)
@@ -26,29 +33,67 @@ internal sealed class GroupPlanningJob
     private GroupPlanningJob(ulong id, CommandEnvelope command, GroupPlanningMember[] members,
         double heading, double spacing)
     {
-        Id = id; Command = command.Freeze(); Members = members.ToArray(); Heading = heading; Spacing = spacing;
-        Ideals = FormationLayout.Create(command.Group!.Formation, members.Length, spacing, command.Group.Goal, heading);
+        Id = id;
+        Command = command.Freeze();
+        _members = members.ToArray();
+        Members = Array.AsReadOnly(_members);
+        Heading = heading;
+        Spacing = spacing;
+        _ideals = FormationLayout.Create(command.Group!.Formation, members.Length, spacing, command.Group.Goal, heading);
     }
 
-    internal void StartMatching()
+    // Matching and candidate preparation progress independently; preparation may finish first.
+    // Return the exact charged column work so the scheduler retains its existing frame budget.
+    internal int Advance(NavigationState navigation, int columnBudget, int candidateBudget)
     {
-        var anchor = Array.FindIndex(Members, member => member.EntityId == Command.Group!.LeaderId.Value);
-        Matching ??= new SlotMatchingWork(Members.Select(member => member.Start).ToArray(), Ideals, Math.Max(0, anchor));
+        var spent = 0;
+        if (_matching is null)
+        {
+            StartMatching();
+            spent = 2 * (_members.Length - 1) * (_members.Length - 1);
+        }
+        spent += _matching!.Advance(Math.Max(1, columnBudget - spent));
+        var end = Math.Min(_members.Length, _candidates.Count + candidateBudget);
+        for (var i = _candidates.Count; i < end; i++)
+            _candidates.Add(GroupPlacementPlanner.Candidates(navigation, _ideals[i]));
+        return spent;
     }
 
-    internal bool Contains(EntityId id) => !Canceled.Contains(id.Value)
-        && Members.Any(member => member.EntityId == id.Value);
+    internal IReadOnlyList<PlacementGoal> PlanPlacement(NavigationState navigation,
+        IReadOnlyList<PlacementMember> members, IReadOnlyList<PlacementBody> bodies)
+    {
+        var result = _matching!.Result();
+        var slots = members.Select(member => result[Array.FindIndex(_members,
+            saved => saved.EntityId == member.Id.Value)]).ToArray();
+        return GroupPlacementPlanner.PlanAssigned(navigation, members, _ideals, slots, bodies, _candidates);
+    }
+
+    private void StartMatching()
+    {
+        var anchor = Array.FindIndex(_members, member => member.EntityId == Command.Group!.LeaderId.Value);
+        _matching = new SlotMatchingWork(_members.Select(member => member.Start).ToArray(), _ideals, Math.Max(0, anchor));
+    }
+
+    internal bool Contains(EntityId id) => !_canceled.Contains(id.Value)
+        && _members.Any(member => member.EntityId == id.Value);
+
+    internal bool Cancel(EntityId id) => Contains(id) && _canceled.Add(id.Value);
+
     internal GroupPlanningSnapshot Capture() => new(Id, Command.Freeze(),
-        Array.AsReadOnly(Members.ToArray()), Heading, Spacing, Array.AsReadOnly(Canceled.Order().ToArray()), Matching?.Capture(), Candidates.Count);
+        Array.AsReadOnly(_members.ToArray()), Heading, Spacing, Array.AsReadOnly(_canceled.Order().ToArray()),
+        _matching?.Capture(), _candidates.Count);
 
     internal static GroupPlanningJob Restore(GroupPlanningSnapshot saved, NavigationState navigation)
     {
         var job = new GroupPlanningJob(saved.GroupId, saved.Command, saved.Members.ToArray(), saved.Heading, saved.Spacing);
-        job.Canceled.UnionWith(saved.Canceled);
+        job._canceled.UnionWith(saved.Canceled);
         if (saved.Matching is not null)
-        { job.StartMatching(); job.Matching!.Restore(saved.Matching); }
+        {
+            job.StartMatching();
+            job._matching!.Restore(saved.Matching);
+        }
         for (var i = 0; i < saved.PreparedCandidates; i++)
-            job.Candidates.Add(GroupPlacementPlanner.Candidates(navigation, job.Ideals[i]));
+            job._candidates.Add(GroupPlacementPlanner.Candidates(navigation, job._ideals[i]));
         return job;
     }
 }

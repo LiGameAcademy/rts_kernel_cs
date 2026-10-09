@@ -95,6 +95,15 @@ Snapshot v9 retains WaitFrames and RetryAfterFrame to in-flight orders, and stor
 Use `dotnet run --project tests/Rts.Kernel.Tests -c Release -- --perf` for repeated 300/500-member planning, movement and diagnostic-read samples. `--perf-long` samples 1,800 movement frames and reports failures, completions and remaining orders. Wall-clock measurements never control the simulation; the dense reordering fixture is not a completed movement-quality or platform-export acceptance test.
 
 
+## 内部状态边界
+
+`UnitOrderBook` 独占当前/排队订单和活动路径，通过替换、追加、停止、衔接与完成操作维护对应关系；对外只提供不可变意图、路径记录及独立读取结果，不返回可写队列或字典。`GroupPlanningQueue` 独占计划身份、FIFO队列、取消及固定工作量调度，`GroupPlanningJob` 独占每个任务的计算进度。
+
+`RtsMatch` 保留实体状态、帧序、输入与事件协调，先检查命令上下文，再调用模块操作。恢复使用同样的状态所有者；整局快照仍包含实体、订单、路径、规划及随机状态。模块为具体对象组合，不使用通用调度或依赖注入框架。
+
+### 运动计算与提交边界
+
+`MovementStepper` 统一计算正式单位和诊断单位的转向、坡度与按时间推进的路径步进。正式单位返回轨迹交给碰撞预约；诊断单位直接提交计算结果，不创建碰撞轨迹。诊断接口无 Motion 时保留原有按距离扣减及保持朝向的约定，避免浮点运算顺序变化影响逐帧快照。失败后是否提交已走距离由调用方决定。
 ## 读取数据的所有权
 
 `Entities` 是按实体 ID 排序的实时只读集合；保留集合引用后，其数量和内容会随后续 `Step` 改变。仅在帧推进之间即时遍历，不跨 `Step` 保留枚举器，也不并发读取或推进同一对局。

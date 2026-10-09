@@ -31,9 +31,3 @@ public sealed record UnitOrderIntent(UnitOrderKind Kind, OrderSource Source, Mov
 
 public sealed record UnitOrderQueueSnapshot(ulong EntityId, UnitOrderIntent? Current,
     IReadOnlyList<UnitOrderIntent> Pending);
-
-internal sealed class UnitOrderQueue(UnitOrderIntent? current)
-{
-    internal UnitOrderIntent? Current { get; set; } = current;
-    internal Queue<UnitOrderIntent> Pending { get; } = new();
-}

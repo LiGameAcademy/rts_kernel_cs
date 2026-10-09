@@ -8,61 +8,38 @@ public sealed partial class RtsMatch
     public const int GroupMatchingColumnsPerFrame = 2097152;
     public const int MaximumGroupPlans = 16;
     public const int GroupCandidateSlotsPerFrame = 64;
-    private readonly List<GroupPlanningJob> _groupPlans = [];
+    private readonly GroupPlanningQueue _planning = new();
 
-    public IReadOnlyList<GroupPlanningView> ReadGroupPlans() => Array.AsReadOnly(_groupPlans.Select(job =>
-        new GroupPlanningView(job.Id, job.Members.Length, job.Canceled.Count, job.Matching?.NextRow ?? 0)).ToArray());
+    public IReadOnlyList<GroupPlanningView> ReadGroupPlans() => _planning.ReadViews();
 
     private void CancelGroupPlans(EntityId id, OrderSource source)
     {
-        foreach (var job in _groupPlans)
-            if (job.Contains(id) && (source != OrderSource.UnitAi || job.Command.Source == OrderSource.UnitAi))
-            {
-                job.Canceled.Add(id.Value);
-                AddGroupEvent(MatchEventKind.CommandRejected, id, "group_plan_superseded", new(job.Id, -1, null, false));
-            }
+        foreach (var outcome in _planning.Cancel(id, source))
+            AddGroupEvent(MatchEventKind.CommandRejected, id, "group_plan_superseded", outcome);
     }
 
     private void AdvanceGroupPlanning()
     {
         var remaining = GroupMatchingColumnsPerFrame;
-        while (_groupPlans.Count > 0 && remaining > 0)
+        while (_planning.AdvanceNext(_navigation!, ref remaining) is { } progress)
         {
-            var job = _groupPlans[0];
-            if (job.Canceled.Count == job.Members.Length) { _groupPlans.RemoveAt(0); continue; }
-            try
+            var job = progress.Job;
+            if (progress.Failed)
             {
-                if (job.Matching is null)
-                {
-                    job.StartMatching();
-                    remaining -= 2 * (job.Members.Length - 1) * (job.Members.Length - 1);
-                }
-                remaining -= job.Matching!.Advance(Math.Max(1, remaining));
-                PrepareGroupCandidates(job);
-            }
-            catch (ArgumentException)
-            {
-                foreach (var member in job.Members.Where(member => !job.Canceled.Contains(member.EntityId)))
+                foreach (var member in job.ActiveMembers)
                     AddGroupEvent(MatchEventKind.CommandRejected, new EntityId(member.EntityId),
                         "invalid_group_geometry", new(job.Id, -1, null, false));
-                _groupPlans.RemoveAt(0);
                 continue;
             }
-            if (!job.Matching!.Complete) break;
-            if (job.Candidates.Count != job.Members.Length) break;
-            _groupPlans.RemoveAt(0); // Committing this job must not cancel itself.
-            var activeIds = job.Members.Where(member => !job.Canceled.Contains(member.EntityId))
+            var activeIds = job.ActiveMembers
                 .Select(member => new EntityId(member.EntityId)).ToArray();
             var activeCommand = job.Command with { Group = job.Command.Group! with { EntityIds = activeIds } };
             var members = PrepareGroupMembers(activeCommand, job.Id).ToArray();
             if (members.Length == 0) continue;
-            var result = job.Matching.Result();
-            var slots = members.Select(member => result[Array.FindIndex(job.Members,
-                saved => saved.EntityId == member.Id.Value)]).ToArray();
             try
             {
-                var goals = GroupPlacementPlanner.PlanAssigned(_navigation!, members, job.Ideals, slots, GroupBodies(members), job.Candidates);
-                ApplyGroupGoals(job.Command, job.Id, job.Heading, goals, true);
+                var goals = job.PlanPlacement(_navigation!, members, GroupBodies(members));
+                CommitPlannedGroupGoals(job.Command, job.Id, job.Heading, goals);
             }
             catch (ArgumentException)
             {
@@ -74,23 +51,4 @@ public sealed partial class RtsMatch
         }
     }
 
-    private void PrepareGroupCandidates(GroupPlanningJob job)
-    {
-        // Ideal geometry is frozen, so preparation may overlap matching without reading mutable occupancy.
-        var end = Math.Min(job.Members.Length, job.Candidates.Count + GroupCandidateSlotsPerFrame);
-        for (var i = job.Candidates.Count; i < end; i++)
-            job.Candidates.Add(GroupPlacementPlanner.Candidates(_navigation!, job.Ideals[i]));
-    }
-
-    private void RestoreGroupPlans(MatchSnapshot snapshot)
-    {
-        foreach (var saved in snapshot.GroupPlans!)
-        {
-            foreach (var member in saved.Members)
-                if (!_entities.TryGetValue(new EntityId(member.EntityId), out var entity)
-                    || entity.OwnerId != saved.Command.PlayerId || ReadMovementDefinition(entity.Id) is null)
-                    throw new InvalidDataException("Group planning member does not match entity content.");
-            _groupPlans.Add(GroupPlanningJob.Restore(saved, _navigation!));
-        }
-    }
 }

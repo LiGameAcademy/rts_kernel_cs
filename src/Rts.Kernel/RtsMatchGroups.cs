@@ -5,7 +5,6 @@ namespace Rts.Kernel;
 public sealed partial class RtsMatch
 {
     private readonly MovementDefinitions _movementDefinitions;
-    private ulong _nextGroupId = 1;
 
     public MovementDefinition? ReadMovementDefinition(EntityId id) => _entities.TryGetValue(id, out var entity)
         && _movementDefinitions.TryGet(entity.MovementDefinitionId, out var definition) ? definition : null;
@@ -16,13 +15,6 @@ public sealed partial class RtsMatch
         return value > int.MaxValue ? int.MaxValue : (int)value;
     }
 
-    private SimVector2 PlacementStart(EntityState entity, OrderMode mode)
-    {
-        if (mode == OrderMode.Append && _unitOrders.TryGetValue(entity.Id, out var queue))
-            return queue.Pending.LastOrDefault()?.Move?.Goal ?? queue.Current?.Move?.Goal ?? entity.Position;
-        return entity.Position;
-    }
-
     private void ExecuteGroupMove(CommandEnvelope command)
     {
         var request = command.Group!;
@@ -31,12 +23,11 @@ public sealed partial class RtsMatch
             foreach (var id in request.EntityIds) AddEvent(MatchEventKind.CommandRejected, id, "group_goal_outside_navigation");
             return;
         }
-        if (_nextGroupId == ulong.MaxValue)
+        if (!_planning.TryAllocateId(out var groupId))
         {
             foreach (var id in request.EntityIds) AddEvent(MatchEventKind.CommandRejected, id, "group_id_exhausted");
             return;
         }
-        var groupId = _nextGroupId++;
         var members = PrepareGroupMembers(command, groupId);
         if (members.Count == 0) return;
         var anchorMember = members.FirstOrDefault(member => member.Id == request.LeaderId) ?? members[0];
@@ -51,18 +42,17 @@ public sealed partial class RtsMatch
         {
             if (members.Count > ImmediateGroupMembers)
             {
-                if (_groupPlans.Count >= MaximumGroupPlans)
+                if (_planning.Count >= MaximumGroupPlans)
                 {
                     foreach (var member in members)
                         AddGroupEvent(MatchEventKind.CommandRejected, member.Id, "group_planning_queue_full", new(groupId, -1, null, false));
                     return;
                 }
-                var spacing = Math.Max(_navigation.Grid.CellSize,
-                    2 * members.Max(member => member.Definition.Radius) + _navigation.Grid.CellSize * 0.1);
+                var spacing = GroupPlacementPlanner.CalculateSpacing(_navigation, members);
                 var job = new GroupPlanningJob(groupId, command, members, heading, spacing);
                 if (command.Mode == OrderMode.Replace)
                     foreach (var member in members) CancelGroupPlans(member.Id, command.Source);
-                _groupPlans.Add(job);
+                _planning.Enqueue(job);
                 return;
             }
             goals = GroupPlacementPlanner.Plan(_navigation, members, request, heading, GroupBodies(members));
@@ -94,10 +84,8 @@ public sealed partial class RtsMatch
             else
             {
                 var retained = new List<SimVector2> { entity.Position };
-                if (_unitOrders.TryGetValue(id, out var retainedQueue))
-                    retained.AddRange(retainedQueue.Pending.Prepend(retainedQueue.Current)
-                        .Where(intent => intent?.Move is not null).Select(intent => intent!.Move!.Goal));
-                members.Add(new PlacementMember(id, PlacementStart(entity, command.Mode), definition, Clearance(definition), retained));
+                retained.AddRange(_orders.RetainedGoals(id));
+                members.Add(new PlacementMember(id, _orders.PlacementStart(entity, command.Mode), definition, Clearance(definition), retained));
             }
             if (error is not null) AddGroupEvent(MatchEventKind.CommandRejected, id, error, new(groupId, -1, null, false));
         }
@@ -112,14 +100,20 @@ public sealed partial class RtsMatch
         {
             var radius = ReadMovementDefinition(entity.Id)?.Radius ?? 0;
             if (!IsMoving(entity.Id)) occupied.Add(new PlacementBody(entity.Position, radius));
-            if (_unitOrders.TryGetValue(entity.Id, out var queue))
-                foreach (var intent in queue.Pending.Prepend(queue.Current).Where(intent => intent?.Move is not null))
-                    occupied.Add(new PlacementBody(intent!.Move!.Goal, radius));
+            foreach (var goal in _orders.RetainedGoals(entity.Id))
+                occupied.Add(new PlacementBody(goal, radius));
         }
         return occupied;
     }
 
-    private void ApplyGroupGoals(CommandEnvelope command, ulong groupId, double heading, IReadOnlyList<PlacementGoal> goals, bool committingPlan = false)
+    private void ApplyGroupGoals(CommandEnvelope command, ulong groupId, double heading, IReadOnlyList<PlacementGoal> goals) =>
+        SubmitGroupGoals(command, groupId, heading, goals, MoveSubmission.Command);
+
+    private void CommitPlannedGroupGoals(CommandEnvelope command, ulong groupId, double heading, IReadOnlyList<PlacementGoal> goals) =>
+        SubmitGroupGoals(command, groupId, heading, goals, MoveSubmission.PlannedGroup);
+
+    private void SubmitGroupGoals(CommandEnvelope command, ulong groupId, double heading,
+        IReadOnlyList<PlacementGoal> goals, MoveSubmission submission)
     {
         var request = command.Group!;
         foreach (var item in goals)
@@ -134,7 +128,9 @@ public sealed partial class RtsMatch
             var move = CommandEnvelope.MoveTo(command.ExecuteFrame, command.PlayerId, command.Sequence, item.Member.Id,
                 item.Goal.Value, definition.Speed, item.Member.Clearance, definition.Motion, command.Mode, command.Source);
             var slot = new GroupSlot(groupId, item.Slot, request.Formation, request.Goal, heading, item.Adjusted);
-            if (ExecuteMove(move, slot, committingPlan)) AddGroupEvent(MatchEventKind.GroupMoveAssigned, item.Member.Id, string.Empty, outcome);
+            var accepted = submission == MoveSubmission.PlannedGroup
+                ? ExecutePlannedGroupMove(move, slot) : ExecuteMove(move, slot);
+            if (accepted) AddGroupEvent(MatchEventKind.GroupMoveAssigned, item.Member.Id, string.Empty, outcome);
         }
     }
 
