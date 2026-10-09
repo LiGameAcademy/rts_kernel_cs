@@ -4,11 +4,14 @@ internal static class GroupPlacementPlanner
 {
     internal const int AdjustmentCells = 8;
 
+    internal static double CalculateSpacing(NavigationState navigation, IReadOnlyList<PlacementMember> members) =>
+        Math.Max(navigation.Grid.CellSize,
+            2 * members.Max(member => member.Definition.Radius) + navigation.Grid.CellSize * 0.1);
+
     internal static IReadOnlyList<PlacementGoal> Plan(NavigationState navigation, IReadOnlyList<PlacementMember> members,
         GroupMoveRequest request, double heading, IReadOnlyList<PlacementBody> externalBodies)
     {
-        var spacing = Math.Max(navigation.Grid.CellSize,
-            2 * members.Max(member => member.Definition.Radius) + navigation.Grid.CellSize * 0.1);
+        var spacing = CalculateSpacing(navigation, members);
         var ideals = FormationLayout.Create(request.Formation, members.Count, spacing, request.Goal, heading);
         var anchorIndex = request.LeaderId.IsNone ? 0 : members.ToList().FindIndex(member => member.Id == request.LeaderId);
         if (anchorIndex < 0) anchorIndex = 0;

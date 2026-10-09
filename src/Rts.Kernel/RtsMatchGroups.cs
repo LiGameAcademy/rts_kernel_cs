@@ -57,8 +57,7 @@ public sealed partial class RtsMatch
                         AddGroupEvent(MatchEventKind.CommandRejected, member.Id, "group_planning_queue_full", new(groupId, -1, null, false));
                     return;
                 }
-                var spacing = Math.Max(_navigation.Grid.CellSize,
-                    2 * members.Max(member => member.Definition.Radius) + _navigation.Grid.CellSize * 0.1);
+                var spacing = GroupPlacementPlanner.CalculateSpacing(_navigation, members);
                 var job = new GroupPlanningJob(groupId, command, members, heading, spacing);
                 if (command.Mode == OrderMode.Replace)
                     foreach (var member in members) CancelGroupPlans(member.Id, command.Source);

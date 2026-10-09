@@ -6,7 +6,7 @@ public sealed partial class RtsMatch
 {
     public const int CrowdBlockedSeconds = 3;
     public const int LocalReplansPerFrame = 16;
-    private const int LocalRetryFrames = 6;
+    internal const int LocalRetryFrames = 6;
 
     private bool CanSpawnGround(CommandEnvelope command)
     {

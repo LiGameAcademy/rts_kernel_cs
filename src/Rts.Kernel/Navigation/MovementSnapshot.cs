@@ -12,7 +12,7 @@ internal static class MovementSnapshot
             if (move is null || move.EntityId <= previous || !entityIds.Contains(move.EntityId)
                 || move.Request is not { IsValid: true } || move.Waypoints is null || move.Waypoints.Count == 0
                 || move.WaitFrames < 0 || move.WaitFrames >= RtsMatch.CrowdBlockedSeconds * snapshot.TickRate
-                || move.RetryAfterFrame < 0 || move.RetryAfterFrame > snapshot.Frame + 6
+                || move.RetryAfterFrame < 0 || move.RetryAfterFrame > snapshot.Frame + RtsMatch.LocalRetryFrames
                 || (snapshot.Entities.Single(entity => entity.Id == move.EntityId).MovementDefinitionId == 0
                     && (move.WaitFrames != 0 || move.RetryAfterFrame != 0))
                 || move.NextWaypoint < 0 || move.NextWaypoint >= move.Waypoints.Count
