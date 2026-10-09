@@ -10,6 +10,7 @@ public sealed partial class RtsMatch
     private readonly List<QueuedCommand> _pendingCommands = [];
     private readonly List<MatchEvent> _events = [];
     private NavigationState? _navigation;
+    private readonly DeterministicRng _rng;
     private ulong _nextEntityId = 1;
     private long _nextArrivalOrder;
     private long _nextEventSequence;
@@ -24,15 +25,13 @@ public sealed partial class RtsMatch
         if (_movementDefinitions.ContentHash is not null && pathingGrid is null)
             throw new ArgumentException("Ground movement definitions require navigation.");
         Config = config;
-        Rng = new DeterministicRng(seed);
+        _rng = new DeterministicRng(seed);
         _navigation = pathingGrid is null ? null : new NavigationState(pathingGrid, terrain);
     }
 
     public MatchConfig Config { get; }
 
     public long Frame { get; private set; }
-
-    public DeterministicRng Rng { get; }
 
     public IReadOnlyCollection<EntityState> Entities => _entities.Values;
 
@@ -116,7 +115,7 @@ public sealed partial class RtsMatch
             _nextEntityId,
             _nextArrivalOrder,
             _nextEventSequence,
-            Rng.State,
+            _rng.State,
             entities,
             pending,
             _navigation?.CaptureSnapshot(),

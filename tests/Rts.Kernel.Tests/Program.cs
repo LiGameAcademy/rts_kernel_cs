@@ -61,7 +61,16 @@ Check(original.SubmitCommand(CommandEnvelope.Stop(10, 1, 3, moving.Id)).Accepted
 var snapshotJson = SnapshotJson.Serialize(original.CaptureSnapshot());
 var restored = RtsMatch.Restore(SnapshotJson.Deserialize(snapshotJson));
 Check(original.ComputeStateHash() == restored.ComputeStateHash(), "snapshot round trip hash");
-Check(original.Rng.NextUInt64() == restored.Rng.NextUInt64(), "random state restored");
+var originalHash = original.ComputeStateHash();
+var restoredHash = restored.ComputeStateHash();
+var originalRandomCopy = new DeterministicRng(original.CaptureSnapshot().RngState);
+var restoredRandomCopy = new DeterministicRng(restored.CaptureSnapshot().RngState);
+for (var draw = 0; draw < 20; draw++)
+{
+    Check(originalRandomCopy.NextUInt64() == restoredRandomCopy.NextUInt64(), "snapshot random sequence restored");
+}
+Check(original.ComputeStateHash() == originalHash && restored.ComputeStateHash() == restoredHash,
+    "consuming detached random streams cannot alter either match");
 var canonicalSnapshot = original.CaptureSnapshot();
 Check(SnapshotDiff.FindFirst(canonicalSnapshot, canonicalSnapshot) is null, "identical snapshots have no diff");
 Check(SnapshotDiff.FindFirst(canonicalSnapshot, canonicalSnapshot with { Frame = canonicalSnapshot.Frame + 1 })?.Path == "frame", "frame diff path");
