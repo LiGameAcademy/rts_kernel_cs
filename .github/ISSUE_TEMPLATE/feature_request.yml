@@ -1,0 +1,21 @@
+name: 功能建议
+description: 说明当前使用限制及希望支持的行为。
+body:
+- type: textarea
+  id: need
+  attributes:
+    label: 当前遇到什么限制
+    description: 说明具体使用场景，不需要先设计接口。
+  validations:
+    required: true
+- type: textarea
+  id: outcome
+  attributes:
+    label: 希望得到什么结果
+  validations:
+    required: true
+- type: textarea
+  id: context
+  attributes:
+    label: 范围与补充信息（可选）
+    description: 已有替代方案、宿主环境、输入/输出或兼容需求。

@@ -1,0 +1,27 @@
+name: 报告缺陷
+description: 描述内核中的实际行为、复现输入与预期结果。
+body:
+- type: textarea
+  id: problem
+  attributes:
+    label: 实际行为与预期结果
+    description: 例如：Stop 后单位仍继续移动；希望它保持停止，直到新命令替换。
+  validations:
+    required: true
+- type: textarea
+  id: reproduction
+  attributes:
+    label: 怎样复现
+    description: 尽量提供最小 C# 示例或输入顺序；暂不能稳定复现时说明已观察到的场景。
+  validations:
+    required: true
+- type: input
+  id: environment
+  attributes:
+    label: 版本与运行环境
+    description: 内核提交或版本、.NET、系统、CLI/宿主；不确定的项可写未知。
+- type: textarea
+  id: evidence
+  attributes:
+    label: 补充证据（可选）
+    description: 错误日志、快照/哈希差异或截图。性能问题请补单位组成、帧数、构建配置与失败/到达结果。

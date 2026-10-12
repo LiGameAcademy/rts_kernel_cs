@@ -1,0 +1,22 @@
+name: 重构与维护
+description: 整理职责、状态边界或重复实现，明确行为与兼容范围。
+body:
+- type: textarea
+  id: problem
+  attributes:
+    label: 当前实现哪里难以修改
+    description: 给出代码位置和实际影响，区分已复现缺陷与结构问题。
+  validations:
+    required: true
+- type: textarea
+  id: scope
+  attributes:
+    label: 本次范围与完成条件
+    description: 说明要整理的职责，以及怎样判断完成；兼容影响尚未确定时可注明待评估。
+  validations:
+    required: true
+- type: textarea
+  id: proposal
+  attributes:
+    label: 方案、依赖与验证（可选）
+    description: 可说明公开 API、快照、执行顺序是否改变，以及依赖的 Issue/PR。
