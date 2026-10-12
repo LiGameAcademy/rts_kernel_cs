@@ -34,9 +34,9 @@ Environment: Windows, .NET SDK 10, kernel `net8.0`, tests/CLI `net10.0`, Godot `
 | Default CLI hash | `dadc36f5f8436389122a88d72006575e0f8a0ed0ec2c9188377ca7776b305e58` (frame 31) |
 | Godot default bridge | `selftest_rts_kernel_bridge: PASS (24 checks)`; CLI/Godot hashes match |
 | Godot navigation bridge | `selftest_rts_kernel_navigation: PASS (15 checks)`; mid-move restore and CLI/Godot hashes match |
-| Host playable boot | `godot_warcraft3` Issue #29: pin this commit, `Test-Apps.ps1 -App game`, normal startup to playable match |
+| Host playable boot | Host PR pins this tip; `Test-Apps.ps1 -App game` → `players=2 camps=20 units=86`, `APP startup PASS: game` |
 
-Known non-blocking Godot exit noise: ObjectDB/resource leak reports and external-editor falling back to internal editor.
+Known non-blocking Godot exit noise: ObjectDB/resource leak reports, external-editor fallback, and occasional dummy-renderer `material` null during doodad load.
 
 Dense 500-member fixture samples still show high failure/remaining counts; that does **not** block 0.0.1 and does **not** satisfy G2.
 
