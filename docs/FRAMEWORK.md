@@ -61,10 +61,28 @@
 - 排序保持 ExecuteFrame → PlayerId → Sequence → ArrivalOrder；拒绝不消耗到达序号；可变群体输入在入队时冻结。
 - v9、公开 API、固定帧顺序及逐帧哈希/事件/恢复基线不变。
 
+## Issue #30 验收要点
+
+对应 [Issue #30](https://github.com/LiGameAcademy/rts_kernel_cs/issues/30)：事件缓冲统一管理发布与序号。
+
+- `MatchEventBuffer` 独占未消费事件与下一序号；普通/群体事件共用 `Publish`，由 `RtsMatch` 显式传入帧号。
+- `Drain` 返回独立结果并清空缓冲，序号不因清空重置；恢复只接管已校验序号。
+- v9 只保存下一事件序号，不保存未消费事件，恢复不重放历史输出。
+- 不引入事件总线、订阅系统或异步。
+
+## Issue #33 验收要点
+
+对应 [Issue #33](https://github.com/LiGameAcademy/rts_kernel_cs/issues/33)：实体身份、状态提交与快照转换独立模块。
+
+- `MatchEntities` 独占实体字典、下一 ID、生成、已有状态提交及实体快照转换。
+- 提供按 ID 读取、稳定 live 集合、detached `ReadAll`；订单/规划恢复只消费只读 `ById` 视图。
+- `Update` 对缺失实体抛实现异常，不隐式新增；拒绝生成不消耗 ID。
+- 快照装配仍由 `RtsMatch` 协调，不新建接收全部模块的快照服务；v9 与逐帧基线不变。
+
 验证入口：仓库根目录 `./Test.ps1`（构建零警告/错误，控制台断言及 CLI）。
 
 ## 0.0.1 范围边界
 
-纳入：命令/事件/实体/订单/规划职责边界，运动计算与提交分离，规划生命周期边界，核心算法可读性整理，非法命令拒绝、随机流所有权、快照恢复与 CLI 一致性。
+纳入：命令/事件/实体/订单/规划职责边界，运动计算与提交分离，规划生命周期边界，核心算法可读性整理，非法命令拒绝、随机流所有权、快照恢复与 CLI 一致性。清单工作包 #12/#13/#14/#16/#29/#30/#33 均已有验收说明。
 
 不纳入：密集交通与 300/500 性能门、完整 M2 正式地图接入、战斗/经济/技能迁移、Windows 导出。完整移动跟踪 [Issue #3](https://github.com/LiGameAcademy/rts_kernel_cs/issues/3)；版本总验收见 [Issue #55](https://github.com/LiGameAcademy/rts_kernel_cs/issues/55)。
