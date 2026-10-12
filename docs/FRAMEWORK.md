@@ -52,6 +52,15 @@
 - `SlotMatchingWork` 说明 1..n 索引、列 0 增广根、势函数、平局顺序与按列计费不变量；碰撞预约与提交顺序有注释。
 - 纯可读性整理：不改预算、迭代顺序、算法结果或 v9；改动文件不超过 500 物理行。
 
+## Issue #29 验收要点
+
+对应 [Issue #29](https://github.com/LiGameAcademy/rts_kernel_cs/issues/29)：命令队列从 `RtsMatch` 拆出为独立状态模块。
+
+- `MatchCommandQueue` 独占待执行命令与到达序号；负责结构校验、冻结、按帧取出、快照导出与恢复。
+- `RtsMatch.SubmitCommand` 委托接收；固定帧内执行规则仍由对局协调，不向模块传入整个对局。
+- 排序保持 ExecuteFrame → PlayerId → Sequence → ArrivalOrder；拒绝不消耗到达序号；可变群体输入在入队时冻结。
+- v9、公开 API、固定帧顺序及逐帧哈希/事件/恢复基线不变。
+
 验证入口：仓库根目录 `./Test.ps1`（构建零警告/错误，控制台断言及 CLI）。
 
 ## 0.0.1 范围边界
