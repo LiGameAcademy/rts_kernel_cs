@@ -10,11 +10,13 @@
 | --- | --- | --- |
 | `MatchEntities` | 实体字典、下一 ID、生成与状态提交、实体快照 | 生成前业务校验、事件发布 |
 | `MatchCommandQueue` | 待执行命令、到达序号、按帧取出 | 命令执行规则 |
+| `MatchCommandExecutor` | 无耐久状态；应用 Spawn / Obstacle / Velocity / Move / Stop 规则 | `GroupMove` 仍暂由对局 partial 处理（Issue #63 包 C） |
 | `MatchEventBuffer` | 未消费事件与事件序号 | 传入帧号、消费后继续推进序号 |
 | `UnitOrderBook` | 当前/排队订单意图与活动路径 | Replace/Append/Stop、完成与失败清理 |
 | `GroupPlanningQueue` | 计划身份、FIFO、取消与本帧列预算调度 | 就绪后调用落点提交；来源保护 |
 | `GroupPlanningJob` | 匹配进度、候选准备、取消成员与就绪判断 | 由队列推进；提交入口在 `RtsMatch` |
 | `MovementStepper` | 路段转向、坡度与按时间推进的运动提案 | 碰撞预约、诊断直接提交、失败后是否保留进度 |
+| `MovePathPlanner` | 无状态；网格寻路 → 世界路点 | 脏路径重规划、排队激活、命令入队 |
 
 导航动态占地仍由 `NavigationState` 拥有。随机流由对局内部持有，不向宿主暴露可变对象。
 
@@ -81,8 +83,17 @@
 
 验证入口：仓库根目录 `./Test.ps1`（构建零警告/错误，控制台断言及 CLI）。
 
+## Issue #63 验收要点（包 A）
+
+对应 [Issue #63](https://github.com/LiGameAcademy/rts_kernel_cs/issues/63) 工作包 A：命令执行规则离开 `RtsMatch` partial。
+
+- `MatchCommandExecutor` 应用 Spawn / Obstacle / Velocity / Move / Stop；依赖为实体、事件、订单、规划、移动定义与按次传入的导航，不持有对局引用。
+- `MovePathPlanner` 集中网格→世界路点；`MovementDefinitions.ClearanceCells` 统一净空换算。
+- `GroupMove` 仍由 `RtsMatch` partial 处理，经执行器提交单单位 Move；拥挤推进（包 B）与群体策略整体迁出（包 C）另开。
+- v9、公开 API、固定帧顺序及逐帧哈希/事件/恢复基线不变。
+
 ## 0.0.1 范围边界
 
 纳入：命令/事件/实体/订单/规划职责边界，运动计算与提交分离，规划生命周期边界，核心算法可读性整理，非法命令拒绝、随机流所有权、快照恢复与 CLI 一致性。清单工作包 #12/#13/#14/#16/#29/#30/#33 均已有验收说明。
 
-不纳入：密集交通与 300/500 性能门、完整 M2 正式地图接入、战斗/经济/技能迁移、Windows 导出。完整移动跟踪 [Issue #3](https://github.com/LiGameAcademy/rts_kernel_cs/issues/3)；版本总验收见 [Issue #55](https://github.com/LiGameAcademy/rts_kernel_cs/issues/55)。
+不纳入：密集交通与 300/500 性能门、完整 M2 正式地图接入、战斗/经济/技能迁移、Windows 导出。完整移动跟踪 [Issue #3](https://github.com/LiGameAcademy/rts_kernel_cs/issues/3)；版本总验收见 [Issue #55](https://github.com/LiGameAcademy/rts_kernel_cs/issues/55)。框架补刀见 [Issue #63](https://github.com/LiGameAcademy/rts_kernel_cs/issues/63)。

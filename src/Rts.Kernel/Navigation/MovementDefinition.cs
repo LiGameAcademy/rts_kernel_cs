@@ -24,4 +24,11 @@ internal sealed class MovementDefinitions
                 .ToLowerInvariant();
     }
     internal bool TryGet(ulong id, out MovementDefinition? definition) => _items.TryGetValue(id, out definition);
+
+    /// <summary>Chebyshev clearance cells from body radius and grid cell size (same rule as host PathQuery).</summary>
+    internal static int ClearanceCells(MovementDefinition definition, double cellSize)
+    {
+        var value = Math.Max(0, Math.Ceiling(definition.Radius / cellSize - 0.5));
+        return value > int.MaxValue ? int.MaxValue : (int)value;
+    }
 }

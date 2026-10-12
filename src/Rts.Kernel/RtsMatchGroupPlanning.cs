@@ -8,15 +8,8 @@ public sealed partial class RtsMatch
     public const int GroupMatchingColumnsPerFrame = 2097152;
     public const int MaximumGroupPlans = 16;
     public const int GroupCandidateSlotsPerFrame = 64;
-    private readonly GroupPlanningQueue _planning = new();
 
     public IReadOnlyList<GroupPlanningView> ReadGroupPlans() => _planning.ReadViews();
-
-    private void CancelGroupPlans(EntityId id, OrderSource source)
-    {
-        foreach (var outcome in _planning.Cancel(id, source))
-            AddGroupEvent(MatchEventKind.CommandRejected, id, "group_plan_superseded", outcome);
-    }
 
     private void AdvanceGroupPlanning()
     {
