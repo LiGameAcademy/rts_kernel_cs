@@ -12,7 +12,7 @@ An engine-independent C# RTS simulation kernel extracted from the [Godot Warcraf
 - Framework ownership: entities, commands, events, order paths and group planning are owned by dedicated internal modules (see [framework notes](docs/FRAMEWORK.md), Chinese).
 - Simple velocity integration; JSON frame snapshots, restoration, state hashes and field-level difference reports.
 - Serializable random state, static pathing grids and bilinear height sampling.
-- **0.0.1**: first usable framework baseline; complete M2 movement acceptance and later gameplay migration are out of scope for this version.
+- **0.0.1**: first usable framework baseline; see [VERSION_0.0.1.md](docs/VERSION_0.0.1.md). Complete M2 movement acceptance and later gameplay migration are out of scope for this version.
 - Eight-neighbor pathfinding with static and match-owned dynamic obstacles, cell clearance and frame commands that add or remove footprints; navigation snapshots validate static map identity.
 - Goal-based path following with stop, replace and append queues; dynamic replanning, continuation after a failed queued goal, player / unit-AI source priority and order snapshot restoration.
 - Authoritative facing, per-frame turning with turn-rate slowdown and elevation-based slope scaling; restoration validates height-field identity.
