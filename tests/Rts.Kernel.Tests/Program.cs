@@ -27,6 +27,26 @@ void CheckThrows<TException>(Action action, string message) where TException : E
     throw new InvalidOperationException(message);
 }
 
+if (args.Contains("--perf") || args.Contains("--perf-long"))
+{
+    MovementPerformance.Run(args.Contains("--perf-long"));
+    return;
+}
+
+if (args.Contains("--framework-traces"))
+{
+    FrameworkTraceChecks.Run(Check);
+    Console.WriteLine($"Framework trace checks PASS ({checks} checks)");
+    return;
+}
+
+if (args.Contains("--crowd-only"))
+{
+    CrowdMovementChecks.Run(Check);
+    Console.WriteLine($"Rts.Kernel crowd checks PASS ({checks} checks)");
+    return;
+}
+
 RtsMatch CreateMovingMatch()
 {
     var match = new RtsMatch(MatchConfig.Default, 1234);
@@ -48,7 +68,16 @@ Check(original.SubmitCommand(CommandEnvelope.Stop(10, 1, 3, moving.Id)).Accepted
 var snapshotJson = SnapshotJson.Serialize(original.CaptureSnapshot());
 var restored = RtsMatch.Restore(SnapshotJson.Deserialize(snapshotJson));
 Check(original.ComputeStateHash() == restored.ComputeStateHash(), "snapshot round trip hash");
-Check(original.Rng.NextUInt64() == restored.Rng.NextUInt64(), "random state restored");
+var originalHash = original.ComputeStateHash();
+var restoredHash = restored.ComputeStateHash();
+var originalRandomCopy = new DeterministicRng(original.CaptureSnapshot().RngState);
+var restoredRandomCopy = new DeterministicRng(restored.CaptureSnapshot().RngState);
+for (var draw = 0; draw < 20; draw++)
+{
+    Check(originalRandomCopy.NextUInt64() == restoredRandomCopy.NextUInt64(), "snapshot random sequence restored");
+}
+Check(original.ComputeStateHash() == originalHash && restored.ComputeStateHash() == restoredHash,
+    "consuming detached random streams cannot alter either match");
 var canonicalSnapshot = original.CaptureSnapshot();
 Check(SnapshotDiff.FindFirst(canonicalSnapshot, canonicalSnapshot) is null, "identical snapshots have no diff");
 Check(SnapshotDiff.FindFirst(canonicalSnapshot, canonicalSnapshot with { Frame = canonicalSnapshot.Frame + 1 })?.Path == "frame", "frame diff path");
@@ -105,9 +134,26 @@ Check(terrain.TrySample(SimVector2.Zero, out altitude) && altitude == 30, "last 
 Check(!terrain.TrySample(new SimVector2(1, 0), out _), "height outside map explicitly missing");
 CheckThrows<ArgumentException>(() => new TerrainHeights(2, 2, 128, default, new double[] {0, 0, 0, double.NaN}), "nonfinite height rejected");
 
+FrameworkTraceChecks.Run(Check);
+EntityReadChecks.Run(Check);
+EntityLifecycleChecks.Run(Check);
+CommandContractChecks.Run(Check);
+MatchCommandQueueChecks.Run(Check);
+MatchEventBufferChecks.Run(Check);
 PathfindingChecks.Run(Check);
 NavigationChecks.Run(Check);
 MovementChecks.Run(Check);
 MotionRuleChecks.Run(Check);
+MotionStateChecks.Run(Check);
+MotionIntegrationChecks.Run(Check);
+FormationGeometryChecks.Run(Check);
+CrowdMovementChecks.Run(Check);
+GroupMovementChecks.Run(Check);
+GroupArrivalChecks.Run(Check);
+GroupEdgeChecks.Run(Check);
+GroupPlanningChecks.Run(Check);
+GroupSupersessionChecks.Run(Check);
+OrderQueueChecks.Run(Check);
+OrderSnapshotChecks.Run(Check);
 
 Console.WriteLine($"Rts.Kernel.Tests PASS ({checks} checks)");

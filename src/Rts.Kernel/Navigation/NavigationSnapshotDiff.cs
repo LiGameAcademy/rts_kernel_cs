@@ -10,6 +10,7 @@ internal static class NavigationSnapshotDiff
         if (left is not null && right is not null)
         {
             if (left.MapHash != right.MapHash) return Difference("navigation.mapHash", left.MapHash, right.MapHash);
+            if (left.HeightHash != right.HeightHash) return Difference("navigation.heightHash", left.HeightHash, right.HeightHash);
             if (left.Obstacles.Count != right.Obstacles.Count)
                 return Difference("navigation.obstacles.count", left.Obstacles.Count, right.Obstacles.Count);
             for (var i = 0; i < left.Obstacles.Count; i++)

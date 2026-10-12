@@ -1,5 +1,9 @@
 using Rts.Kernel;
 
+if (args.Contains("--crowd")) { CrowdSample.Run(); return; }
+if (args.Contains("--formation")) { FormationSample.Run(); return; }
+if (args.Contains("--orders")) { OrdersSample.Run(); return; }
+if (args.Contains("--motion")) { MotionSample.Run(); return; }
 if (args.Contains("--navigation")) { NavigationSample.Run(); return; }
 
 var match = new RtsMatch(MatchConfig.Default, seed: 0xC0FFEEUL);

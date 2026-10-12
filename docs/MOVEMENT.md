@@ -1,6 +1,6 @@
 # 目标移动与帧快照
 
-Issue #3 的第一批实现。内核计算路径和位置，宿主提交命令并消费状态与事件；Godot 示例由游戏仓库维护。
+Issue #3 的分步骤实现。内核计算路径、位置和朝向，宿主提交命令并消费状态与事件；Godot 示例由游戏仓库维护。
 
 ```csharp
 var match = new RtsMatch(MatchConfig.Default, seed: 7, pathingGrid: grid);
@@ -14,23 +14,100 @@ var snapshot = match.CaptureSnapshot();
 var restored = RtsMatch.Restore(snapshot, grid);
 ```
 
-速度为世界单位/秒；目标和速度必须有限、速度为正，净空沿用导航格子规则。命令在目标帧执行并在同帧推进移动。所有权错误、无导航、不可达或地图外目标在执行时产生 CommandRejected。非法替换保留原移动；有效替换从当前坐标重新寻路。Stop 在移动积分前取消路径并清零速度。
+速度为世界单位/秒；目标和速度必须有限、速度为正，净空沿用导航格子规则。命令在目标帧执行并在同帧推进移动。所有权错误、无导航、不可达或地图外目标在执行时产生 CommandRejected。非法替换保留原移动；有效替换从当前坐标重新寻路。Stop 在移动积分前取消路径、清空待执行队列并清零速度；保留 Stop 订单，直到新的玩家或玩家 AI 移动替换。
 
 路径按格子中心逐段移动，再到精确目标；不平滑、不吸附。跨多个路点也按本帧距离预算消费，抵达时精确停在目标、速度归零并只发一次 MoveCompleted。成功增删动态占地后，所有在途移动在本帧重新寻路；失败时停止并发 MoveFailed，不自动重试。单位被新障碍覆盖也会停止，暂不实现挤出。
 
-实体移动、路径索引与障碍更新只发生在 Step。ReadMoveOrders 返回路径副本，不能修改对局。启用导航的对局拒绝 SetVelocity，避免绕过寻路；无地图的速度积分骨架仍可运行。出生仍是诊断命令，没有合法落点与生产规则。
+实体移动、路径索引与障碍更新只发生在 Step。ReadMoveOrders 返回路径副本，不能修改对局。只需要实体ID、等待/重试帧时使用 ReadMovementStatuses，返回独立只读视图，避免复制路点。启用导航的对局拒绝 SetVelocity，避免绕过寻路；无地图的速度积分骨架仍可运行。带移动定义的出生校验静态净空、身体边界和现有地面单位重叠；定义为0的旧诊断出生保持原语义。尚未实现生产规则。
 
-## 快照 v3
+## 追加与来源优先级
 
-保存每个在途实体的目标、速度、净空、路径世界坐标和下一路点索引，包含未执行的 MoveTo 载荷，状态哈希与差异报告覆盖这些字段。移动过程中每帧快照可恢复并继续相同模拟。静态地图不嵌入快照，恢复仍需提供身份完全一致的 PathingGrid。
+MoveTo 可指定 `mode: OrderMode.Append`，默认 Replace。当前有移动或等待衔接的队列时，追加只保存意图，不改变当前路径；空闲或停住时追加会立即启动新移动。成功替换清空待执行队列，非法替换/追加保留原状态。每个实体最多64个待执行订单，超限在执行帧返回 `order_queue_full`。
 
-恢复校验路径点有效性、相邻格、穿墙角与当前位置所在路径段；失败只丢弃新实例。v1/v2 快照不再接受，未提供迁移。没有导航的快照也使用 v3。CLI 默认示例位置/帧号保持不变，哈希随新字段改变；验证宿主时从当前 CLI 取得期望值，不加载旧程序集或硬编码旧哈希。
+追加帧校验目标在地图内、当前可占用；轮到执行时从实际当前位置重新寻路，不冻结后续路径。完成/失败后，下一帧最多激活一个后续订单；没有在前一个订单之后重复授予整帧运动预算。动态障碍使某项不可达时发 MoveFailed 并保留剩余队列，后续帧继续；不自动重试失败项。
+
+```csharp
+match.SubmitCommand(CommandEnvelope.MoveTo(match.Frame + 1, 0, 2, new EntityId(1),
+    new SimVector2(25, 15), 45, mode: OrderMode.Append));
+```
+
+`source` 默认 OrderSource.Player；PlayerAi 使用同一所有权校验和显式命令权限。UnitAi 不能替换、停止或追加到有效的玩家/玩家 AI 订单，也不能绕过已有玩家队列或持久 Stop。玩家命令可以替换单位 AI 行动。来源仍是可信宿主的诊断元数据，本批没有实现 AI 决策或联网身份认证。
+
+同帧继续按执行帧、PlayerId、Sequence、到达顺序稳定执行；不按真实到达时间或来源重新排序。ReadUnitOrders 返回副本，ReadCurrentOrder 返回不可变当前意图，GetPendingOrderCount 返回待执行数量；等待下一帧衔接时当前意图为 null，队列仍存在。
+
+## 转向与真实坡度
+
+MoveTo 的可选 `motion` 参数启用 MotionParameters；默认 null 的旧诊断单位保持原直接跟随；带移动定义的正式地面单位朝向跟随实际路径方向。带运动参数的命令以 EntityState.Facing 为权威，单位为弧度，范围 [-π, π)。TurnRate 使用圈/秒，诊断参数最小0.05，非法参数在提交时拒绝。
+
+```csharp
+var match = new RtsMatch(MatchConfig.Default, seed: 7, pathingGrid: grid, terrain: terrain);
+match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new SimVector2(15, 15)));
+match.Step();
+match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 1, new EntityId(1),
+    new SimVector2(65, 15), 45, motion: new MotionParameters()));
+match.Step();
+var restored = RtsMatch.Restore(match.CaptureSnapshot(), grid, terrain);
+```
+
+每个路径段先用当前朝向计算速度倍率，再按耗时转向、平移。多个路径段共享整帧时间，不能重复取得整帧转角；位置仍沿路径方向推进，不通过表现朝向反算移动。25/140度为全速/最低倍率阈值，最低0.12，使用 smoothstep 曲线。倍率为零时仍可转向；停止和抵达后保留朝向。
+
+默认启用坡度：高度场必须覆盖完整导航网格；采样当前位置与下一路点的真实高度差，按高度差/平面距离取坡度。30度封顶，上坡最低0.6、下坡最低0.85，等高线/平地不降速。缺少高度时，执行帧返回 `motion_requires_height_field`，保留旧订单；非有限几何或高度计算失败停止并发 MoveFailed。禁用 ScaleSlopeSpeed 时无需高度场。运动参数仍是诊断入口，正式参数须来自权威单位定义。
+
+## 快照 v9
+
+保存实体朝向，以及每个在途实体的目标、速度、净空、运动参数、路径世界坐标和下一路点索引，并保存当前订单类型/来源、FIFO 待执行意图及未执行命令的追加模式/来源，状态哈希与差异报告覆盖这些字段。移动过程中每帧快照可恢复并继续相同模拟。静态地图不嵌入快照，恢复仍需提供身份完全一致的 PathingGrid，以及原局使用的 TerrainHeights；高度哈希包含尺寸、坐标和全部顶点高度。
+
+恢复校验路径点有效性、相邻格、穿墙角与当前位置所在路径段；失败只丢弃新实例。v1–v8 快照不再接受，未提供迁移。没有导航的快照也使用 v9。CLI 默认示例位置/帧号保持不变，哈希随新字段改变；验证宿主时从当前 CLI 取得期望值，不加载旧程序集或硬编码旧哈希。
 
 ```powershell
 ./Test.ps1 -Configuration Release
 dotnet run --project samples/Rts.Kernel.Cli --no-build -c Release -- --navigation
+dotnet run --project samples/Rts.Kernel.Cli --no-build -c Release -- --motion
+dotnet run --project samples/Rts.Kernel.Cli --no-build -c Release -- --orders
 ```
 
 ## 本批边界
 
-这一批是直接路径跟随，尚非原游戏的完整移动替代。转向速度、坡度、命令排队、组队落点分配、预约、单位间避让、追击与真实游戏接入留在 Issue #3 的后续批次。速度/净空目前随诊断命令传入，正式玩法必须由权威单位定义约束，不能直接信任联网客户端。未声明跨平台确定性；300/500 单位性能基线与 Windows 导出按计划暂缓。
+这一批包含直接路径跟随及转向/坡度隔离验证，尚非原游戏的完整移动替代。群体落点、途中预约与局部避让已在内核及隔离宿主接入；追击、正式内容接入和主游戏验收仍在 Issue #3 后续范围。速度/净空/运动参数目前随诊断命令传入，正式玩法必须由权威单位定义约束，不能直接信任联网客户端。未声明跨平台确定性；300/500 单位性能基线与 Windows 导出按计划暂缓。
+
+## Group placement and formations
+
+Create a match with frozen MovementDefinition entries and spawn members with their movementDefinitionId. Submit CommandEnvelope.MoveGroup with IDs, goal, FormationKind (Compact/Rectangle/Wedge/Circle), optional leader and heading. Commands do not supply member speeds or radii. Definitions are copied into a canonical catalog; snapshots require the identical content identity. Legacy diagnostic moves cannot override capabilities of profiled entities.
+
+The kernel assigns stable ideal slots using deterministic minimum squared-distance matching, then checks clearance, connectivity, body separation, other known endpoints and stationary units. Local adjustment searches up to eight grid cells around each ideal slot. A failed member keeps its previous orders; other members may succeed. GroupMoveAssigned events carry actual goals and adjustment results. Append keeps current orders and persists resolved slots in the queue. Stop releases them.
+
+Soft formations use individual paths and assemble at their assigned destinations. Open-ground group routes check every cell and corner before using the shortest octile route, otherwise A* applies. Group commands above 64 members enter a FIFO queue of at most 16 plans. Matching advances with a fixed budget of 2,097,152 inspected columns per frame; candidate preparation advances 64 slots per frame, including while exact matching is incomplete. Candidate coordinates are enumerated lazily in the unchanged distance/Y/X order; a spatial index narrows exact body-overlap checks. Old orders continue until commit; at most one plan commits per frame. Valid player Replace/Stop cancels the corresponding member, Append preserves pending plans. Planning freezes starts and exact slot identities; commit rechecks current navigation, eligibility and occupied destinations. ReadGroupPlans exposes copied progress views.
+
+v9 stores movement content identity, entity definition IDs, group counter, future group commands and current/pending slot metadata. Restore requires definitions as the final RtsMatch.Restore argument. Older snapshots are rejected. Run the CLI with --formation for a host parity example.
+
+
+## Swept-space reservations and compact arrival
+
+Profiled ground units reserve their full swept path for the current frame, using body radii and a derived spatial index. Unprocessed units hold their starting positions. Touching is allowed; overlap, high-speed crossing and swaps are prevented. This is conservative space reservation, not a time-expanded path scheduler. Legacy diagnostic entities without movement definitions do not participate in these body reservations.
+
+Blocked units attempt local routes within eight cells, at most 256 expanded nodes shared across rejoin attempts. The match permits 16 attempts per frame; a unit retries after six frames. Local routes retain the original goal, capabilities and group slot. Stationary and Stop units are never pushed. Continuous physical blockage for three seconds raises MoveFailed with crowd_blocked_timeout; the next queued intent starts on a subsequent frame.
+
+Near the assigned goal (four body radii plus two grid cells), a higher slot yields only when occupying its endpoint would block a nearby lower active slot's remaining final corridor in the same group. The checked corridor ends at that lower goal and spans up to the sum of both radii plus two cells. Nearby endpoints are indexed within twice the sum of both radii plus two cells. Nonconflicting members may arrive concurrently; a cleared corridor, arrival, failure, Stop or replacement releases the dependency. This intentional assembly wait does not consume the physical-blockage timeout. Members still navigate independently in transit; this is a soft formation. A complete 500-member arrival under dense congestion is not guaranteed by the bounded local planner; the full movement-quality/performance gate remains open.
+
+Snapshot v9 retains WaitFrames and RetryAfterFrame to in-flight orders, and stores pending planning jobs, frozen starts, canceled members, Hungarian work state and candidate preparation progress. Candidate preparation may now overlap matching; this changes scheduling and requires the new format. Derived reservations, arrival-neighbor indexes and navigation caches are rebuilt. Formats 1 through 8 are rejected; no migration is provided. CLI --crowd demonstrates detouring around a stationary Stop unit and provides a current host-parity hash.
+
+
+Use `dotnet run --project tests/Rts.Kernel.Tests -c Release -- --perf` for repeated 300/500-member planning, movement and diagnostic-read samples. `--perf-long` samples 1,800 movement frames and reports failures, completions and remaining orders. Wall-clock measurements never control the simulation; the dense reordering fixture is not a completed movement-quality or platform-export acceptance test.
+
+
+## 内部状态边界
+
+`UnitOrderBook` 独占当前/排队订单和活动路径，通过替换、追加、停止、衔接与完成操作维护对应关系；对外只提供不可变意图、路径记录及独立读取结果，不返回可写队列或字典。`GroupPlanningQueue` 独占计划身份、FIFO队列、取消及固定工作量调度，`GroupPlanningJob` 独占每个任务的计算进度。
+
+`RtsMatch` 保留实体状态、帧序、输入与事件协调，先检查命令上下文，再调用模块操作。恢复使用同样的状态所有者；整局快照仍包含实体、订单、路径、规划及随机状态。模块为具体对象组合，不使用通用调度或依赖注入框架。
+
+### 运动计算与提交边界
+
+`MovementStepper` 统一计算正式单位和诊断单位的转向、坡度与按时间推进的路径步进。正式单位返回轨迹交给碰撞预约；诊断单位直接提交计算结果，不创建碰撞轨迹。诊断接口无 Motion 时保留原有按距离扣减及保持朝向的约定，避免浮点运算顺序变化影响逐帧快照。失败后是否提交已走距离由调用方决定。
+## 读取数据的所有权
+
+`Entities` 是按实体 ID 排序的实时只读集合；保留集合引用后，其数量和内容会随后续 `Step` 改变。仅在帧推进之间即时遍历，不跨 `Step` 保留枚举器，也不并发读取或推进同一对局。
+
+需要保留一个时间点的实体结果时，调用 `ReadEntities()`；它按需复制为独立只读列表，后续帧不会改变数量或实体状态。`EntityState` 是仅含值类型字段的不可变记录，可以共享；使用 `with` 得到的新记录不会写回对局。该列表仅供读取，不是包含订单、规划与随机状态的完整存档；存档仍使用 `CaptureSnapshot()`。
+
+`ReadMoveOrders`、`ReadMovementStatuses`、`ReadUnitOrders`、`ReadGroupPlans` 返回独立只读结果。路径和订单的嵌套集合在边界复制；宿主按实际需要选择读取 API，不在每帧无条件复制全部数据。`TryGetEntity` 返回读取时的不可变实体记录。

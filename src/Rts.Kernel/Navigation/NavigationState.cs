@@ -8,18 +8,26 @@ public readonly record struct GridArea(int X, int Y, int Width, int Height)
 
 public sealed record NavigationObstacle(ulong Id, GridArea Area);
 public sealed record ObstacleCommand(ulong Id, GridArea? Area = null);
-public sealed record NavigationSnapshot(string MapHash, IReadOnlyList<NavigationObstacle> Obstacles);
+public sealed record NavigationSnapshot(string MapHash, IReadOnlyList<NavigationObstacle> Obstacles, string? HeightHash = null);
 
 /// <summary>Mutable occupancy belongs to one match; static grid data may be shared.</summary>
 internal sealed class NavigationState
 {
     private readonly PathingGrid _grid;
+    internal PathingGrid Grid => _grid;
+    internal TerrainHeights? Terrain { get; }
     private readonly SortedDictionary<ulong, GridArea> _obstacles = [];
     private readonly int[] _occupancy;
+    private readonly Dictionary<int, byte[]> _clearanceCache = [];
 
-    internal NavigationState(PathingGrid grid)
+    internal NavigationState(PathingGrid grid, TerrainHeights? terrain = null)
     {
         _grid = grid;
+        Terrain = terrain;
+        var end = new SimVector2(grid.Origin.X + grid.Width * grid.CellSize,
+            grid.Origin.Y + grid.Height * grid.CellSize);
+        if (terrain is not null && (!terrain.TrySample(grid.Origin, out _) || !terrain.TrySample(end, out _)))
+            throw new ArgumentException("Height field must cover the entire navigation grid.");
         _occupancy = new int[checked(grid.Width * grid.Height)];
     }
 
@@ -34,8 +42,44 @@ internal sealed class NavigationState
     internal SimVector2 CellCenter(GridCell cell) => new(
         _grid.Origin.X + (cell.X + 0.5) * _grid.CellSize,
         _grid.Origin.Y + (cell.Y + 0.5) * _grid.CellSize);
-    internal bool CanOccupy(GridCell cell, int clearance) =>
-        GridPathfinder.HasClearance(_grid, cell, clearance, IsWalkable);
+    internal bool CanOccupy(GridCell cell, int clearance)
+    {
+        if (clearance < 0 || cell.X < 0 || cell.Y < 0 || cell.X >= _grid.Width || cell.Y >= _grid.Height
+            || clearance >= Math.Max(_grid.Width, _grid.Height)) return false;
+        if (!_clearanceCache.TryGetValue(clearance, out var cache))
+        {
+            if (_clearanceCache.Count == 8) _clearanceCache.Clear();
+            cache = new byte[_occupancy.Length];
+            _clearanceCache.Add(clearance, cache);
+        }
+        var index = cell.Y * _grid.Width + cell.X;
+        if (cache[index] == 0)
+            cache[index] = GridPathfinder.HasClearance(_grid, cell, clearance, IsWalkable) ? (byte)1 : (byte)2;
+        return cache[index] == 1;
+    }
+    internal bool CanStandAt(SimVector2 position, double radius)
+    {
+        var endX = _grid.Origin.X + _grid.Width * _grid.CellSize;
+        var endY = _grid.Origin.Y + _grid.Height * _grid.CellSize;
+        if (!TryWorldToCell(position, out _) || position.X - radius < _grid.Origin.X
+            || position.Y - radius < _grid.Origin.Y || position.X + radius > endX || position.Y + radius > endY)
+            return false;
+        var left = Math.Max(0, (int)Math.Floor((position.X - radius - _grid.Origin.X) / _grid.CellSize));
+        var top = Math.Max(0, (int)Math.Floor((position.Y - radius - _grid.Origin.Y) / _grid.CellSize));
+        var right = Math.Min(_grid.Width - 1, (int)Math.Floor((position.X + radius - _grid.Origin.X) / _grid.CellSize));
+        var bottom = Math.Min(_grid.Height - 1, (int)Math.Floor((position.Y + radius - _grid.Origin.Y) / _grid.CellSize));
+        for (var y = top; y <= bottom; y++)
+        for (var x = left; x <= right; x++)
+        {
+            if (IsWalkable(new GridCell(x, y))) continue;
+            var nearest = new SimVector2(Math.Clamp(position.X, _grid.Origin.X + x * _grid.CellSize,
+                _grid.Origin.X + (x + 1.0) * _grid.CellSize), Math.Clamp(position.Y, _grid.Origin.Y + y * _grid.CellSize,
+                _grid.Origin.Y + (y + 1.0) * _grid.CellSize));
+            if (CrowdGeometry.Overlap(position, position, radius, nearest, nearest, 0)) return false;
+        }
+        return true;
+    }
+
     internal bool CanTraverse(GridCell from, GridCell to, int clearance) =>
         Math.Abs(from.X - to.X) <= 1 && Math.Abs(from.Y - to.Y) <= 1
         && CanOccupy(from, clearance) && CanOccupy(to, clearance)
@@ -49,6 +93,7 @@ internal sealed class NavigationState
             || (long)area.Y + area.Height > _grid.Height) return false;
         if (_obstacles.TryGetValue(id, out var previous)) Apply(previous, -1);
         _obstacles[id] = area;
+        _clearanceCache.Clear();
         Apply(area, 1);
         return true;
     }
@@ -57,18 +102,19 @@ internal sealed class NavigationState
     {
         if (!_obstacles.Remove(id, out var area)) return false;
         Apply(area, -1);
+        _clearanceCache.Clear();
         return true;
     }
 
     internal NavigationSnapshot CaptureSnapshot() => new(_grid.ContentHash,
-        Array.AsReadOnly(_obstacles.Select(pair => new NavigationObstacle(pair.Key, pair.Value)).ToArray()));
+        Array.AsReadOnly(_obstacles.Select(pair => new NavigationObstacle(pair.Key, pair.Value)).ToArray()), Terrain?.ContentHash);
 
-    internal static NavigationState Restore(PathingGrid grid, NavigationSnapshot snapshot)
+    internal static NavigationState Restore(PathingGrid grid, NavigationSnapshot snapshot, TerrainHeights? terrain = null)
     {
         ValidateSnapshot(snapshot);
-        if (snapshot.MapHash != grid.ContentHash)
+        if (snapshot.MapHash != grid.ContentHash || snapshot.HeightHash != terrain?.ContentHash)
             throw new InvalidDataException("Navigation snapshot requires the identical static pathing grid.");
-        var state = new NavigationState(grid);
+        var state = new NavigationState(grid, terrain);
         foreach (var obstacle in snapshot.Obstacles)
             if (!state.TrySetObstacle(obstacle.Id, obstacle.Area))
                 throw new InvalidDataException("Obstacle footprint lies outside the static grid.");
@@ -79,6 +125,8 @@ internal sealed class NavigationState
     {
         if (snapshot.MapHash is null || snapshot.MapHash.Length != 64
             || snapshot.MapHash.Any(c => !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))
+            || (snapshot.HeightHash is not null && (snapshot.HeightHash.Length != 64
+                || snapshot.HeightHash.Any(c => !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')))))
             || snapshot.Obstacles is null)
             throw new InvalidDataException("Invalid navigation snapshot identity or collection.");
         ulong previousId = 0;
