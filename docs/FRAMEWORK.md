@@ -13,6 +13,7 @@
 | `MatchEventBuffer` | 未消费事件与事件序号 | 传入帧号、消费后继续推进序号 |
 | `UnitOrderBook` | 当前/排队订单意图与活动路径 | Replace/Append/Stop、完成与失败清理 |
 | `GroupPlanningQueue` | 计划身份、FIFO、取消与本帧工作量 | 规划推进、落点提交、来源保护 |
+| `MovementStepper` | 路段转向、坡度与按时间推进的运动提案 | 碰撞预约、诊断直接提交、失败后是否保留进度 |
 
 导航动态占地仍由 `NavigationState` 拥有。随机流由对局内部持有，不向宿主暴露可变对象。
 
@@ -24,10 +25,19 @@
 - 代表性合法输入保持逐帧哈希与事件顺序；快照仍为 v9，派生缓存恢复后重建。
 - 不引入 ECS、DI 容器、通用调度或 Actor 框架。
 
+## Issue #13 验收要点
+
+对应 [Issue #13](https://github.com/LiGameAcademy/rts_kernel_cs/issues/13)：诊断与正式移动共享 `MovementStepper` 路段数学，分别提交。
+
+- 正式单位走 `Compute`，返回轨迹供扫掠预约与局部绕行；诊断单位走 `ComputeDiagnostic`，无碰撞轨迹。
+- 无 `Motion` 的诊断路径保留按距离扣减并保持朝向；有 `Motion` 时与正式路径共用转向/坡度时间步进。
+- 零长度路点、失败时部分进度由调用方决定是否提交；不新增 Strategy 框架。
+- 逐帧哈希/事件与转向、坡度、拐点、恢复检查保持一致；详见 [移动说明](MOVEMENT.md)。
+
 验证入口：仓库根目录 `./Test.ps1`（构建零警告/错误，控制台断言及 CLI）。
 
 ## 0.0.1 范围边界
 
-纳入：命令/事件/实体/订单/规划职责边界，非法命令拒绝、随机流所有权、快照恢复与 CLI 一致性。
+纳入：命令/事件/实体/订单/规划职责边界，运动计算与提交分离，非法命令拒绝、随机流所有权、快照恢复与 CLI 一致性。
 
 不纳入：密集交通与 300/500 性能门、完整 M2 正式地图接入、战斗/经济/技能迁移、Windows 导出。完整移动跟踪 [Issue #3](https://github.com/LiGameAcademy/rts_kernel_cs/issues/3)；版本总验收见 [Issue #55](https://github.com/LiGameAcademy/rts_kernel_cs/issues/55)。
