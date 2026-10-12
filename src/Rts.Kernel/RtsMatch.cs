@@ -9,6 +9,9 @@ public sealed partial class RtsMatch
     private readonly MatchEntities _entities = new();
     private readonly MatchCommandQueue _commands = new();
     private readonly MatchEventBuffer _events = new();
+    private readonly UnitOrderBook _orders = new();
+    private readonly GroupPlanningQueue _planning = new();
+    private readonly MatchCommandExecutor _commandExecutor;
     private NavigationState? _navigation;
     private readonly DeterministicRng _rng;
 
@@ -24,6 +27,7 @@ public sealed partial class RtsMatch
         Config = config;
         _rng = new DeterministicRng(seed);
         _navigation = pathingGrid is null ? null : new NavigationState(pathingGrid, terrain);
+        _commandExecutor = new MatchCommandExecutor(_entities, _events, _orders, _planning, _movementDefinitions);
     }
 
     public MatchConfig Config { get; }
@@ -121,65 +125,13 @@ public sealed partial class RtsMatch
 
     private void Execute(CommandEnvelope command)
     {
-        switch (command.Kind)
+        if (command.Kind == CommandKind.GroupMove)
         {
-            case CommandKind.SetObstacle:
-                if (_navigation is null || !_navigation.TrySetObstacle(command.Obstacle!.Id, command.Obstacle.Area!.Value))
-                    AddEvent(MatchEventKind.CommandRejected, EntityId.None, "invalid_obstacle_or_navigation_disabled");
-                else _pathsDirty = true;
-                break;
-            case CommandKind.RemoveObstacle:
-                if (_navigation is null || !_navigation.RemoveObstacle(command.Obstacle!.Id))
-                    AddEvent(MatchEventKind.CommandRejected, EntityId.None, "obstacle_missing_or_navigation_disabled");
-                else _pathsDirty = true;
-                break;
-            case CommandKind.GroupMove:
-                ExecuteGroupMove(command);
-                break;
-            case CommandKind.MoveTo:
-                ExecuteMove(command);
-                break;
-            case CommandKind.SpawnEntity:
-                ExecuteSpawn(command);
-                break;
-            case CommandKind.SetVelocity:
-                if (!_entities.TryGet(command.EntityId, out var entity) || entity.OwnerId != command.PlayerId)
-                {
-                    AddEvent(MatchEventKind.CommandRejected, command.EntityId, "entity_missing_or_not_owned");
-                    break;
-                }
-
-                if (_navigation is not null)
-                {
-                    AddEvent(MatchEventKind.CommandRejected, command.EntityId, "use_move_to_with_navigation");
-                    break;
-                }
-                _orders.Clear(entity.Id);
-                _entities.Update(entity with { Velocity = command.Velocity });
-                break;
-            case CommandKind.Stop:
-                ExecuteStop(command);
-                break;
-            default:
-                AddEvent(MatchEventKind.CommandRejected, command.EntityId, "unknown_command");
-                break;
-        }
-    }
-
-    private void ExecuteSpawn(CommandEnvelope command)
-    {
-        if (command.MovementDefinitionId != 0 && !_movementDefinitions.TryGet(command.MovementDefinitionId, out _))
-        {
-            AddEvent(MatchEventKind.CommandRejected, EntityId.None, "movement_definition_missing");
+            ExecuteGroupMove(command);
             return;
         }
-        if (!CanSpawnGround(command))
-        {
-            AddEvent(MatchEventKind.CommandRejected, EntityId.None, "spawn_ground_unavailable");
-            return;
-        }
-        var spawned = _entities.Spawn(command.PlayerId, command.Position, command.MovementDefinitionId);
-        AddEvent(MatchEventKind.EntitySpawned, spawned.Id, string.Empty);
+
+        _commandExecutor.Execute(Frame, command, _navigation, ref _pathsDirty);
     }
 
     private void AddEvent(MatchEventKind kind, EntityId entityId, string detail) =>

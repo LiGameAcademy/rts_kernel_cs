@@ -8,18 +8,6 @@ public sealed partial class RtsMatch
     public const int LocalReplansPerFrame = 16;
     internal const int LocalRetryFrames = 6;
 
-    private bool CanSpawnGround(CommandEnvelope command)
-    {
-        if (command.MovementDefinitionId == 0) return true;
-        var definition = _movementDefinitions.TryGet(command.MovementDefinitionId, out var found) ? found : null;
-        if (definition is null || !_navigation!.TryWorldToCell(command.Position, out var cell)
-            || !_navigation.CanOccupy(cell, Clearance(definition)) || !_navigation.CanStandAt(command.Position, definition.Radius))
-            return false;
-        return !_entities.Live.Where(entity => entity.MovementDefinitionId != 0).Any(entity =>
-            CrowdGeometry.Overlap(command.Position, command.Position, definition.Radius,
-                entity.Position, entity.Position, ReadMovementDefinition(entity.Id)!.Radius));
-    }
-
     private void ValidateGroundBodies()
     {
         var bodies = _entities.Live.Where(entity => entity.MovementDefinitionId != 0).ToArray();
@@ -50,7 +38,7 @@ public sealed partial class RtsMatch
             var order = _orders.ReadPath(entity.Id);
             if (_pathsDirty)
             {
-                if (!TryPlanMove(entity.Position, order.Request, out var replanned, true))
+                if (!MovePathPlanner.TryPlan(_navigation, entity.Position, order.Request, out var replanned, true))
                 {
                     FinishMove(entity.Id, entity.Position, MatchEventKind.MoveFailed, "path_blocked");
                     continue;
