@@ -1,34 +1,34 @@
 # RTS Kernel C#
 
-[English](README.en.md)
+[中文](README.zh.md)
 
-不依赖游戏引擎的纯 C# RTS 模拟内核。从 [Godot Warcraft3 学习项目](https://github.com/LiGameAcademy/godot_warcraft3)中提取，围绕该项目的战术与操作需求逐步开发。
+An engine-independent C# RTS simulation kernel extracted from the [Godot Warcraft3 learning project](https://github.com/LiGameAcademy/godot_warcraft3). Development follows that game's tactical and control requirements.
 
-**项目处于早期开发阶段。API、数据结构和快照格式可能发生不兼容变化；尚不承诺生产可用、跨版本存档兼容或跨平台确定性。** 当前是可运行的模拟骨架，不是完整 RTS 框架；网络通信、完整移动规则、战斗、经济、技能等仍有待开发。
+**Early development:** APIs, data structures and snapshot formats may change incompatibly. This is not a complete RTS framework and does not promise production readiness, cross-version save compatibility or cross-platform determinism. Networking, complete movement rules, combat, economy and abilities remain future work.
 
-## 当前能力
+## Available today
 
-- 独立对局实例、固定逻辑帧、实体 ID、命令队列与事件。
-- 框架模块职责：实体、命令、事件、订单路径与群体规划由独立内部对象独占（见 [框架说明](docs/FRAMEWORK.md)）。
-- 简单速度积分示例；JSON 帧快照、恢复、状态哈希和字段级差异报告。
-- 可保存的随机流、静态网格阻挡查询与高度场双线性采样。
-- **0.0.1**：框架首个可用基线；完整 M2 移动验收与后续玩法迁移不在本版本。
-- 静态与对局动态障碍的八方向寻路、格子净空、帧命令增删占地；导航快照校验静态地图身份。
-- 目标路径跟随、停止、替换和追加队列；动态重规划、失败后继续排队、玩家/单位 AI 来源优先级及订单快照恢复。
-- 权威朝向、按帧转向与转向减速、基于真实高度差的坡度倍率；恢复校验高度场身份。
-- 群体落点与四种软编队、固定工作量分帧规划、途中扫掠预约与局部绕行、按槽位顺序进入紧凑落点。
-- 连续拥堵3秒失败后继续队列；停住单位不被推移。
-- Windows 优先；确定性验证仅限相同代码、输入、内容和受控运行环境。
+- Independent match instances, fixed simulation steps, entity IDs, queued commands and events.
+- Framework ownership: entities, commands, events, order paths and group planning are owned by dedicated internal modules (see [framework notes](docs/FRAMEWORK.md), Chinese).
+- Simple velocity integration; JSON frame snapshots, restoration, state hashes and field-level difference reports.
+- Serializable random state, static pathing grids and bilinear height sampling.
+- **0.0.1**: first usable framework baseline; complete M2 movement acceptance and later gameplay migration are out of scope for this version.
+- Eight-neighbor pathfinding with static and match-owned dynamic obstacles, cell clearance and frame commands that add or remove footprints; navigation snapshots validate static map identity.
+- Goal-based path following with stop, replace and append queues; dynamic replanning, continuation after a failed queued goal, player / unit-AI source priority and order snapshot restoration.
+- Authoritative facing, per-frame turning with turn-rate slowdown and elevation-based slope scaling; restoration validates height-field identity.
+- Group placement with four soft formations, fixed-work deferred planning, sweep reservation and local detours, and slot-ordered compact arrival.
+- Continuous congestion for 3 seconds fails the current goal and continues the queue; stopped units are not pushed.
+- Windows first; determinism checks apply only to matching code, input, content and controlled runtime environments.
 
-现阶段使用普通 C# 类型与模块化组合，重点完善正确性、状态边界与可读性，不启动 ECS 迁移。ECS 不作为永久禁用项；后续可根据实际维护问题、真实性能证据及依赖成本评估成熟第三方实现，不提前自建通用框架。设计以实际游戏需求为依据，不预先构建通用引擎。宿主负责输入、资源读取、渲染和网络；内核不引用 Godot，也不依赖场景树或节点生命周期。
+The current implementation uses ordinary C# types and modular composition, focusing on correctness, state ownership and readability without an ECS migration. ECS is not permanently excluded: a mature third-party implementation may be evaluated later against real maintenance needs, project performance measurements and dependency costs. A general-purpose framework is not built in advance. Hosts own input, assets, rendering and networking; the kernel has no Godot reference or scene-tree dependency.
 
-框架职责见 [框架说明](docs/FRAMEWORK.md)；导航 API 见 [导航说明](docs/NAVIGATION.md)，目标移动与快照 v9 见 [移动说明](docs/MOVEMENT.md)。v1–v8 快照不再接受；本项目尚不支持跨版本存档迁移。
+See [framework](docs/FRAMEWORK.md), [navigation](docs/NAVIGATION.md) and [movement](docs/MOVEMENT.md) for contracts (Chinese). Snapshot v9 stores facing, motion progress, order queues and group-planning progress, and validates supplied static grid and height field identities. Versions 1–8 are rejected; cross-version migration remains unsupported.
 
-对局随机流由内核独占，宿主不能通过公开对象消费随机数。快照的 `RngState` 可用于诊断或建立独立随机流；移除了早期的可变 `RtsMatch.Rng` 公开属性。
+The match owns its random stream. Hosts cannot consume it through a public mutable object. Snapshot `RngState` can be used for diagnostics or a detached stream; the early mutable `RtsMatch.Rng` property has been removed.
 
-## 构建与运行
+## Build and run
 
-安装 .NET 10 SDK（用于构建、测试和 CLI）。核心类库目标为 `net8.0`，测试及 CLI 目标为 `net10.0`；首次恢复需取得 net8 targeting pack，CI 同时安装 .NET 8/10 SDK。
+Install the .NET 10 SDK. The library targets `net8.0`; the test and CLI hosts target `net10.0`. Initial restore needs the net8 targeting pack; CI installs both .NET 8 and 10 SDKs.
 
 ```powershell
 git clone https://github.com/LiGameAcademy/rts_kernel_cs.git
@@ -36,7 +36,7 @@ cd rts_kernel_cs
 ./Test.ps1
 ```
 
-也可以使用标准命令：
+Equivalent commands:
 
 ```text
 dotnet restore RtsKernel.sln -m:1
@@ -45,28 +45,27 @@ dotnet run --project tests/Rts.Kernel.Tests --no-build -c Release
 dotnet run --project samples/Rts.Kernel.Cli --no-build -c Release
 ```
 
-测试采用无第三方测试框架的控制台检查器，失败时返回非零退出码；`dotnet test` 不是本仓库的验收入口。Windows CI 执行同一脚本。
+Tests use a console assertion runner with a nonzero exit code on failure. Use the script above, not `dotnet test`, as the verification entry point. Windows CI runs the same script.
 
-## 仓库边界
+## Repository boundaries
 
-- `src/Rts.Kernel`：纯模拟与数学数据契约。
-- `tests/Rts.Kernel.Tests`：内核行为检查。
-- `samples/Rts.Kernel.Cli`：无窗口最小示例。
-- Godot 桥接、WC3 JSON/SLK 转换、地图资源及游戏集成测试继续留在游戏仓库。
+- `src/Rts.Kernel`: simulation and terrain data contracts.
+- `tests/Rts.Kernel.Tests`: kernel behavior checks.
+- `samples/Rts.Kernel.Cli`: minimal headless example.
 
-内核不包含游戏美术或地图资源。静态地形 API 的坐标及阻挡位目前继承源项目约定，尚未抽象为通用地图格式。
+Godot adapters, WC3 JSON/SLK conversion, game assets and integration tests stay in the game repository. No game artwork or map assets are included here. Terrain coordinates and flag bits currently follow the source project's conventions, not a general-purpose map format.
 
-## 作为子模块使用
+## Host integration
 
 ```text
 git submodule add https://github.com/LiGameAcademy/rts_kernel_cs.git external/rts_kernel
 git submodule update --init --recursive
 ```
 
-宿主通过 ProjectReference 引用 `external/rts_kernel/src/Rts.Kernel/Rts.Kernel.csproj`。宿主固定子模块提交，升级时显式更新引用。开发顺序为：内核提交并推送 → 宿主更新子模块提交并验证 → 提交宿主。
+Reference `external/rts_kernel/src/Rts.Kernel/Rts.Kernel.csproj` from the host. Pin the submodule commit and upgrade explicitly. Commit and push kernel work first, then update, verify and commit the host's submodule pointer.
 
-## 历史与许可证
+## History and license
 
-从源仓库 `05cf2b0` 提取相关路径历史，保留原作者、时间及提交说明；提取后哈希发生变化，见 [提交映射](docs/history-map.txt)。早期提交保留了拆分前的项目引用，独立构建入口从拆分整理提交开始可用。
+Relevant path history was extracted from source commit `05cf2b0`, preserving authors, dates and messages. Commit hashes changed; see the [mapping](docs/history-map.txt). Historical commits retain pre-extraction project references; standalone builds are supported starting at the repository preparation commit.
 
-MIT，Copyright (c) 2026 李维民。见 [LICENSE](LICENSE)。暂不发布 NuGet 包或正式 Release。
+MIT, Copyright (c) 2026 李维民. See [LICENSE](LICENSE). No NuGet package or formal release is published at this stage.
