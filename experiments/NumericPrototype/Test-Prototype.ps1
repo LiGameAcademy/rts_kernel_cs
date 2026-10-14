@@ -9,6 +9,7 @@ foreach ($entry in $manifest.files.PSObject.Properties) {
     $actual = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actual -ne $entry.Value.sha256) { throw "Pinned vendor file mismatch: $($entry.Name)" }
 }
+$expectedInputHash = '6d8de2d1136af0129063576981e9caa3f3cb1c68398d8ca07e8cc959dbe95621'
 $reports = @()
 foreach ($configuration in @('Debug', 'Release')) {
     dotnet build $prototype -c $configuration -p:NuGetAudit=false
@@ -19,11 +20,13 @@ foreach ($configuration in @('Debug', 'Release')) {
         if ($LASTEXITCODE -ne 0) { throw "Prototype process failed: $configuration/$process" }
         $report = ($output -join "`n") | ConvertFrom-Json
         if ($report.rawTraceHash -ne $expectedHash) { throw "Raw math trace mismatch: $configuration/$process" }
+        if ($report.inputTraceHash -ne $expectedInputHash) { throw "Input quantization trace mismatch: $configuration/$process" }
         $reports += [pscustomobject]@{
             configuration = $configuration
             process = $process
             checks = $report.checks
             rawTraceHash = $report.rawTraceHash
+            inputTraceHash = $report.inputTraceHash
             maxSinError = $report.maxSinError
             maxAtanError = $report.maxAtanError
             maxSqrtError = $report.maxSqrtError

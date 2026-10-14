@@ -17,3 +17,13 @@ Run `./experiments/NumericPrototype/Test-Prototype.ps1` with the existing .NET 1
 2,118 checks per process. Initial raw trace SHA256: `9f4c05d906c21313a8e2d615b87b1a0a54140d84a56792caece87ec1db938975`.
 
 Remaining Issue #68 work: real content range survey, input quantization, a genuine terrain/pathfinding/turning/slope/collision chain, in-progress matching snapshots, actual Godot execution, 300/500 business/performance measurements and numerical range proof. No claim that an arithmetic loop satisfies those gates. This step does not authorize switching the host, changing v9, replacing the published v0.0.1 tag, or closing #68.
+
+## Step 2: exact decimal input and real content survey
+
+`InputQuantizer` parses JSON-number text using exact BigInteger rationals, without a double/decimal conversion in the authority path. It rounds to nearest raw unit, ties away from zero, and rejects any exact input outside the representable interval before rounding. JSON grammar, a 256-character token bound and an exponent bound of +/-256 are explicit experimental ingestion limits. This is offline conversion code, not a hot-loop numeric type.
+
+`dotnet run --project experiments/NumericPrototype -- --survey <assets-directory>` reads existing UnitData/UnitBalance exports and parsed Echo Isles units/pathing/heights. It records source SHA256, per-field range, skipped non-number/missing fields and decimal diagnostic quantization error. Numeric overflow aborts rather than disappearing from statistics. Source content is not bundled. The survey reflects the existing exporter output, not the original binary map or every supported map/mod.
+
+4,206 checks per probe process; Debug/Release each run two independent processes. Existing raw math hash is unchanged. New decimal-input trace is `6d8de2d1136af0129063576981e9caa3f3cb1c68398d8ca07e8cc959dbe95621`. Boundary cases include exact half units, signed rounding, values just outside representable bounds, exponents, cultures, dyadic fractions, missing values, source identity and survey overflow.
+
+Real local samples: pathing512x384, cell32; heights12,513 values226.25..722.5; numeric unit speed617 records0..405 (219 non-numeric), collision836 records8..196. These are observed samples, not approved business limits or interpreted movement definitions. Position range alone does not prove squared-distance or matching-aggregate intermediate safety. Wide intermediate/cost representation remains a separate design decision; this step does not implement a replacement matching algorithm or a genuine migrated movement chain.

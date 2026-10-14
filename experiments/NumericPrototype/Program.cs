@@ -8,6 +8,11 @@ using Rts.Kernel;
 
 CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
+if (args.Length == 2 && args[0] == "--survey")
+{
+    Console.WriteLine(JsonSerializer.Serialize(ContentRangeSurvey.Run(args[1])));
+    return;
+}
 var checks = 0;
 void Check(bool condition, string message)
 {
@@ -62,6 +67,8 @@ Check(maxAtanError < 0.00001, "sample atan2 error bound");
 Check(maxSqrtError < 0.000001, "sample square-root error bound");
 var state = new long[] { one.Raw, -1, long.MaxValue, long.MinValue };
 Check(JsonSerializer.Deserialize<long[]>(JsonSerializer.Serialize(state))!.SequenceEqual(state), "64-bit raw JSON round trip in .NET");
+ContentSurveyChecks.Run(Check);
+var inputTraceHash = InputQuantizationChecks.Run(Check);
 var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawTrace.ToString()))).ToLowerInvariant();
-Console.WriteLine(JsonSerializer.Serialize(new { checks, rawTraceHash = digest, maxSinError, maxAtanError, maxSqrtError,
+Console.WriteLine(JsonSerializer.Serialize(new { checks, rawTraceHash = digest, inputTraceHash, maxSinError, maxAtanError, maxSqrtError,
     scope = "scalar and math contract probe; not a migrated RTS simulation" }));
