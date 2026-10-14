@@ -19,6 +19,9 @@ internal sealed class GroupPlanningJob
     private readonly HashSet<ulong> _canceled = [];
     private readonly List<CandidateCell[]> _candidates = [];
     private WideMatchingWork? _matching;
+    internal int PreparedCount => _candidates.Count;
+    internal int MatchingRow => _matching?.NextRow ?? 0;
+    internal bool IsCanceled(ulong member) => _canceled.Contains(member);
     internal ulong Id => _input.Id;
     internal bool UnitAi => _input.UnitAi;
     internal bool AllCanceled => _canceled.Count == _input.Members.Length;
@@ -41,9 +44,12 @@ internal sealed class GroupPlanningJob
         }
         foreach (var point in _input.Ideals)
         {
-            var cell = world.Cell(point);
-            if (cell.X < -8 || cell.Y < -8 || cell.X >= world.Width + 8 || cell.Y >= world.Height + 8)
-                throw new ArgumentException("Ideal outside experimental eight-cell placement margin.");
+            var margin = 131072L * FixedMath.One;
+            if ((Int128)point.X < (Int128)world.Origin.X - margin
+                || (Int128)point.Y < (Int128)world.Origin.Y - margin
+                || (Int128)point.X > (Int128)world.Origin.X + (Int128)world.Width * world.CellSize + margin
+                || (Int128)point.Y > (Int128)world.Origin.Y + (Int128)world.Height * world.CellSize + margin)
+                throw new ArgumentException("Ideal outside experimental formation coordinate bound.");
         }
         var anchor = Array.FindIndex(_input.Members, member => member.Id == input.Leader);
         if (anchor < 0) anchor = 0; // Current kernel fallback, including absent leader.
@@ -55,7 +61,7 @@ internal sealed class GroupPlanningJob
             var start = _input.Members[_followers[row]].Start;
             var goal = _input.Ideals[column + 1];
             var cost = WideSquaredDistance.Between(new(start.X), new(start.Y), new(goal.X), new(goal.Y)).Raw;
-            if (cost > WideMatchingWork.MaximumCost) throw new ArgumentException("Experimental matching cost bound exceeded.");
+            if (cost > WideMatchingWork.MaximumFormationCost) throw new ArgumentException("Experimental matching cost bound exceeded.");
             _costs[row * _followers.Length + column] = cost;
         }
     }
@@ -70,7 +76,7 @@ internal sealed class GroupPlanningJob
         var charged = 0;
         if (_matching is null)
         {
-            _matching = new WideMatchingWork(_followers.Length, _costs);
+            _matching = new WideMatchingWork(_followers.Length, _costs, WideMatchingWork.MaximumFormationCost);
             charged = 2 * _followers.Length * _followers.Length;
         }
         charged += _matching.Advance(Math.Max(1, columnBudget - charged));
@@ -105,7 +111,7 @@ internal sealed class GroupPlanningJob
         foreach (var member in state.Canceled)
             if (!job.Cancel(member)) throw new InvalidDataException("Unknown canceled group member.");
         if (state.Matching is not null)
-            job._matching = WideMatchingWork.Restore(job._followers.Length, job._costs, state.Matching);
+            job._matching = WideMatchingWork.Restore(job._followers.Length, job._costs, state.Matching, WideMatchingWork.MaximumFormationCost);
         while (job._candidates.Count < state.Prepared)
             job._candidates.Add(Candidates(world, job._input.Ideals[job._candidates.Count]));
         return job;

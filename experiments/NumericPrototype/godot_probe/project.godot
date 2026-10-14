@@ -10,3 +10,10 @@ project/assembly_name="NumericProbe"
 
 [rendering]
 renderer/rendering_method="gl_compatibility"
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=900
+
+[physics]
+common/physics_ticks_per_second=30

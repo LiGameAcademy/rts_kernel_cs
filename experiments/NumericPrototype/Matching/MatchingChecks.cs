@@ -83,6 +83,12 @@ internal static class MatchingChecks
         check((BigInteger)(2 * WideMatchingWork.MaximumMembers + 3) *
             (BigInteger)WideMatchingWork.MaximumCost < (BigInteger)Int128.MaxValue,
             "conservative intermediate envelope fits signed Int128");
+        check((BigInteger)1003 * (BigInteger)WideMatchingWork.MaximumFormationCost < (BigInteger)Int128.MaxValue,
+            "500-member formation potential envelope fits signed Int128");
+        var wide = new WideMatchingWork(1, [WideMatchingWork.MaximumFormationCost], WideMatchingWork.MaximumFormationCost);
+        wide.Advance(1);
+        check(WideMatchingWork.Restore(1, [WideMatchingWork.MaximumFormationCost], wide.Capture(),
+            WideMatchingWork.MaximumFormationCost).Result()[0] == 0, "formation-bound cost restores exactly");
         try
         {
             _ = new WideMatchingWork(1, [WideMatchingWork.MaximumCost + 1]);
