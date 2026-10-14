@@ -52,3 +52,43 @@ The isolated chain quantizes the terrain/definition inputs, plans an integer oct
 4,610 checks per synthetic probe process. Local real map: first eligible candidate route, no failed moving candidates; 12 waypoints, 43 frames to exact goal; adding the stationary blocker fails at frame108 after90 consecutive blocked frames, one terminal event. Both normal movement and restored continuation match raw state/events every frame. Source identities and four-process results are preserved in internal research records; these samples are not whole-map quality or cross-machine proof.
 
 Remaining #68 scope: actual Godot execution, in-progress matching/potential range and restore, bounded production collision strategy, 300/500 business/performance measurements, broader numerical error budget and a final migration decision. Production double/v9 and the host pointer are unchanged.
+
+
+### Signed incremental matching prototype (2026-10-14)
+
+`Matching/WideMatchingWork.cs` validates the current Hungarian matching phases with
+signed `Int128` potentials/reduced costs in coordinate-raw squared units (2^64).
+It preserves row/column tie order, zero-edge seeding and suspension between whole
+column batches. `null` represents an unvisited minimum; no numeric infinity sentinel
+participates in arithmetic. This isolated square matrix excludes the production
+anchor/cancellation/task scheduler and does not change production matching or v9.
+
+Experimental bounds are 1–500 matched rows and each cost in [0,C], where
+C = 2 × (16384 × 2^32)^2. This is an explicit conservative matrix contract, not
+permission to subtract arbitrary Int64 coordinate extremes. Coordinate input must
+still satisfy the separate distance/world bounds before producing these costs.
+
+With feasible seeded duals, initial row/column potentials lie in [0,C]. Each batch
+has nonnegative delta; its update raises the dual objective by delta (the used tree
+has one more row than real column). A perfect assignment bounds this objective by
+nC, so cumulative deltas are at most nC. Thus row potentials stay in [0,(n+1)C],
+column potentials in [-nC,C], and a conservative signed subtraction envelope
+(2n+3)C is below Int128.MaxValue even for n=500. Checked arithmetic remains enabled.
+Tests verify dual feasibility and tight assigned edges at suspension boundaries.
+
+Experimental snapshot format 1 writes signed Int128 values as decimal strings,
+including minimum entries (null means unset). It owns detached arrays and binds the
+cost matrix/order/algorithm identity. Restore reconstructs the same deterministic
+batch history and compares every saved field before returning a new owner. This
+is a deliberately expensive **validation oracle**, not a production restoration
+implementation or 500-member performance claim. Corrupt counters, potentials,
+predecessors and content identity are rejected. No stable snapshot format changes.
+
+The default runner checks 84 cases of sizes 1–7 against an independent exhaustive
+BigInteger permutation oracle, budgets 1–3 versus uninterrupted execution, JSON
+restore at every suspension, negative potentials and stable ties. A separate
+500-row maximal equal-cost case checks the bound and deterministic assignment;
+it does not measure a difficult 500-row solve. Test-Prototype.ps1 checks the raw
+matching trace across two Debug and two Release processes. Remaining work includes
+production structural restore design, real group coordinates/cancellation, Godot
+execution, and representative 300/500-member business/performance measurements.
