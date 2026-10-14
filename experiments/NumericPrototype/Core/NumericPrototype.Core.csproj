@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../**/*.cs" Exclude="../Program.cs;../vendor/**/*.cs;../godot_probe/**/*.cs;../**/bin/**/*.cs;../**/obj/**/*.cs" />
+    <Compile Include="../../../src/Rts.Kernel/DeterministicRng.cs" Link="Contracts/DeterministicRng.cs" />
+    <ProjectReference Include="../vendor/FixPointCS/FixPointCS.csproj" />
+  </ItemGroup>
+</Project>
