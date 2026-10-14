@@ -11,6 +11,7 @@
 | `MatchEntities` | 实体字典、下一 ID、生成与状态提交、实体快照 | 生成前业务校验、事件发布 |
 | `MatchCommandQueue` | 待执行命令、到达序号、按帧取出 | 命令执行规则 |
 | `MatchCommandExecutor` | 无耐久状态；应用 Spawn / Obstacle / Velocity / Move / Stop 规则 | `GroupMove` 仍暂由对局 partial 处理（Issue #63 包 C） |
+| `CrowdStepper` | 到达邻接缓存；拥挤预约、局部绕行、超时失败与到点让行 | 帧推进时传入导航与脏路径标志 |
 | `MatchEventBuffer` | 未消费事件与事件序号 | 传入帧号、消费后继续推进序号 |
 | `UnitOrderBook` | 当前/排队订单意图与活动路径 | Replace/Append/Stop、完成与失败清理 |
 | `GroupPlanningQueue` | 计划身份、FIFO、取消与本帧列预算调度 | 就绪后调用落点提交；来源保护 |
@@ -91,6 +92,15 @@
 - `MovePathPlanner` 集中网格→世界路点；`MovementDefinitions.ClearanceCells` 统一净空换算。
 - `GroupMove` 仍由 `RtsMatch` partial 处理，经执行器提交单单位 Move；拥挤推进（包 B）与群体策略整体迁出（包 C）另开。
 - v9、公开 API、固定帧顺序及逐帧哈希/事件/恢复基线不变。
+
+## Issue #63 验收要点（包 B）
+
+对应 [Issue #63](https://github.com/LiGameAcademy/rts_kernel_cs/issues/63) 工作包 B：拥挤推进离开 `RtsMatch` partial。
+
+- `CrowdStepper` 负责地面单位预约、局部绕行、拥挤超时、到点让行及恢复时占地重叠校验；仅独占到达邻接缓存。
+- 实体提交仍经 `MatchEntities`，路径状态仍经 `UnitOrderBook`，导航占地仍归 `NavigationState`；不向步进器传入整个对局。
+- `RtsMatch.CrowdBlockedSeconds` / `LocalRetryFrames` 等公开常量保持别名，快照校验语义不变。
+- 群体 `GroupMove` 策略仍在对局 partial（包 C）；v9 与逐帧哈希/事件基线不变。
 
 ## 0.0.1 范围边界
 

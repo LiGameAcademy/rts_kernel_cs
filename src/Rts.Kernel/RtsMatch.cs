@@ -12,6 +12,7 @@ public sealed partial class RtsMatch
     private readonly UnitOrderBook _orders = new();
     private readonly GroupPlanningQueue _planning = new();
     private readonly MatchCommandExecutor _commandExecutor;
+    private readonly CrowdStepper _crowd;
     private NavigationState? _navigation;
     private readonly DeterministicRng _rng;
 
@@ -28,6 +29,7 @@ public sealed partial class RtsMatch
         _rng = new DeterministicRng(seed);
         _navigation = pathingGrid is null ? null : new NavigationState(pathingGrid, terrain);
         _commandExecutor = new MatchCommandExecutor(_entities, _events, _orders, _planning, _movementDefinitions);
+        _crowd = new CrowdStepper(_entities, _events, _orders, _movementDefinitions);
     }
 
     public MatchConfig Config { get; }
