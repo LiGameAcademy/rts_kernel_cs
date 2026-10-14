@@ -3,3 +3,7 @@
 *.md text eol=lf
 *.yml text eol=lf
 *.ps1 text eol=lf
+
+# Preserve pinned upstream bytes for the numeric experiment source manifest.
+experiments/NumericPrototype/vendor/FixPointCS/Fixed*.cs -text
+experiments/NumericPrototype/vendor/FixPointCS/LICENSE.txt -text

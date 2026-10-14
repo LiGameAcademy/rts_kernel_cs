@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Fixed32.cs" />
+    <Compile Include="Fixed64.cs" />
+    <Compile Include="FixedUtil.cs" />
+  </ItemGroup>
+</Project>
