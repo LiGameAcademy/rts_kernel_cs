@@ -18,6 +18,11 @@ if (args.Length == 2 && args[0] == "--movement-assets")
     Console.WriteLine(JsonSerializer.Serialize(NumericPrototype.Movement.RealMovementProbe.Run(args[1])));
     return;
 }
+if (args.Length == 2 && args[0] == "--group-assets")
+{
+    Console.WriteLine(JsonSerializer.Serialize(NumericPrototype.Groups.RealGroupProbe.Run(args[1])));
+    return;
+}
 var checks = 0;
 void Check(bool condition, string message)
 {
@@ -75,8 +80,9 @@ Check(JsonSerializer.Deserialize<long[]>(JsonSerializer.Serialize(state))!.Seque
 ContentSurveyChecks.Run(Check);
 var inputTraceHash = InputQuantizationChecks.Run(Check);
 var wideCostTraceHash = WideCostChecks.Run(Check);
+var groupTraceHash = NumericPrototype.Groups.GroupPlanningChecks.Run(Check);
 var matchingTraceHash = NumericPrototype.Matching.MatchingChecks.Run(Check);
 var movementTraceHash = NumericPrototype.Movement.MovementChecks.Run(Check);
 var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawTrace.ToString()))).ToLowerInvariant();
-Console.WriteLine(JsonSerializer.Serialize(new { checks, rawTraceHash = digest, inputTraceHash, wideCostTraceHash, movementTraceHash, matchingTraceHash, maxSinError, maxAtanError, maxSqrtError,
+Console.WriteLine(JsonSerializer.Serialize(new { checks, rawTraceHash = digest, inputTraceHash, wideCostTraceHash, movementTraceHash, matchingTraceHash, groupTraceHash, maxSinError, maxAtanError, maxSqrtError,
     scope = "isolated scalar/input/movement contract prototype; not a production RTS migration" }));

@@ -13,6 +13,8 @@ $expectedInputHash = '6d8de2d1136af0129063576981e9caa3f3cb1c68398d8ca07e8cc959db
 $expectedWideHash = '4227d7416bf64430462b07089e0ae94bcca4d3a0daa8c98774c9729d17d30ba2'
 $expectedMovementHash = '4cf7cd8ca7c2ab68272da6963cb44e53243082a84b97e267b18e0ffe0ad6a531'
 $expectedMatchingHash = 'd04cacf1645d1e838f01d320872274caa923abf31eb5b1ecf6d5fb2009ab74b2'
+$expectedGroupHash = '31464ed0135e5f65766d02945edca67358d8eebd950255d3c4413ecb56585f5b'
+$realGroupBaseline = $null
 $realMovementBaseline = $null
 $reports = @()
 foreach ($configuration in @('Debug', 'Release')) {
@@ -28,6 +30,8 @@ foreach ($configuration in @('Debug', 'Release')) {
         if ($report.wideCostTraceHash -ne $expectedWideHash) { throw "Wide-cost trace mismatch: $configuration/$process" }
         if ($report.movementTraceHash -ne $expectedMovementHash) { throw "Movement state/event trace mismatch: $configuration/$process" }
         if ($report.matchingTraceHash -ne $expectedMatchingHash) { throw "Matching state trace mismatch: $configuration/$process" }
+        if ($report.groupTraceHash -ne $expectedGroupHash) { throw "Group planning trace mismatch: $configuration/$process" }
+        $realGroup = $null
         $realMovement = $null
         if ($AssetsDirectory) {
             $realOutput = & dotnet $assembly --movement-assets $AssetsDirectory
@@ -36,6 +40,12 @@ foreach ($configuration in @('Debug', 'Release')) {
             if ($null -eq $realMovementBaseline) { $realMovementBaseline = $canonical }
             if ($canonical -ne $realMovementBaseline) { throw "Real-map state/event trace differs: $configuration/$process" }
             $realMovement = $canonical | ConvertFrom-Json
+            $groupOutput = & dotnet $assembly --group-assets $AssetsDirectory
+            if ($LASTEXITCODE -ne 0) { throw "Real-map group planning failed: $configuration/$process" }
+            $groupCanonical = $groupOutput -join "`n"
+            if ($null -eq $realGroupBaseline) { $realGroupBaseline = $groupCanonical }
+            if ($groupCanonical -ne $realGroupBaseline) { throw "Real-map group planning differs: $configuration/$process" }
+            $realGroup = $groupCanonical | ConvertFrom-Json
         }
         $reports += [pscustomobject]@{
             configuration = $configuration
@@ -46,6 +56,8 @@ foreach ($configuration in @('Debug', 'Release')) {
             wideCostTraceHash = $report.wideCostTraceHash
             movementTraceHash = $report.movementTraceHash
             matchingTraceHash = $report.matchingTraceHash
+            groupTraceHash = $report.groupTraceHash
+            realGroup = $realGroup
             realMovement = $realMovement
             maxSinError = $report.maxSinError
             maxAtanError = $report.maxAtanError

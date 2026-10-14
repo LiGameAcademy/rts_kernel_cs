@@ -92,3 +92,39 @@ it does not measure a difficult 500-row solve. Test-Prototype.ps1 checks the raw
 matching trace across two Debug and two Release processes. Remaining work includes
 production structural restore design, real group coordinates/cancellation, Godot
 execution, and representative 300/500-member business/performance measurements.
+
+
+### Coordinate-to-group scheduling prototype (2026-10-14)
+
+`Groups/` adapts frozen member IDs/raw start positions and explicit ideal points to
+wide matching. It reserves slot zero for the original leader (first member fallback),
+then maps follower rows back to the original member order. Canceling a member,
+including the leader, filters the original assignment without rematching survivors.
+The FIFO harness preserves existing activations while pending, protects player jobs
+from unit-AI cancellation, drops wholly canceled heads and commits at most one group
+per frame. It returns activation events, not actual movement orders or final goals.
+
+Candidate preparation uses the production eight-cell neighborhood and exact wide
+squared-distance/Y/X ordering. Blocked candidates are intentionally retained until
+placement filtering, which is outside this prototype. Candidate caches reconstruct
+from saved progress. Snapshots own arrays and bind the world identity; matcher
+restore still uses the expensive replay oracle described above. Queue state includes
+budgets, frame/event counters, pending inputs/cancellations and prior activations.
+This is a bounded scheduling harness, not a second production simulation pipeline.
+
+The runner checks 65-member FIFO tasks with the current 2,097,152-column/64-candidate
+budget and a deliberately reduced 128-column diagnostic budget to force suspension.
+It captures/restores before each frame, compares full raw state and emitted events,
+and separately checks canceled survivors keep their original slots, leader fallback,
+cache reconstruction, array ownership, malformed progress and total cancellation.
+The harness does not implement Stop/Replace/Append command queues: tests invoke the
+cancellation boundary directly, and Append has no planner mutation to execute here.
+
+With `-AssetsDirectory`, `--group-assets` chooses 140 distinct body-clear grid centers
+from the actual Echo Isles map at two-cell spacing using hfoo collision radius31,
+then uses a seeded shuffle for 65 distinct starts and explicit goals. These are real
+content-derived coordinates, not a recording of an actual game's issued formation.
+Four independent Debug/Release processes compare this complete report. The 128-column
+budget is for diagnostics and must not be interpreted as production response latency.
+No formation generation/trigonometry, final placement connectivity/body occupancy,
+Stop order effects, crowd movement, Godot or 300/500 performance is proven by this test.
