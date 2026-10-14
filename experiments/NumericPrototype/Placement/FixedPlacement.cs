@@ -14,6 +14,17 @@ internal static class FixedPlacement
 
     internal static PlacementOutcome[] Plan(MovementWorld world, PlacementMember[] members,
         FixedPoint[] ideals, IReadOnlyDictionary<ulong, int> assignments, PlacementBody[] externalBodies)
+        => Plan(world, members, ideals, assignments, externalBodies, null, null);
+
+    internal static PlacementOutcome[] PlanPrepared(MovementWorld world, PlacementMember[] members,
+        GroupPlanningJob job, IReadOnlyDictionary<ulong, int> assignments, PlacementBody[] externalBodies,
+        PlacementReachability reachability)
+        => Plan(world, members, Enumerable.Range(0, job.PreparedCount).Select(job.Ideal).ToArray(),
+            assignments, externalBodies, job.PreparedCandidates, reachability);
+
+    private static PlacementOutcome[] Plan(MovementWorld world, PlacementMember[] members,
+        FixedPoint[] ideals, IReadOnlyDictionary<ulong, int> assignments, PlacementBody[] externalBodies,
+        Func<int, IReadOnlyList<CandidateCell>>? preparedCandidates, PlacementReachability? cachedReachability)
     {
         if (members.Length == 0 || members.Length > 500 || members.Any(member => member is null
             || member.Id == 0 || member.Radius <= 0 || member.Radius > 4 * world.CellSize || member.Retained is null)
@@ -22,14 +33,17 @@ internal static class FixedPlacement
             || assignments.Values.Distinct().Count() != assignments.Count
             || externalBodies.Any(body => body is null || body.Radius <= 0 || body.Radius > 4 * world.CellSize))
             throw new ArgumentException("Invalid experimental placement members/slots/bodies.");
-        var reachability = new PlacementReachability(world);
-        var candidates = new Dictionary<int, CandidateCell[]>();
+        var reachability = cachedReachability ?? new PlacementReachability(world);
+        var candidates = new Dictionary<int, IReadOnlyList<CandidateCell>>();
         var failed = new HashSet<ulong>();
         while (true)
         {
             var before = failed.Count;
             var occupied = externalBodies.Concat(members.Where(member => failed.Contains(member.Id))
                 .SelectMany(member => member.Retained.Select(point => new PlacementBody(point, member.Radius)))).ToList();
+            var index = preparedCandidates is null ? null : new PlacementBodyIndex(world);
+            if (index is not null)
+                foreach (var body in occupied) index.Add(body);
             var result = new List<PlacementOutcome>();
             foreach (var member in members.OrderBy(member => assignments[member.Id]))
             {
@@ -39,16 +53,20 @@ internal static class FixedPlacement
                 {
                     if (!candidates.TryGetValue(slot, out var cells))
                     {
-                        cells = GroupPlanningJob.Candidates(world, ideals[slot]);
+                        cells = preparedCandidates is null
+                            ? GroupPlanningJob.Candidates(world, ideals[slot]) : preparedCandidates(slot);
                         candidates.Add(slot, cells);
                     }
                     foreach (var cell in cells)
                     {
                         var point = world.Center(cell.X, cell.Y);
                         if (!reachability.Connected(member.Start, point, member.Radius)
-                            || occupied.Any(body => Overlaps(point, member.Radius, body))) continue;
+                            || (index is null ? occupied.Any(body => Overlaps(point, member.Radius, body))
+                                : index.Overlaps(point, member.Radius))) continue;
                         goal = point;
-                        occupied.Add(new(point, member.Radius));
+                        var body = new PlacementBody(point, member.Radius);
+                        if (index is null) occupied.Add(body);
+                        else index.Add(body);
                         break;
                     }
                 }

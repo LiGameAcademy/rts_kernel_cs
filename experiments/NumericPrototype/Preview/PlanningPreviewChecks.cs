@@ -32,6 +32,7 @@ internal static class PlanningPreviewChecks
             Check(session.Metrics().Succeeded + session.Metrics().Failed == count - 1,
                 "canceled member excluded from new placement");
             Check(session.ReadUnits().Single(unit => unit.Id == 1).Canceled, "cancellation remains visible after commit");
+            Check(session.MatchesPlacementReference(), "prepared/indexed placement equals independent linear reference");
             var completed = session.Capture();
             clone.Restore(completed);
             Check(clone.Capture() == completed, "completed preview snapshot restores");
@@ -40,6 +41,46 @@ internal static class PlanningPreviewChecks
             catch (InvalidDataException) { Check(true, "invalid preview rejected"); }
             Check(session.Capture() == completed, "failed restore is atomic");
         }
+        VerifyWarmCache(assetsDirectory, Check);
+        VerifyBodyIndex(Check);
         return new { Checks = checks, Result = "planning_preview_restore_pass" };
     }
+    private static void VerifyWarmCache(string assetsDirectory, Action<bool, string> check)
+    {
+        var warm = new PlanningPreviewSession(assetsDirectory, 65);
+        var map = warm.ReadMap();
+        string Number(long raw) => (raw / (decimal)PrototypeScalar.Scale).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var x = Number(map.Origin.X + map.Width * map.CellSize / 2);
+        var y = Number(map.Origin.Y + map.Height * map.CellSize / 2);
+        warm.Plan(0, x, y);
+        while (warm.Planning) warm.Tick();
+        warm.Plan(1, x, y);
+        var cold = new PlanningPreviewSession(assetsDirectory, 65);
+        cold.Restore(warm.Capture());
+        while (warm.Planning)
+        {
+            warm.Tick();
+            cold.Tick();
+            check(warm.Capture() == cold.Capture(), "warm/cold reachability cache preserves authoritative frames");
+        }
+        check(warm.MatchesPlacementReference(), "cached reachability preserves reference outcomes");
+    }
+
+    private static void VerifyBodyIndex(Action<bool, string> check)
+    {
+        var world = Placement.PlacementChecks.World();
+        var bodies = Enumerable.Range(0, 128).Select(index => new Placement.PlacementBody(
+            world.Center(index * 17 % 64 - 16, index * 31 % 48 - 16),
+            (index % 4 + 1) * world.CellSize)).ToArray();
+        var spatial = new Placement.PlacementBodyIndex(world);
+        foreach (var body in bodies) spatial.Add(body);
+        for (var index = 0; index < 512; index++)
+        {
+            var point = world.Center(index * 19 % 80 - 24, index * 37 % 64 - 24);
+            var radius = (index % 4 + 1) * world.CellSize;
+            check(spatial.Overlaps(point, radius) == bodies.Any(body => Placement.FixedPlacement.Overlaps(point, radius, body)),
+                "spatial broad phase equals exact scan across negative coordinates and mixed radii");
+        }
+    }
+
 }

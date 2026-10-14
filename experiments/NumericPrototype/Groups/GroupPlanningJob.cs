@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using NumericPrototype.Matching;
 using NumericPrototype.Movement;
 
@@ -19,6 +20,12 @@ internal sealed class GroupPlanningJob
     private readonly HashSet<ulong> _canceled = [];
     private readonly List<CandidateCell[]> _candidates = [];
     private WideMatchingWork? _matching;
+    // Wall-clock diagnostics never participate in scheduling or snapshots.
+    internal double MatchingMs { get; private set; }
+    internal double CandidateMs { get; private set; }
+    internal double MatchingPeakMs { get; private set; }
+    internal double CandidatePeakMs { get; private set; }
+    internal double MatchingInitializationMs { get; private set; }
     internal int PreparedCount => _candidates.Count;
     internal int MatchingRow => _matching?.NextRow ?? 0;
     internal bool IsCanceled(ulong member) => _canceled.Contains(member);
@@ -73,15 +80,24 @@ internal sealed class GroupPlanningJob
     internal int Advance(MovementWorld world, int columnBudget, int candidateBudget)
     {
         if (columnBudget <= 0 || candidateBudget <= 0) throw new ArgumentOutOfRangeException(nameof(columnBudget));
+        var watch = Stopwatch.StartNew();
         var charged = 0;
         if (_matching is null)
         {
             _matching = new WideMatchingWork(_followers.Length, _costs, WideMatchingWork.MaximumFormationCost);
             charged = 2 * _followers.Length * _followers.Length;
+            MatchingInitializationMs = watch.Elapsed.TotalMilliseconds;
         }
         charged += _matching.Advance(Math.Max(1, columnBudget - charged));
+        var matchingMs = watch.Elapsed.TotalMilliseconds;
+        MatchingMs += matchingMs;
+        MatchingPeakMs = Math.Max(MatchingPeakMs, matchingMs);
+        watch.Restart();
         var end = Math.Min(_input.Ideals.Length, _candidates.Count + candidateBudget);
         while (_candidates.Count < end) _candidates.Add(Candidates(world, _input.Ideals[_candidates.Count]));
+        var candidateMs = watch.Elapsed.TotalMilliseconds;
+        CandidateMs += candidateMs;
+        CandidatePeakMs = Math.Max(CandidatePeakMs, candidateMs);
         return charged;
     }
 
@@ -94,6 +110,15 @@ internal sealed class GroupPlanningJob
         return _input.Members.Select((member, index) => (Member: member.Id, Slot: slots[index]))
             .Where(item => !_canceled.Contains(item.Member)).ToArray();
     }
+
+    // Borrowed read-only views: the job owns immutable prepared cells and ideal values.
+    internal IReadOnlyList<CandidateCell> PreparedCandidates(int slot)
+    {
+        if (!Ready) throw new InvalidOperationException("Group plan is pending.");
+        return Array.AsReadOnly(_candidates[slot]);
+    }
+
+    internal FixedPoint Ideal(int slot) => _input.Ideals[slot];
 
     internal GroupJobSnapshot Capture() => new(Copy(_input), _canceled.Order().ToArray(),
         _candidates.Count, _matching?.Capture());

@@ -1,10 +1,12 @@
+using System.Diagnostics;
 using NumericPrototype.Movement;
 
 namespace NumericPrototype.Placement;
 
-/// <summary>Derived per-plan component labels, keyed by integer body clearance.</summary>
+/// <summary>Derived immutable-world component labels; owned by the preview session, keyed by integer body clearance.</summary>
 internal sealed class PlacementReachability(MovementWorld world)
 {
+    internal double BuildMs { get; private set; }
     private readonly Dictionary<int, int[]> _labels = [];
     internal bool Connected(FixedPoint from, FixedPoint to, long radius)
     {
@@ -16,7 +18,9 @@ internal sealed class PlacementReachability(MovementWorld world)
         if (!Inside(a.X, a.Y) || !Inside(b.X, b.Y)) return false;
         if (!_labels.TryGetValue(clearance, out var labels))
         {
+            var watch = Stopwatch.StartNew();
             labels = Build(clearance);
+            BuildMs += watch.Elapsed.TotalMilliseconds;
             _labels.Add(clearance, labels);
         }
         var component = labels[a.Y * world.Width + a.X];
