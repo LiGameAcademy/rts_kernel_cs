@@ -6,10 +6,10 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="vendor/**/*.cs" />
-    <Compile Include="../../src/Rts.Kernel/DeterministicRng.cs" Link="Contracts/DeterministicRng.cs" />
-    <ProjectReference Include="vendor/FixPointCS/FixPointCS.csproj" />
+    <Compile Include="Program.cs" />
+    <ProjectReference Include="Core/NumericPrototype.Core.csproj" />
   </ItemGroup>
 </Project>
