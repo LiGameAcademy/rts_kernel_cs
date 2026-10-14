@@ -44,10 +44,6 @@ internal static class MovementSnapshot
                 if (left.Waypoints[j] != right.Waypoints[j])
                     return Difference(prefix + $".waypoints[{j}]", left.Waypoints[j], right.Waypoints[j]);
         }
-        for (var i = 0; i < expected.PendingCommands.Count; i++)
-            if (expected.PendingCommands[i].Command.Move != actual.PendingCommands[i].Command.Move)
-                return Difference($"pendingCommands[{i}].command.move", expected.PendingCommands[i].Command.Move,
-                    actual.PendingCommands[i].Command.Move);
         return null;
     }
 

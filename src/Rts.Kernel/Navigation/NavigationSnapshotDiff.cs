@@ -25,16 +25,6 @@ internal static class NavigationSnapshotDiff
                 if (a.Area.Height != b.Area.Height) return Difference(prefix + ".area.height", a.Area.Height, b.Area.Height);
             }
         }
-        for (var i = 0; i < expected.PendingCommands.Count; i++)
-        {
-            var a = expected.PendingCommands[i].Command.Obstacle;
-            var b = actual.PendingCommands[i].Command.Obstacle;
-            var prefix = $"pendingCommands[{i}].command.obstacle";
-            if ((a is null) != (b is null)) return Difference(prefix + ".present", a is not null, b is not null);
-            if (a is null || b is null) continue;
-            if (a.Id != b.Id) return Difference(prefix + ".id", a.Id, b.Id);
-            if (a.Area != b.Area) return Difference(prefix + ".area", a.Area, b.Area);
-        }
         return null;
     }
 

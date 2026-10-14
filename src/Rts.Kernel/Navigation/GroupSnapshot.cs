@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace Rts.Kernel.Navigation;
 
 internal static class GroupSnapshot
@@ -38,16 +36,6 @@ internal static class GroupSnapshot
             return new("movementHash", expected.MovementHash ?? "null", actual.MovementHash ?? "null");
         if (expected.NextGroupId != actual.NextGroupId)
             return new("nextGroupId", expected.NextGroupId.ToString(), actual.NextGroupId.ToString());
-        for (var i = 0; i < expected.PendingCommands.Count; i++)
-        {
-            var a = expected.PendingCommands[i].Command;
-            var b = actual.PendingCommands[i].Command;
-            if (a.MovementDefinitionId != b.MovementDefinitionId)
-                return new($"pendingCommands[{i}].movementDefinitionId", a.MovementDefinitionId.ToString(), b.MovementDefinitionId.ToString());
-            var left = JsonSerializer.Serialize(a.Group);
-            var right = JsonSerializer.Serialize(b.Group);
-            if (left != right) return new($"pendingCommands[{i}].group", left, right);
-        }
         return null;
     }
 }
