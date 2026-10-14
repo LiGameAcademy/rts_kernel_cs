@@ -1,10 +1,18 @@
-# Numeric contract probe — Issue #68, step 1
+# Numeric contract probe — Issue #68
 
-This is an isolated experiment, not a second supported RTS simulation. Production spatial types and v9 snapshots still use double. Nothing references this experiment from Rts.Kernel or the Godot host.
+This is an isolated experiment, not a second supported RTS simulation. Production spatial types and v9 snapshots still use double. Nothing references this experiment from Rts.Kernel or the production Godot host.
 
 Run `./experiments/NumericPrototype/Test-Prototype.ps1` with the existing .NET 10 SDK. The runner builds Debug/Release and compares raw math traces from two independent processes in each configuration. This proves only the tested Windows machine/configurations; it is not a cross-CPU or cross-platform certification.
 
-## Contract findings
+## Current layout
+
+The pure experiment is compiled once as `Core/NumericPrototype.Core.csproj` (net8.0).
+The existing CLI stays net10.0 and calls `PrototypeRunner`; the isolated Godot4.7.2
+Mono project under `godot_probe` calls that same library. Neither adapter owns
+simulation rules. Sections below record successive steps; their counts/remaining
+scope describe those steps, rather than the latest complete state.
+
+## Step 1 contract findings
 
 - FixPointCS source is unmodified, pinned to `a852f05b428a942f8dc274ee516a893ae224e0d4`. `vendor/FixPointCS/SOURCE.json` records Git blob and SHA256 identities. MIT license is included. Its local SDK project is ours; the three numeric sources are third-party files and intentionally retain upstream layout.
 - Candidate multiplication floors negative fractions. The proposed project contract truncates toward zero. `PrototypeScalar` uses checked Int128 intermediate arithmetic for this probe; candidate integer square root and trigonometric functions are tested separately. This is evidence that raw vendor API calls cannot silently define project semantics, not approval of the wrapper as a production API.
@@ -174,3 +182,35 @@ counts are not production command latency. This verifies planning/results and a
 minimal apply-only-successful-outcomes boundary, not the real Stop/Append command
 queue, gameplay event emission, moving crowd, Godot or300/500 performance. Matching
 restore remains the expensive replay oracle. Stable double/v9/host pointers stay unchanged.
+
+
+### Actual Godot execution parity (2026-10-14)
+
+`Test-GodotPrototype.ps1 -GodotConsole <console-exe> -AssetsDirectory <assets-dir>
+-ReportPath <output-json>` builds the CLI and isolated Godot Debug assembly, imports
+the project, and runs independent CLI/Godot processes for checks, content survey,
+real-map movement, group scheduling and formation/final placement. Without assets,
+it runs the synthetic checks only. Supply PowerShell7, the existing .NET10 SDK and
+the matching Godot4.7.2 Mono distribution/packages. This does not launch or modify
+the production game, nor require changing its kernel submodule pointer.
+
+The comparison uses each complete JSON report, including raw trajectory hashes,
+outcomes, frames and events where the scenario exposes them. Native exit code,
+script/managed error logs and an explicit completion marker are all required. Each
+run uses a fresh temporary output directory to avoid accepting stale reports.
+Owned processes have a timeout; failures remain failures and are not automatically
+retried. The script records the actual embedded CLR independently of target framework.
+
+Godot dynamically loads managed bytes, so Assembly.Location may be empty. The adapter
+reports its loaded core module MVID plus the Debug output DLL SHA256; the script
+checks both against the current CLI core using an isolated metadata load context.
+This guards against testing an old loaded assembly while hashing a newer file.
+The same shared runner restores host culture after each invocation. Checked core
+arithmetic and the pinned unchecked vendor arithmetic remain unchanged.
+
+The validated platform/CLR and any engine startup/import anomalies are recorded in
+the run evidence. net8.0 is a target, not proof of a net8 runtime. Headless Debug
+execution does not certify Godot Release/export, cross-machine determinism, production
+game readiness, full command/event integration, moving crowd or300/500 performance.
+The Godot parity script is an explicit local check; CI continues running the pure
+CLI probe without requiring the engine or proprietary source assets.

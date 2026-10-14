@@ -3,3 +3,5 @@
 .vs/
 .idea/
 TestResults/
+
+experiments/NumericPrototype/godot_probe/.godot/

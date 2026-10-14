@@ -1,0 +1,12 @@
+config_version=5
+
+[application]
+config/name="Numeric Prototype Parity"
+run/main_scene="res://numeric_probe.tscn"
+config/features=PackedStringArray("4.7", "C#", "GL Compatibility")
+
+[dotnet]
+project/assembly_name="NumericProbe"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
