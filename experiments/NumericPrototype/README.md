@@ -128,3 +128,49 @@ Four independent Debug/Release processes compare this complete report. The 128-c
 budget is for diagnostics and must not be interpreted as production response latency.
 No formation generation/trigonometry, final placement connectivity/body occupancy,
 Stop order effects, crowd movement, Godot or 300/500 performance is proven by this test.
+
+
+### Formation geometry and final placement prototype (2026-10-14)
+
+`Placement/` adds fixed-point Compact/Rectangle/Wedge/Circle geometry and a final
+placement reference. Counts are 1–500; experimental spacing is positive and at most
+256 world units. All products are widened/checked. Compact uses the pinned square
+root of3; circle uses the pinned sine/cosine and a truncating fixed-point division.
+Rotation normalizes the raw period, widens both products before a single division
+per coordinate (toward zero); a zero heading is exactly the identity, avoiding the
+provider's approximate cos(0). Rectangle column count uses integer ceil-sqrt. These
+are explicit prototype rounding rules, not approval of the final numeric contract.
+
+Shape checks cover counts1/2/3/7/65/500, analytical rectangle/hexagon cases, unique
+slots, exact anchor/period identity, circle radius and quarter-turn diagnostic error
+below0.01 world units over the tested ranges. Floating point is used only for error
+oracles. The spacing formula is max(cell,2*maxRadius+cell/10), with exact rational
+one-tenth truncated once, rather than a separately quantized0.1 coefficient.
+
+Final placement checks integer-clearance connected components (no diagonal corner
+cutting), exact Int128 body separation (tangency allowed), deterministic8-cell
+candidate order and slot-order reservation. On failure, retained old positions are
+reserved and other assignments are re-evaluated until the failure set stops growing.
+Connected labels are a per-plan derived cache; this intentionally simple reference
+has no production occupancy acceleration or performance claim. Accepted goals are
+independently checked with integer A* and exact static geometry. Dynamic map obstacle
+mutation is not included; external stationary unit bodies are explicit input.
+
+The group numeric harness now permits ideals up to8cells outside the map, while
+starts remain inside and every matrix cost must still satisfy its explicit bound.
+This fixes an overly strict experimental guard; no production behavior changes.
+Synthetic tests cover map edges, disconnected regions, an external body, failed
+members' retained future goals, exact tangency and one-raw penetration. Four65-member
+synthetic formation chains and a seven-member edge chain compare JSON-restored
+planning and final outcome/order-application payloads at the same diagnostic frame.
+
+With `-AssetsDirectory`, `--placement-assets` runs the four65-member shapes using
+actual Echo Isles/hfoo radius31, nonzero heading, a fixed map-center goal and an
+external stationary body. The initial starts come from a reproducible body-clear
+sample, not a gameplay recording. Each reported Adjusted also includes grid-center
+snapping; it does not mean that many slots encountered obstacles. The runner compares
+all raw reports across two Debug/two Release processes. Diagnostic128-column frame
+counts are not production command latency. This verifies planning/results and a
+minimal apply-only-successful-outcomes boundary, not the real Stop/Append command
+queue, gameplay event emission, moving crowd, Godot or300/500 performance. Matching
+restore remains the expensive replay oracle. Stable double/v9/host pointers stay unchanged.
