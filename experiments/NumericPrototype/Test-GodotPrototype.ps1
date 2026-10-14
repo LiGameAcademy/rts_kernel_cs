@@ -56,6 +56,7 @@ try { $coreModule = $loadContext.LoadFromAssemblyPath($cliCore).ManifestModule.M
 finally { $loadContext.Unload() }
 $cases = [ordered]@{ checks = [string[]]@() }
 if ($AssetsDirectory) {
+    $cases['preview_restore'] = [string[]]@('--planning-verify', $AssetsDirectory)
     $cases['survey'] = [string[]]@('--survey', $AssetsDirectory)
     $cases['movement'] = [string[]]@('--movement-assets', $AssetsDirectory)
     $cases['group'] = [string[]]@('--group-assets', $AssetsDirectory)

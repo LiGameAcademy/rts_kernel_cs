@@ -1,0 +1,66 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://NumericPlanningPreview.cs" id="1"]
+
+[node name="NumericPlanningPreview" type="Node2D"]
+script = ExtResource("1")
+
+[node name="Hud" type="CanvasLayer" parent="."]
+
+[node name="Panel" type="PanelContainer" parent="Hud"]
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 1260.0
+offset_bottom = 195.0
+
+[node name="Layout" type="VBoxContainer" parent="Hud/Panel"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Hud/Panel/Layout"]
+layout_mode = 2
+text = "RTS数值原型 · 群体落点验收（固定起点，不模拟单位移动）"
+
+[node name="Toolbar" type="HBoxContainer" parent="Hud/Panel/Layout"]
+layout_mode = 2
+
+[node name="Count65" type="Button" parent="Hud/Panel/Layout/Toolbar"]
+layout_mode = 2
+text = "65成员"
+
+[node name="Count300" type="Button" parent="Hud/Panel/Layout/Toolbar"]
+layout_mode = 2
+text = "300成员"
+
+[node name="Count500" type="Button" parent="Hud/Panel/Layout/Toolbar"]
+layout_mode = 2
+text = "500成员"
+
+[node name="Formation" type="OptionButton" parent="Hud/Panel/Layout/Toolbar"]
+layout_mode = 2
+
+[node name="Pause" type="Button" parent="Hud/Panel/Layout/Toolbar"]
+layout_mode = 2
+text = "暂停/继续"
+
+[node name="Save" type="Button" parent="Hud/Panel/Layout/Toolbar"]
+layout_mode = 2
+text = "保存F5"
+
+[node name="Load" type="Button" parent="Hud/Panel/Layout/Toolbar"]
+layout_mode = 2
+text = "恢复F9"
+
+[node name="Reset" type="Button" parent="Hud/Panel/Layout/Toolbar"]
+layout_mode = 2
+text = "重置"
+
+[node name="Help" type="Label" parent="Hud/Panel/Layout"]
+layout_mode = 2
+text = "左键下达目标 · 规划中右键蓝点取消成员 · 1~4队形 · 空格暂停 · 滚轮缩放/中键平移 · L连线"
+
+[node name="Status" type="Label" parent="Hud/Panel/Layout"]
+layout_mode = 2
+text = "正在加载真实地图…"
+
+[node name="Notice" type="Label" parent="Hud/Panel/Layout"]
+layout_mode = 2

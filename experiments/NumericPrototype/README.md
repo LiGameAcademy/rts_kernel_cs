@@ -214,3 +214,47 @@ execution does not certify Godot Release/export, cross-machine determinism, prod
 game readiness, full command/event integration, moving crowd or300/500 performance.
 The Godot parity script is an explicit local check; CI continues running the pure
 CLI probe without requiring the engine or proprietary source assets.
+
+
+### Interactive planning acceptance and 300/500 load probe (2026-10-14)
+
+`Start-PlanningPreview.ps1 -GodotConsole <console-exe> -AssetsDirectory <assets-dir>`
+builds/imports an isolated Godot scene and opens an interactive window. It defaults
+to300 frozen hfoo starts on the actual map. Buttons choose65/300/500 members and four
+formations; left-click changes the target, right-click near a blue start cancels a
+pending member. Space pauses, F5/F9 save/restore an in-memory snapshot of the same
+fixture, wheel zooms, middle-drag pans and L toggles correspondence lines. Pause
+before a new target to inspect/cancel/save the pending plan. Green marks are accepted
+goals, red crosses failed members, orange canceled members; blue starts never move.
+This is deliberately **planning acceptance**, not crowd movement or production game
+integration. Runtime failures log context and pause; expected input rejection is shown.
+
+`-SelfTest` exercises the actual500-member scene and snapshot continuation headlessly.
+`-SelfTest -CapturePath <absolute-png>` uses a visible viewport, saves a frame and exits.
+The launcher checks exit codes/logs/completion for these modes and leaves a normal
+interactive process running for the user. Logs use a fresh temporary directory.
+The prior import-native-exit limitation still applies; nonzero imports are not ignored.
+
+CLI `--planning-load <assets-dir>` records all four shapes at300/500, two repetitions
+each in one process: creation time, peak logic step, final placement time, current-
+thread allocated bytes, frames, successful/failed outcomes and state identity. These
+are planning-only measurements; map loading, renderer, snapshot validation and full
+simulation traffic are outside their timed scope. Repeat1 may include JIT work and
+is not a separate-process cold-start benchmark. `--planning-verify <assets-dir>`
+checks65/300/500 cancellation, subsequent-frame equality after restore, completed
+snapshots and atomic rejection. Optional Godot parity now includes this restore case.
+
+Larger wedge ideals exceed map extents legitimately. Group matching uses a separately
+bounded formation cost range: map span<=16384, count<=500, spacing<=256, rotated local
+L1 extent<=128000. An explicit131072-unit ideal margin yields per-axis delta<=147456,
+so C=2*(147456*2^32)^2; (2n+3)C still fits signed Int128 for n<=500. The old standalone
+map-cost bound remains the default. The8-cell adjustment neighborhood has not grown:
+far-out slots fail individually instead of rejecting the whole numeric request.
+
+Matching identity streams the exact existing canonical decimal bytes into SHA256,
+avoiding the giant joined string. The existing raw/golden identities remain unchanged;
+16 real300/500 samples matched before/after. Measured500 compact allocation decreased
+from about126 to71 million bytes in the local Release runs, but peak steps remain
+above a30Hz frame budget. No performance pass, M2 completion or numerical adoption is
+claimed. Current fixtures include substantial wedge/circle failures; inspect outcomes
+as well as timing. Internal evidence records the actual numbers and manual checklist.
