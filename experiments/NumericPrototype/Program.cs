@@ -80,9 +80,10 @@ Check(JsonSerializer.Deserialize<long[]>(JsonSerializer.Serialize(state))!.Seque
 ContentSurveyChecks.Run(Check);
 var inputTraceHash = InputQuantizationChecks.Run(Check);
 var wideCostTraceHash = WideCostChecks.Run(Check);
+var placementTraceHash = NumericPrototype.Placement.PlacementChecks.Run(Check);
 var groupTraceHash = NumericPrototype.Groups.GroupPlanningChecks.Run(Check);
 var matchingTraceHash = NumericPrototype.Matching.MatchingChecks.Run(Check);
 var movementTraceHash = NumericPrototype.Movement.MovementChecks.Run(Check);
 var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawTrace.ToString()))).ToLowerInvariant();
-Console.WriteLine(JsonSerializer.Serialize(new { checks, rawTraceHash = digest, inputTraceHash, wideCostTraceHash, movementTraceHash, matchingTraceHash, groupTraceHash, maxSinError, maxAtanError, maxSqrtError,
+Console.WriteLine(JsonSerializer.Serialize(new { checks, rawTraceHash = digest, inputTraceHash, wideCostTraceHash, movementTraceHash, matchingTraceHash, groupTraceHash, placementTraceHash, maxSinError, maxAtanError, maxSqrtError,
     scope = "isolated scalar/input/movement contract prototype; not a production RTS migration" }));
