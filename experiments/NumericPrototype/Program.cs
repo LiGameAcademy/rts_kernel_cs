@@ -69,6 +69,7 @@ var state = new long[] { one.Raw, -1, long.MaxValue, long.MinValue };
 Check(JsonSerializer.Deserialize<long[]>(JsonSerializer.Serialize(state))!.SequenceEqual(state), "64-bit raw JSON round trip in .NET");
 ContentSurveyChecks.Run(Check);
 var inputTraceHash = InputQuantizationChecks.Run(Check);
+var wideCostTraceHash = WideCostChecks.Run(Check);
 var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawTrace.ToString()))).ToLowerInvariant();
-Console.WriteLine(JsonSerializer.Serialize(new { checks, rawTraceHash = digest, inputTraceHash, maxSinError, maxAtanError, maxSqrtError,
+Console.WriteLine(JsonSerializer.Serialize(new { checks, rawTraceHash = digest, inputTraceHash, wideCostTraceHash, maxSinError, maxAtanError, maxSqrtError,
     scope = "scalar and math contract probe; not a migrated RTS simulation" }));

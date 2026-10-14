@@ -10,6 +10,7 @@ foreach ($entry in $manifest.files.PSObject.Properties) {
     if ($actual -ne $entry.Value.sha256) { throw "Pinned vendor file mismatch: $($entry.Name)" }
 }
 $expectedInputHash = '6d8de2d1136af0129063576981e9caa3f3cb1c68398d8ca07e8cc959dbe95621'
+$expectedWideHash = '4227d7416bf64430462b07089e0ae94bcca4d3a0daa8c98774c9729d17d30ba2'
 $reports = @()
 foreach ($configuration in @('Debug', 'Release')) {
     dotnet build $prototype -c $configuration -p:NuGetAudit=false
@@ -21,12 +22,14 @@ foreach ($configuration in @('Debug', 'Release')) {
         $report = ($output -join "`n") | ConvertFrom-Json
         if ($report.rawTraceHash -ne $expectedHash) { throw "Raw math trace mismatch: $configuration/$process" }
         if ($report.inputTraceHash -ne $expectedInputHash) { throw "Input quantization trace mismatch: $configuration/$process" }
+        if ($report.wideCostTraceHash -ne $expectedWideHash) { throw "Wide-cost trace mismatch: $configuration/$process" }
         $reports += [pscustomobject]@{
             configuration = $configuration
             process = $process
             checks = $report.checks
             rawTraceHash = $report.rawTraceHash
             inputTraceHash = $report.inputTraceHash
+            wideCostTraceHash = $report.wideCostTraceHash
             maxSinError = $report.maxSinError
             maxAtanError = $report.maxAtanError
             maxSqrtError = $report.maxSqrtError
