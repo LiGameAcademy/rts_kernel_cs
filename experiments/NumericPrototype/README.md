@@ -258,3 +258,29 @@ from about126 to71 million bytes in the local Release runs, but peak steps remai
 above a30Hz frame budget. No performance pass, M2 completion or numerical adoption is
 claimed. Current fixtures include substantial wedge/circle failures; inspect outcomes
 as well as timing. Internal evidence records the actual numbers and manual checklist.
+
+
+## Planning reuse and occupancy broad phase
+
+The preview consumes the job's prepared candidate lists instead of generating them
+again during final placement. Those lists remain owned by the job and are borrowed
+through read-only views. Final placement uses eight-cell spatial buckets, followed
+by the existing exact Int128 overlap test. The original linear path remains the
+reference for all four shapes at300/500 and for canceled-member outcomes.
+
+Reachability labels belong to each preview session's immutable world and are reused
+across commands. They are derived data, excluded from snapshots; warm/cold restores
+must produce the same authoritative frames. This experiment has no mutable terrain
+or obstacle API: a future mutable world needs explicit cache invalidation.
+
+`--planning-load` also records cumulative MatchingMs/CandidateMs, their per-advance
+peaks, MatchingInitializationMs, and cumulative ReachabilityMs. ReachabilityMs is a
+subset of PlacementMs; these values must not be added together. Creation, phase
+timing and allocation remain diagnostics only and never affect work budgets/state.
+The timing scope excludes reference verification performed after reading metrics.
+`--planning-verify` additionally compares spatial buckets against exact scans with
+mixed radii/negative coordinates, and cold restores against a warmed session.
+
+This change preserves the experimental snapshot format and activation frames.
+Final placement and initial matching preparation are still synchronous: lower
+placement allocation/time does not establish a30Hz performance pass.

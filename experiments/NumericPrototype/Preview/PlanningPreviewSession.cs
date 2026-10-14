@@ -13,7 +13,9 @@ public sealed record PreviewPoint(long X, long Y);
 public sealed record PreviewMap(int Width, int Height, long CellSize, PreviewPoint Origin, byte[] Walkable);
 public sealed record PreviewUnit(ulong Id, PreviewPoint Start, PreviewPoint? Goal, int Slot, bool Failed, bool Canceled);
 public sealed record PreviewMetrics(int Frame, bool Planning, int Prepared, int MatchingRow,
-    int Succeeded, int Failed, double CreateMs, double LastTickMs, double PeakTickMs, double PlacementMs, long AllocatedBytes);
+    int Succeeded, int Failed, double CreateMs, double LastTickMs, double PeakTickMs, double PlacementMs, long AllocatedBytes,
+    double MatchingMs, double CandidateMs, double ReachabilityMs,
+    double MatchingPeakMs, double CandidatePeakMs, double MatchingInitializationMs);
 internal sealed record PreviewSaved(int Format, string Fixture, int Frame, ulong NextId,
     GroupJobSnapshot? Job, PlacementOutcome[] Outcomes);
 
@@ -23,6 +25,7 @@ public sealed class PlanningPreviewSession
     private readonly MovementWorld _world;
     private readonly PlacementMember[] _members;
     private readonly string _fixture;
+    private readonly PlacementReachability _reachability;
     private GroupPlanningJob? _job;
     private PlacementOutcome[] _outcomes = [];
     private int _frame;
@@ -32,6 +35,7 @@ public sealed class PlanningPreviewSession
     private double _peakMs;
     private double _placementMs;
     private long _allocated;
+    private double _reachabilityStart;
     public long BodyRadius => _members[0].Radius;
     public ulong Leader => _members[Count / 2].Id;
     public int Count => _members.Length;
@@ -43,6 +47,7 @@ public sealed class PlanningPreviewSession
         if (count is < 2 or > 500) throw new ArgumentOutOfRangeException(nameof(count));
         _world = new(File.ReadAllText(Path.Combine(assetsDirectory, "map-parsed/echoisles/pathing.json")),
             File.ReadAllText(Path.Combine(assetsDirectory, "map-parsed/echoisles/terrain-heightfield.json")));
+        _reachability = new PlacementReachability(_world);
         using var balance = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(assetsDirectory, "slk-exported/Units/UnitBalance.json")));
         var radius = MovementWorld.Number(balance.RootElement.GetProperty("records").EnumerateArray()
             .Single(value => value.GetProperty("unitBalanceID").GetString() == "hfoo"), "collision");
@@ -84,6 +89,7 @@ public sealed class PlanningPreviewSession
         _allocated = GC.GetAllocatedBytesForCurrentThread() - before;
         _peakMs = 0;
         _placementMs = 0;
+        _reachabilityStart = _reachability.BuildMs;
     }
 
     public bool Cancel(ulong member) => Planning && _job!.Cancel(member);
@@ -103,7 +109,7 @@ public sealed class PlanningPreviewSession
             var bodies = _members.Where(member => !assignments.ContainsKey(member.Id))
                 .Select(member => new PlacementBody(member.Start, member.Radius)).ToArray();
             if (active.Length > 0)
-                _outcomes = FixedPlacement.Plan(_world, active, _job.Capture().Input.Ideals, assignments, bodies);
+                _outcomes = FixedPlacement.PlanPrepared(_world, active, _job, assignments, bodies, _reachability);
             else _outcomes = [];
             _placementMs = placementWatch.Elapsed.TotalMilliseconds;
         }
@@ -116,7 +122,9 @@ public sealed class PlanningPreviewSession
     {
         return new(_frame, Planning, _job?.PreparedCount ?? 0, _job?.MatchingRow ?? 0,
             _outcomes.Count(item => item.Goal.HasValue), _outcomes.Count(item => !item.Goal.HasValue),
-            _createMs, _lastMs, _peakMs, _placementMs, _allocated);
+            _createMs, _lastMs, _peakMs, _placementMs, _allocated,
+            _job?.MatchingMs ?? 0, _job?.CandidateMs ?? 0, _reachability.BuildMs - _reachabilityStart,
+            _job?.MatchingPeakMs ?? 0, _job?.CandidatePeakMs ?? 0, _job?.MatchingInitializationMs ?? 0);
     }
 
     public PreviewUnit[] ReadUnits()
@@ -128,6 +136,18 @@ public sealed class PlanningPreviewSession
             return new PreviewUnit(member.Id, Point(member.Start), outcome?.Goal is FixedPoint goal ? Point(goal) : null,
                 outcome?.Slot ?? -1, outcome is not null && !outcome.Goal.HasValue, _job?.IsCanceled(member.Id) ?? false);
         }).ToArray();
+    }
+
+    internal bool MatchesPlacementReference()
+    {
+        if (_job is null || Planning) throw new InvalidOperationException("No completed plan to verify.");
+        var assignments = _job.Assignments().ToDictionary(item => item.Member, item => item.Slot);
+        var active = _members.Where(member => assignments.ContainsKey(member.Id)).ToArray();
+        var bodies = _members.Where(member => !assignments.ContainsKey(member.Id))
+            .Select(member => new PlacementBody(member.Start, member.Radius)).ToArray();
+        var expected = active.Length == 0 ? [] : FixedPlacement.Plan(_world, active,
+            _job.Capture().Input.Ideals, assignments, bodies);
+        return _outcomes.SequenceEqual(expected);
     }
 
     public string Capture() => JsonSerializer.Serialize(new PreviewSaved(1, _fixture, _frame, _nextId, _job?.Capture(), _outcomes));
@@ -148,6 +168,7 @@ public sealed class PlanningPreviewSession
         _nextId = saved.NextId;
         _outcomes = saved.Outcomes.ToArray();
         _lastMs = _peakMs = _placementMs = _createMs = 0;
+        _reachabilityStart = _reachability.BuildMs;
         _allocated = 0; // Diagnostics are deliberately outside simulation state.
     }
 
