@@ -1,0 +1,23 @@
+{
+  "repository": "https://github.com/XMunkki/FixPointCS",
+  "commit": "a852f05b428a942f8dc274ee516a893ae224e0d4",
+  "license": "MIT",
+  "files": {
+    "FixPointCS/Fixed32.cs": {
+      "git_blob_sha": "24a43cfa6a7a031acb9f00bbeda19d9955157eca",
+      "sha256": "59fc9a8f3adbb959c17a25775012fa0c5606722d6a02e41ceb8d9dba4dbfd7c5"
+    },
+    "FixPointCS/Fixed64.cs": {
+      "git_blob_sha": "9836aa591c1145b95ad43979d15f9c6184281605",
+      "sha256": "2614e091964a97a8bb36ed12ee63140cddd05242b633695a764e87f40afb0d63"
+    },
+    "FixPointCS/FixedUtil.cs": {
+      "git_blob_sha": "84da1e36d1aa2f9632b2367b739f5eeed8d57e23",
+      "sha256": "8853a1d4c409cf15d938a37e13d60509a99136a4dc4a69ed98268338a37038b1"
+    },
+    "LICENSE.txt": {
+      "git_blob_sha": "4714e8ddbfa96e0bb219ecf6750f2a10cc4a18b7",
+      "sha256": "d9e35896ab1848e5c26ce0b7c9f835d6127f153d1967a394d85a0980bd8a1a6b"
+    }
+  }
+}

@@ -20,3 +20,6 @@ jobs:
       - name: Build, run checks and CLI
         shell: pwsh
         run: ./Test.ps1
+      - name: Numeric contract probe (experimental)
+        shell: pwsh
+        run: ./experiments/NumericPrototype/Test-Prototype.ps1
