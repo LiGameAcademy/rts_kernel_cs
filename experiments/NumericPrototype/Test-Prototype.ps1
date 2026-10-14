@@ -12,6 +12,7 @@ foreach ($entry in $manifest.files.PSObject.Properties) {
 $expectedInputHash = '6d8de2d1136af0129063576981e9caa3f3cb1c68398d8ca07e8cc959dbe95621'
 $expectedWideHash = '4227d7416bf64430462b07089e0ae94bcca4d3a0daa8c98774c9729d17d30ba2'
 $expectedMovementHash = '4cf7cd8ca7c2ab68272da6963cb44e53243082a84b97e267b18e0ffe0ad6a531'
+$expectedMatchingHash = 'd04cacf1645d1e838f01d320872274caa923abf31eb5b1ecf6d5fb2009ab74b2'
 $realMovementBaseline = $null
 $reports = @()
 foreach ($configuration in @('Debug', 'Release')) {
@@ -26,6 +27,7 @@ foreach ($configuration in @('Debug', 'Release')) {
         if ($report.inputTraceHash -ne $expectedInputHash) { throw "Input quantization trace mismatch: $configuration/$process" }
         if ($report.wideCostTraceHash -ne $expectedWideHash) { throw "Wide-cost trace mismatch: $configuration/$process" }
         if ($report.movementTraceHash -ne $expectedMovementHash) { throw "Movement state/event trace mismatch: $configuration/$process" }
+        if ($report.matchingTraceHash -ne $expectedMatchingHash) { throw "Matching state trace mismatch: $configuration/$process" }
         $realMovement = $null
         if ($AssetsDirectory) {
             $realOutput = & dotnet $assembly --movement-assets $AssetsDirectory
@@ -43,6 +45,7 @@ foreach ($configuration in @('Debug', 'Release')) {
             inputTraceHash = $report.inputTraceHash
             wideCostTraceHash = $report.wideCostTraceHash
             movementTraceHash = $report.movementTraceHash
+            matchingTraceHash = $report.matchingTraceHash
             realMovement = $realMovement
             maxSinError = $report.maxSinError
             maxAtanError = $report.maxAtanError
