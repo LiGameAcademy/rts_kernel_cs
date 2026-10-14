@@ -33,11 +33,17 @@ internal sealed class GroupPlanningJob
                 input.Members.Select(member => member.Id).Order().Distinct()))
             throw new ArgumentException("Invalid experimental group input.");
         _input = Copy(input);
-        foreach (var point in _input.Members.Select(member => member.Start).Concat(_input.Ideals))
+        foreach (var point in _input.Members.Select(member => member.Start))
         {
             var cell = world.Cell(point);
             if (cell.X < 0 || cell.Y < 0 || cell.X >= world.Width || cell.Y >= world.Height)
-                throw new ArgumentException("Group point outside experimental world bounds.");
+                throw new ArgumentException("Group start outside experimental world bounds.");
+        }
+        foreach (var point in _input.Ideals)
+        {
+            var cell = world.Cell(point);
+            if (cell.X < -8 || cell.Y < -8 || cell.X >= world.Width + 8 || cell.Y >= world.Height + 8)
+                throw new ArgumentException("Ideal outside experimental eight-cell placement margin.");
         }
         var anchor = Array.FindIndex(_input.Members, member => member.Id == input.Leader);
         if (anchor < 0) anchor = 0; // Current kernel fallback, including absent leader.
@@ -48,8 +54,9 @@ internal sealed class GroupPlanningJob
         {
             var start = _input.Members[_followers[row]].Start;
             var goal = _input.Ideals[column + 1];
-            _costs[row * _followers.Length + column] = WideSquaredDistance.Between(
-                new(start.X), new(start.Y), new(goal.X), new(goal.Y)).Raw;
+            var cost = WideSquaredDistance.Between(new(start.X), new(start.Y), new(goal.X), new(goal.Y)).Raw;
+            if (cost > WideMatchingWork.MaximumCost) throw new ArgumentException("Experimental matching cost bound exceeded.");
+            _costs[row * _followers.Length + column] = cost;
         }
     }
 
