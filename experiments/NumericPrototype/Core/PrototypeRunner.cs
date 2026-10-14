@@ -23,6 +23,8 @@ public static class PrototypeRunner
             if (arguments.Length != 2) throw new ArgumentException("Expected one probe mode and an input directory.");
             return arguments[0] switch
             {
+                "--planning-verify" => JsonSerializer.Serialize(PlanningPreviewChecks.Run(arguments[1])),
+                "--planning-load" => JsonSerializer.Serialize(PlanningLoadProbe.Run(arguments[1])),
                 "--survey" => JsonSerializer.Serialize(ContentRangeSurvey.Run(arguments[1])),
                 "--movement-assets" => JsonSerializer.Serialize(Movement.RealMovementProbe.Run(arguments[1])),
                 "--group-assets" => JsonSerializer.Serialize(Groups.RealGroupProbe.Run(arguments[1])),

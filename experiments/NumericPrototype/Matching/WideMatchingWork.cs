@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 
 namespace NumericPrototype.Matching;
@@ -15,6 +13,10 @@ internal sealed class WideMatchingWork
     internal const int MaximumMembers = 500;
     internal static readonly Int128 MaximumCost =
         2 * (Int128)(16384L * PrototypeScalar.Scale) * (16384L * PrototypeScalar.Scale);
+    // Map span <=16384, rotated 500-member wedge offset <=128000 at spacing<=256.
+    // A 131072-unit ideal margin gives <=147456 per-axis member/ideal separation.
+    internal static readonly Int128 MaximumFormationCost =
+        2 * (Int128)(147456L * PrototypeScalar.Scale) * (147456L * PrototypeScalar.Scale);
     private readonly Int128[] _costs;
     private readonly int _n;
     private readonly string _identity;
@@ -29,16 +31,16 @@ internal sealed class WideMatchingWork
     private bool _searching;
     private int _batches;
 
-    internal WideMatchingWork(int count, IReadOnlyList<Int128> costs)
+    internal WideMatchingWork(int count, IReadOnlyList<Int128> costs, Int128? costLimit = null)
     {
         if (count < 1 || count > MaximumMembers || costs.Count != count * count)
             throw new ArgumentException("Invalid matching dimensions.");
-        if (costs.Any(cost => cost < 0 || cost > MaximumCost))
+        var limit = costLimit ?? MaximumCost;
+        if (limit <= 0 || limit > MaximumFormationCost || costs.Any(cost => cost < 0 || cost > limit))
             throw new ArgumentOutOfRangeException(nameof(costs), "Experimental cost bound exceeded.");
         _n = count;
         _costs = costs.ToArray();
-        _identity = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-            "wide-hungarian-v1;" + count + ";" + string.Join(";", _costs.Select(Text)))));
+        _identity = MatchingInputIdentity.Compute(count, _costs);
         _u = new Int128[count + 1];
         _v = new Int128[count + 1];
         _occupant = new int[count + 1];
@@ -61,6 +63,7 @@ internal sealed class WideMatchingWork
     }
 
     internal bool Complete => _row > _n;
+    internal int NextRow => _row;
     private Int128 Reduced(int row, int column) =>
         checked(_costs[(row - 1) * _n + column - 1] - _u[row] - _v[column]);
 
@@ -144,12 +147,12 @@ internal sealed class WideMatchingWork
 
     // Deliberately expensive reference restore: reconstruct reachable state before returning an owner.
     // This validates every field without inventing a second incomplete structural validator.
-    internal static WideMatchingWork Restore(int count, IReadOnlyList<Int128> costs, MatchingSnapshot saved)
+    internal static WideMatchingWork Restore(int count, IReadOnlyList<Int128> costs, MatchingSnapshot saved, Int128? costLimit = null)
     {
         if (count < 1 || count > MaximumMembers) throw new InvalidDataException("Invalid matching dimensions.");
         if (saved is null || saved.Format != 1 || saved.Batches < 0 || saved.Batches > count * count)
             throw new InvalidDataException("Invalid experimental matching snapshot.");
-        var candidate = new WideMatchingWork(count, costs);
+        var candidate = new WideMatchingWork(count, costs, costLimit);
         if (saved.Identity != candidate._identity) throw new InvalidDataException("Matching input differs.");
         while (candidate._batches < saved.Batches && !candidate.Complete) candidate.Advance(1);
         // Advance may skip seeded rows at zero cost, including the final completion transition.
