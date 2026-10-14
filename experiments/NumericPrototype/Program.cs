@@ -13,6 +13,11 @@ if (args.Length == 2 && args[0] == "--survey")
     Console.WriteLine(JsonSerializer.Serialize(ContentRangeSurvey.Run(args[1])));
     return;
 }
+if (args.Length == 2 && args[0] == "--movement-assets")
+{
+    Console.WriteLine(JsonSerializer.Serialize(NumericPrototype.Movement.RealMovementProbe.Run(args[1])));
+    return;
+}
 var checks = 0;
 void Check(bool condition, string message)
 {
@@ -70,6 +75,7 @@ Check(JsonSerializer.Deserialize<long[]>(JsonSerializer.Serialize(state))!.Seque
 ContentSurveyChecks.Run(Check);
 var inputTraceHash = InputQuantizationChecks.Run(Check);
 var wideCostTraceHash = WideCostChecks.Run(Check);
+var movementTraceHash = NumericPrototype.Movement.MovementChecks.Run(Check);
 var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawTrace.ToString()))).ToLowerInvariant();
-Console.WriteLine(JsonSerializer.Serialize(new { checks, rawTraceHash = digest, inputTraceHash, wideCostTraceHash, maxSinError, maxAtanError, maxSqrtError,
-    scope = "scalar and math contract probe; not a migrated RTS simulation" }));
+Console.WriteLine(JsonSerializer.Serialize(new { checks, rawTraceHash = digest, inputTraceHash, wideCostTraceHash, movementTraceHash, maxSinError, maxAtanError, maxSqrtError,
+    scope = "isolated scalar/input/movement contract prototype; not a production RTS migration" }));
