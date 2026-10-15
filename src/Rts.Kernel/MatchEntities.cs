@@ -26,10 +26,10 @@ internal sealed class MatchEntities
     internal EntityState Get(EntityId id) => _states[id];
     internal bool TryGet(EntityId id, [NotNullWhen(true)] out EntityState? state) => _states.TryGetValue(id, out state);
 
-    internal EntityState Spawn(int ownerId, SimVector2 position, ulong movementDefinitionId)
+    internal EntityState Spawn(int ownerId, FixedVector2 position, ulong movementDefinitionId)
     {
         var id = new EntityId(NextId++);
-        var entity = new EntityState(id, ownerId, position, SimVector2.Zero, MovementDefinitionId: movementDefinitionId);
+        var entity = new EntityState(id, ownerId, position, FixedVector2.Zero, MovementDefinitionId: movementDefinitionId);
         _states.Add(id, entity);
         return entity;
     }
@@ -55,8 +55,8 @@ internal sealed class MatchEntities
         {
             var id = new EntityId(entity.Id);
             if (id.IsNone || !_states.TryAdd(id, new EntityState(id, entity.OwnerId,
-                    new SimVector2(entity.PositionX, entity.PositionY),
-                    new SimVector2(entity.VelocityX, entity.VelocityY), entity.Facing, entity.MovementDefinitionId)))
+                    new FixedVector2(entity.PositionX, entity.PositionY),
+                    new FixedVector2(entity.VelocityX, entity.VelocityY), entity.Facing, entity.MovementDefinitionId)))
             {
                 throw new InvalidDataException($"Invalid or duplicate entity id {entity.Id}.");
             }

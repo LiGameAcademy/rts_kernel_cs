@@ -10,7 +10,7 @@ internal static class MovementPerformance
         for (var run = 0; run < (longRun ? 1 : 3); run++)
         {
             var definitions = new[] { new MovementDefinition(1, 60, 4), new MovementDefinition(2, 30, 9) };
-            var grid = new PathingGrid(64, 64, 10, SimVector2.Zero, new byte[4096]);
+            var grid = new PathingGrid(64, 64, 10, FixedVector2.Zero, new byte[4096]);
             var match = new RtsMatch(MatchConfig.Default, 7, grid, movementDefinitions: definitions);
             for (var i = 0; i < count; i++)
                 match.SubmitCommand(CommandEnvelope.Spawn(1, 0, i, new(35 + i % 20 * 20, 35 + i / 20 * 20),

@@ -37,12 +37,12 @@ internal sealed class CrowdStepper
                 throw new InvalidDataException("Ground unit bodies overlap in snapshot.");
     }
 
-    internal void Advance(long frame, int tickRate, double seconds, NavigationState navigation, ref bool pathsDirty)
+    internal void Advance(long frame, int tickRate, NavigationState navigation, ref bool pathsDirty)
     {
         var bodies = _entities.Live.Where(entity => entity.MovementDefinitionId != 0).ToArray();
         if (bodies.Length == 0) return;
         var maximumRadius = bodies.Max(entity => ReadDefinition(entity.Id)!.Radius);
-        var reservations = new CrowdReservations(Math.Max(navigation.Grid.CellSize, maximumRadius * 2));
+        var reservations = new CrowdReservations(SimMath.Max(navigation.Grid.CellSize, maximumRadius * 2));
         foreach (var body in bodies)
             reservations.Put(new(body.Id, ReadDefinition(body.Id)!.Radius, new[] { body.Position, body.Position }));
         RefreshArrivalNeighbors(navigation);
@@ -64,7 +64,7 @@ internal sealed class CrowdStepper
                 }
                 order = replanned! with { WaitFrames = order.WaitFrames, RetryAfterFrame = order.RetryAfterFrame };
             }
-            var step = MovementStepper.Compute(entity, order, seconds, navigation.Terrain);
+            var step = MovementStepper.Compute(entity, order, tickRate, navigation.Terrain);
             if (step.Failure is not null)
             {
                 FinishMove(frame, entity.Id, entity.Position, MatchEventKind.MoveFailed, step.Failure);
@@ -72,7 +72,7 @@ internal sealed class CrowdStepper
             }
             if (YieldAtGroupGoal(navigation, entity, order, step))
             {
-                _entities.Update(entity with { Velocity = SimVector2.Zero });
+                _entities.Update(entity with { Velocity = FixedVector2.Zero });
                 _orders.UpdatePath(entity.Id, order with { WaitFrames = 0 });
                 continue; // Assembly sequencing is intentional waiting, not a physical-blockage failure.
             }
@@ -85,7 +85,7 @@ internal sealed class CrowdStepper
                     var detour = LocalDetour.Find(navigation, reservations, entity, definition, order);
                     if (detour is not null)
                     {
-                        var alternative = MovementStepper.Compute(entity, detour, seconds, navigation.Terrain);
+                        var alternative = MovementStepper.Compute(entity, detour, tickRate, navigation.Terrain);
                         if (alternative.Failure is null && reservations.Safe(entity.Id, definition.Radius, alternative.Trace))
                         {
                             order = detour;
@@ -96,7 +96,7 @@ internal sealed class CrowdStepper
                 if (!reservations.Safe(entity.Id, definition.Radius, step.Trace))
                 {
                     var wait = order.WaitFrames + 1;
-                    _entities.Update(entity with { Velocity = SimVector2.Zero, Facing = step.Facing });
+                    _entities.Update(entity with { Velocity = FixedVector2.Zero, Facing = step.Facing });
                     if (wait >= CrowdBlockedSeconds * tickRate)
                         FinishMove(frame, entity.Id, entity.Position, MatchEventKind.MoveFailed, "crowd_blocked_timeout");
                     else
@@ -109,8 +109,8 @@ internal sealed class CrowdStepper
             {
                 Position = step.Position,
                 Facing = step.Facing,
-                Velocity = new((step.Position.X - entity.Position.X) / seconds,
-                    (step.Position.Y - entity.Position.Y) / seconds)
+                Velocity = new((step.Position.X - entity.Position.X) * tickRate,
+                    (step.Position.Y - entity.Position.Y) * tickRate)
             });
             reservations.Put(new(entity.Id, definition.Radius, step.Trace));
             if (step.NextWaypoint == order.Waypoints.Count)
@@ -144,9 +144,7 @@ internal sealed class CrowdStepper
         if (group is null || group.Slot == 0) return false;
         var radius = ReadDefinition(entity.Id)!.Radius;
         var threshold = radius * 4 + navigation.Grid.CellSize * 2;
-        var dx = proposal.Position.X - order.Request.Goal.X;
-        var dy = proposal.Position.Y - order.Request.Goal.Y;
-        if (Math.Sqrt(dx * dx + dy * dy) > threshold) return false;
+        if (SquaredDistance.Between(proposal.Position, order.Request.Goal).Length > threshold) return false;
         foreach (var other in _arrivalNeighbors[group.GroupId].Prior(entity.Id))
             if (_orders.TryReadPath(other.Id, out var prior)
                 && _orders.ReadCurrent(other.Id)?.Group?.GroupId == group.GroupId
@@ -155,10 +153,10 @@ internal sealed class CrowdStepper
         return false;
     }
 
-    private void FinishMove(long frame, EntityId id, SimVector2 position, MatchEventKind kind, string detail)
+    private void FinishMove(long frame, EntityId id, FixedVector2 position, MatchEventKind kind, string detail)
     {
         _orders.Complete(id);
-        _entities.Update(_entities.Get(id) with { Position = position, Velocity = SimVector2.Zero });
+        _entities.Update(_entities.Get(id) with { Position = position, Velocity = FixedVector2.Zero });
         _events.Publish(frame, kind, id, detail);
     }
 

@@ -34,7 +34,7 @@ internal static class MatchEventBufferChecks
         check(match.DrainEvents().Count == 0, "drain consumes events exactly once");
         check(match.ComputeStateHash() == beforeDrain, "draining does not reset the counter or alter state");
 
-        var later = CommandEnvelope.SetVelocity(3, 0, 0, id, new SimVector2(3, 0));
+        var later = CommandEnvelope.SetVelocity(3, 0, 0, id, new FixedVector2(3, 0));
         match.SubmitCommand(later);
         restored.SubmitCommand(later);
         match.Step();
@@ -56,14 +56,14 @@ internal static class MatchEventBufferChecks
     private static RtsMatch CreateMatchWithBufferedEvents(PathingGrid grid, MovementDefinition[] definitions)
     {
         var match = new RtsMatch(MatchConfig.Default, 7, grid, movementDefinitions: definitions);
-        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new SimVector2(15, 15), 1));
-        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 1, new SimVector2(45, 15), 1));
+        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new FixedVector2(15, 15), 1));
+        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 1, new FixedVector2(45, 15), 1));
         match.Step();
         var id = new EntityId(1);
-        match.SubmitCommand(CommandEnvelope.SetVelocity(2, 0, 0, id, new SimVector2(1, 0)));
+        match.SubmitCommand(CommandEnvelope.SetVelocity(2, 0, 0, id, new FixedVector2(1, 0)));
         match.SubmitCommand(CommandEnvelope.MoveGroup(2, 0, 1,
-            new GroupMoveRequest(new[] { id }, new SimVector2(105, 105))));
-        match.SubmitCommand(CommandEnvelope.SetVelocity(2, 0, 2, id, new SimVector2(2, 0)));
+            new GroupMoveRequest(new[] { id }, new FixedVector2(105, 105))));
+        match.SubmitCommand(CommandEnvelope.SetVelocity(2, 0, 2, id, new FixedVector2(2, 0)));
         match.Step();
 
         return match;

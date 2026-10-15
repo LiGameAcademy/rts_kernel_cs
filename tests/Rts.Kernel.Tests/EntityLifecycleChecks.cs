@@ -8,10 +8,10 @@ internal static class EntityLifecycleChecks
         var grid = new PathingGrid(20, 20, 10, default, new byte[400]);
         var definitions = new[] { new MovementDefinition(1, 30, 1) };
         var match = new RtsMatch(MatchConfig.Default, 7, grid, movementDefinitions: definitions);
-        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new SimVector2(15, 15), 99));
-        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 1, new SimVector2(15, 15), 1));
-        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 2, new SimVector2(15, 15), 1));
-        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 3, new SimVector2(35, 15), 1));
+        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new FixedVector2(15, 15), 99));
+        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 1, new FixedVector2(15, 15), 1));
+        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 2, new FixedVector2(15, 15), 1));
+        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 3, new FixedVector2(35, 15), 1));
         match.Step();
         var spawned = match.DrainEvents();
         check(spawned.Select(item => item.Kind).SequenceEqual(new[]
@@ -25,8 +25,8 @@ internal static class EntityLifecycleChecks
         check(match.ReadEntities().Select(item => item.Id.Value).SequenceEqual(new[] { 1UL, 2UL }),
             "rejected spawns do not consume entity IDs");
         check(match.CaptureSnapshot().NextEntityId == 3, "next ID belongs to accepted spawns only");
-        match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 0, new EntityId(1), new SimVector2(15, 115), 30));
-        match.SubmitCommand(CommandEnvelope.Spawn(2, 0, 1, new SimVector2(65, 15), 1));
+        match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 0, new EntityId(1), new FixedVector2(15, 115), 30));
+        match.SubmitCommand(CommandEnvelope.Spawn(2, 0, 1, new FixedVector2(65, 15), 1));
         match.Step();
         match.DrainEvents();
         VerifyCaptureAndRestore(match, grid, definitions, check);
@@ -51,7 +51,7 @@ internal static class EntityLifecycleChecks
             "restored entity enumeration remains sorted by ID");
         reversed[0] = reversed[0] with { OwnerId = 9, PositionX = 999 };
         check(match.ComputeStateHash() == restored.ComputeStateHash(), "restored states do not alias caller snapshot entries");
-        var spawn = CommandEnvelope.Spawn(3, 0, 0, new SimVector2(95, 15), 1);
+        var spawn = CommandEnvelope.Spawn(3, 0, 0, new FixedVector2(95, 15), 1);
         match.SubmitCommand(spawn);
         restored.SubmitCommand(spawn);
         match.Step();

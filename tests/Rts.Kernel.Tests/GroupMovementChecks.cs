@@ -6,17 +6,17 @@ internal static class GroupMovementChecks
     internal static void Run(Action<bool, string> check)
     {
         var definitions = new[] { new MovementDefinition(1, 60, 4), new MovementDefinition(2, 30, 9) };
-        var grid = new PathingGrid(64, 64, 10, SimVector2.Zero, new byte[4096]);
+        var grid = new PathingGrid(64, 64, 10, FixedVector2.Zero, new byte[4096]);
         RtsMatch Create(int count = 6)
         {
             var match = new RtsMatch(MatchConfig.Default, 7, grid, movementDefinitions: definitions);
             for (var i = 0; i < count; i++)
-                match.SubmitCommand(CommandEnvelope.Spawn(1, 0, i, new SimVector2(35 + i % 20 * 20, 35 + i / 20 * 20),
+                match.SubmitCommand(CommandEnvelope.Spawn(1, 0, i, new FixedVector2(35 + i % 20 * 20, 35 + i / 20 * 20),
                     i % 3 == 0 ? 2UL : 1UL));
             match.Step(); match.DrainEvents(); return match;
         }
         GroupMoveRequest Request(RtsMatch match, FormationKind kind = FormationKind.Compact) =>
-            new(match.Entities.Select(entity => entity.Id).ToArray(), new SimVector2(325, 325), kind);
+            new(match.Entities.Select(entity => entity.Id).ToArray(), new FixedVector2(325, 325), kind);
         foreach (var kind in Enum.GetValues<FormationKind>())
         {
             var match = Create();
@@ -63,7 +63,7 @@ internal static class GroupMovementChecks
         bMatch.SubmitCommand(CommandEnvelope.MoveGroup(2, 0, 1, aRequest with { EntityIds = aRequest.EntityIds.Reverse().ToArray() }));
         aMatch.Step(); bMatch.Step();
         check(aMatch.ComputeStateHash() == bMatch.ComputeStateHash(), "selection order cannot change group result");
-        aMatch.SubmitCommand(CommandEnvelope.MoveGroup(3, 0, 2, aRequest with { Goal = new SimVector2(425, 425), Formation = FormationKind.Rectangle }, OrderMode.Append));
+        aMatch.SubmitCommand(CommandEnvelope.MoveGroup(3, 0, 2, aRequest with { Goal = new FixedVector2(425, 425), Formation = FormationKind.Rectangle }, OrderMode.Append));
         aMatch.Step();
         check(aMatch.ReadUnitOrders().All(queue => queue.Pending.Count == 1 && queue.Pending[0].Group!.GroupId == 2), "append preserves current group and persists second group slots");
         var queued = aMatch.CaptureSnapshot();
@@ -92,10 +92,10 @@ internal static class GroupMovementChecks
         check(SnapshotDiff.FindFirst(queued, queued with { NextGroupId = 100 })?.Path == "nextGroupId", "group counter field difference exposed");
         var blockFlags = new byte[4096];
         for (var y = 0; y < 64; y++) blockFlags[y * 64 + 30] = 2;
-        var disconnectedGrid = new PathingGrid(64, 64, 10, SimVector2.Zero, blockFlags);
+        var disconnectedGrid = new PathingGrid(64, 64, 10, FixedVector2.Zero, blockFlags);
         var blocked = new RtsMatch(MatchConfig.Default, 7, disconnectedGrid, movementDefinitions: definitions);
-        blocked.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new SimVector2(35, 35), 1)); blocked.Step(); blocked.DrainEvents();
-        blocked.SubmitCommand(CommandEnvelope.MoveGroup(2, 0, 1, new(new[] { new EntityId(1) }, new SimVector2(505, 505)))); blocked.Step();
+        blocked.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new FixedVector2(35, 35), 1)); blocked.Step(); blocked.DrainEvents();
+        blocked.SubmitCommand(CommandEnvelope.MoveGroup(2, 0, 1, new(new[] { new EntityId(1) }, new FixedVector2(505, 505)))); blocked.Step();
         check(blocked.DrainEvents().Any(e => e.Detail == "group_slot_unavailable") && !blocked.IsMoving(new EntityId(1)), "disconnected goal reports failure without teleporting or unbounded search");
         var large = Create(500);
         var watch = System.Diagnostics.Stopwatch.StartNew();
@@ -129,7 +129,7 @@ internal static class GroupMovementChecks
                 var radius = large.ReadMovementDefinition(entities[a].Id)!.Radius + large.ReadMovementDefinition(entities[b].Id)!.Radius;
                 var dx = entities[a].Position.X - entities[b].Position.X;
                 var dy = entities[a].Position.Y - entities[b].Position.Y;
-                separatedDuringMotion &= dx * dx + dy * dy >= radius * radius - 1e-8;
+                separatedDuringMotion &= dx * dx + dy * dy >= radius * radius;
             }
             if (i == 90)
             {

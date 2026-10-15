@@ -8,10 +8,10 @@ internal static class OrderSnapshotChecks
         var grid = new PathingGrid(8, 4, 10, default, new byte[32]);
         var id = new EntityId(1);
         var match = new RtsMatch(MatchConfig.Default, 7, grid);
-        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new SimVector2(5, 5)));
+        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new FixedVector2(5, 5)));
         match.Step();
-        match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 1, id, new SimVector2(65, 5), 30));
-        match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 2, id, new SimVector2(25, 5), 30, mode: OrderMode.Append));
+        match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 1, id, new FixedVector2(65, 5), 30));
+        match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 2, id, new FixedVector2(25, 5), 30, mode: OrderMode.Append));
         match.Step();
         var saved = match.CaptureSnapshot();
         var queue = saved.Orders!.Single();
@@ -40,19 +40,19 @@ internal static class OrderSnapshotChecks
         Invalid(saved with { Orders = new[] { queue with { Pending = Enumerable.Repeat(queue.Pending[0], 65).ToArray() } } },
             "oversized restored queue rejected");
         Invalid(saved with { Orders = new[] { queue with { Current = queue.Current! with
-            { Move = queue.Current.Move! with { Goal = new SimVector2(25, 5) } } } } }, "active request and path must agree");
+            { Move = queue.Current.Move! with { Goal = new FixedVector2(25, 5) } } } } }, "active request and path must agree");
         MatchSnapshot WithPending(UnitOrderIntent intent) =>
             saved with { Orders = new[] { queue with { Pending = new[] { intent } } } };
         var pendingIntent = queue.Pending[0];
-        Invalid(WithPending(pendingIntent with { Move = pendingIntent.Move! with { Goal = new SimVector2(-5, 5) } }),
+        Invalid(WithPending(pendingIntent with { Move = pendingIntent.Move! with { Goal = new FixedVector2(-5, 5) } }),
             "restored queued goal must be inside map");
-        Invalid(WithPending(pendingIntent with { Move = pendingIntent.Move! with { Speed = double.NaN } }),
+        Invalid(WithPending(pendingIntent with { Move = pendingIntent.Move! with { Speed = SimScalar.MaxValue } }),
             "restored queued speed must be finite");
         Invalid(WithPending(pendingIntent with { Move = pendingIntent.Move! with { Motion = new MotionParameters() } }),
             "pending slope intent requires height identity even before it has a path");
         var changedSource = saved with { Orders = new[] { queue with { Current = queue.Current! with { Source = OrderSource.PlayerAi } } } };
         check(SnapshotDiff.FindFirst(saved, changedSource)?.Path == "orders[0].current.source", "current source difference is located");
-        var changedGoal = WithPending(pendingIntent with { Move = pendingIntent.Move! with { Goal = new SimVector2(45, 5) } });
+        var changedGoal = WithPending(pendingIntent with { Move = pendingIntent.Move! with { Goal = new FixedVector2(45, 5) } });
         check(SnapshotDiff.FindFirst(saved, changedGoal)?.Path == "orders[0].pending[0].move", "pending goal difference is located");
         var changedOrder = saved with { Orders = new[] { queue with { Pending = Array.Empty<UnitOrderIntent>() } } };
         check(SnapshotDiff.FindFirst(saved, changedOrder)?.Path == "orders[0].pending.count", "pending length difference is located");
@@ -65,7 +65,7 @@ internal static class OrderSnapshotChecks
         }
         catch (NotSupportedException) { check(true, "pending view is read-only"); }
 
-        var pendingCommand = CommandEnvelope.MoveTo(5, 0, 3, id, new SimVector2(45, 5), 30, mode: OrderMode.Append);
+        var pendingCommand = CommandEnvelope.MoveTo(5, 0, 3, id, new FixedVector2(45, 5), 30, mode: OrderMode.Append);
         match.SubmitCommand(pendingCommand);
         var waiting = match.CaptureSnapshot();
         var next = RtsMatch.Restore(SnapshotJson.Deserialize(SnapshotJson.Serialize(waiting)), grid);

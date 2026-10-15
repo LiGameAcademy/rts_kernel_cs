@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)][string]$GodotConsole,
     [string]$AssetsDirectory = "",
-    [string]$ReportPath = ""
+    [string]$ReportPath = "",
+    [switch]$UseImportedProject
 )
 $ErrorActionPreference = 'Stop'
 $godot = (Resolve-Path -LiteralPath $GodotConsole).Path
@@ -46,15 +47,22 @@ Invoke-Captured $dotnet @('build', $cli, '-c', 'Debug', '-p:NuGetAudit=false') (
 Invoke-Captured $dotnet @('restore', $project, '--source', $packages, '--ignore-failed-sources', '-p:NuGetAudit=false') (Join-Path $logs 'godot-restore.log') | Out-Null
 Invoke-Captured $dotnet @('build', $project, '--no-restore', '-c', 'Debug', '-p:NuGetAudit=false') (Join-Path $logs 'godot-build.log') | Out-Null
 $errors = '(?m)^ERROR:|SCRIPT ERROR|Parse Error|Failed to load|Failed loading|Unhandled exception|Could not instantiate'
-$import = Invoke-Captured $godot @('--headless', '--path', $projectDirectory, '--editor', '--import', '--quit') (Join-Path $logs 'import.log')
-if ($import -match $errors) { throw "Godot import reported errors: $logs" }
+if ($UseImportedProject) {
+    if (-not (Test-Path -LiteralPath (Join-Path $projectDirectory '.godot'))) {
+        throw 'An existing imported probe project is required for explicit runtime-only verification.'
+    }
+}
+else {
+    $import = Invoke-Captured $godot @('--headless', '--path', $projectDirectory, '--editor', '--import') (Join-Path $logs 'import.log')
+    if ($import -match $errors) { throw "Godot import reported errors: $logs" }
+}
 $cliAssembly = Join-Path $PSScriptRoot 'bin/Debug/net10.0/NumericPrototype.dll'
 $cliCore = Join-Path $PSScriptRoot 'bin/Debug/net10.0/NumericPrototype.Core.dll'
 $coreHash = (Get-FileHash -LiteralPath $cliCore -Algorithm SHA256).Hash.ToLowerInvariant()
 $loadContext = [Runtime.Loader.AssemblyLoadContext]::new(("numeric-parity-" + [Guid]::NewGuid().ToString('N')), $true)
 try { $coreModule = $loadContext.LoadFromAssemblyPath($cliCore).ManifestModule.ModuleVersionId.ToString('D') }
 finally { $loadContext.Unload() }
-$cases = [ordered]@{ checks = [string[]]@() }
+$cases = [ordered]@{ checks = [string[]]@(); production_fixed = [string[]]@('--kernel-checks') }
 if ($AssetsDirectory) {
     $cases['survey'] = [string[]]@('--survey', $AssetsDirectory)
     $cases['movement'] = [string[]]@('--movement-assets', $AssetsDirectory)
@@ -91,6 +99,7 @@ $report = [pscustomobject]@{
     coreTarget = 'net8.0'
     cliTarget = 'net10.0'
     godotAssemblyConfiguration = 'Debug'
+    importMode = $(if ($UseImportedProject) { 'existing-cache-runtime-only' } else { 'editor-import-verified' })
     logsDirectory = $logs
     results = $results
 }

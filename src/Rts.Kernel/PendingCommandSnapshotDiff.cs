@@ -98,7 +98,7 @@ internal static class PendingCommandSnapshotDiff
     private static string Format<T>(T value) => value switch
     {
         null => "null",
-        double number => number.ToString("R", CultureInfo.InvariantCulture),
+        SimScalar number => number.ToString(),
         IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
         _ => value.ToString() ?? string.Empty,
     };

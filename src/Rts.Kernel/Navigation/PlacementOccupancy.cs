@@ -1,10 +1,9 @@
 namespace Rts.Kernel.Navigation;
 
 /// <summary>Derived per-placement body index. Exact overlap geometry remains authoritative.</summary>
-internal sealed class PlacementOccupancy(NavigationState navigation, double maximumRadius)
+internal sealed class PlacementOccupancy(NavigationState navigation, SimScalar maximumRadius)
 {
-    private readonly int _bucketCells = (int)Math.Min(int.MaxValue,
-        Math.Max(1, Math.Ceiling(maximumRadius * 2 / navigation.Grid.CellSize)));
+    private readonly int _bucketCells = FixedGridMath.BucketCells(maximumRadius, 2, navigation.Grid.CellSize);
     private readonly Dictionary<(int X, int Y), List<PlacementBody>> _buckets = [];
     private readonly List<PlacementBody> _outside = [];
 
@@ -16,7 +15,7 @@ internal sealed class PlacementOccupancy(NavigationState navigation, double maxi
         bucket.Add(body);
     }
 
-    internal bool Overlaps(SimVector2 position, double radius)
+    internal bool Overlaps(FixedVector2 position, SimScalar radius)
     {
         if (_outside.Any(body => GroupPlacementPlanner.Overlaps(position, radius, body))) return true;
         navigation.TryWorldToCell(position, out var cell); // Placement candidates are inside the grid.

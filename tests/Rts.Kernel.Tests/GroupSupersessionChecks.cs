@@ -13,10 +13,10 @@ internal static class GroupSupersessionChecks
             var match = new RtsMatch(MatchConfig.Default, 7, grid, movementDefinitions: definitions);
             for (var i = 0; i < 100; i++)
                 match.SubmitCommand(CommandEnvelope.Spawn(1, 0, i,
-                    new SimVector2(35 + i % 13 * 20, 35 + i / 13 * 20), 1));
+                    new FixedVector2(35 + i % 13 * 20, 35 + i / 13 * 20), 1));
             match.Step();
             match.DrainEvents();
-            var request = new GroupMoveRequest(match.Entities.Select(entity => entity.Id).ToArray(), new SimVector2(455, 455));
+            var request = new GroupMoveRequest(match.Entities.Select(entity => entity.Id).ToArray(), new FixedVector2(455, 455));
             match.SubmitCommand(CommandEnvelope.MoveGroup(2, 0, 100, request, source: source));
             match.Step();
             check(match.ReadGroupPlans().Count == 1, "supersession fixture keeps planning in progress");
@@ -37,7 +37,7 @@ internal static class GroupSupersessionChecks
         }
 
         var replaced = Create(OrderSource.UnitAi);
-        var replacementGoal = new SimVector2(35, 525);
+        var replacementGoal = new FixedVector2(35, 525);
         replaced.SubmitCommand(CommandEnvelope.MoveTo(3, 0, 101, id, replacementGoal, 30, source: OrderSource.UnitAi));
         replaced.Step();
         check(replaced.ReadCurrentOrder(id)?.Move?.Goal == replacementGoal

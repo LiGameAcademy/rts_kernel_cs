@@ -6,12 +6,12 @@ internal static class CommandContractChecks
     internal static void Run(Action<bool, string> check)
     {
         var id = new EntityId(5);
-        var spawn = CommandEnvelope.Spawn(5, 0, 0, SimVector2.Zero);
+        var spawn = CommandEnvelope.Spawn(5, 0, 0, FixedVector2.Zero);
         var invalid = new[]
         {
             spawn with { Kind = (CommandKind)999 },
             CommandEnvelope.Stop(5, 0, 1, EntityId.None),
-            CommandEnvelope.SetVelocity(5, 0, 2, EntityId.None, SimVector2.Zero),
+            CommandEnvelope.SetVelocity(5, 0, 2, EntityId.None, FixedVector2.Zero),
             spawn with { EntityId = id },
         };
         foreach (var command in invalid)
@@ -43,12 +43,12 @@ internal static class CommandContractChecks
         var legal = new[]
         {
             spawn,
-            CommandEnvelope.SetVelocity(5, 0, 1, id, new SimVector2(1, 2)),
+            CommandEnvelope.SetVelocity(5, 0, 1, id, new FixedVector2(1, 2)),
             CommandEnvelope.Stop(5, 0, 2, id),
             CommandEnvelope.SetObstacle(5, 0, 3, 1, new GridArea(0, 0, 1, 1)),
             CommandEnvelope.RemoveObstacle(5, 0, 4, 1),
-            CommandEnvelope.MoveTo(5, 0, 5, id, new SimVector2(5, 5), 10),
-            CommandEnvelope.MoveGroup(5, 0, 6, new GroupMoveRequest(new[] { id }, new SimVector2(5, 5))),
+            CommandEnvelope.MoveTo(5, 0, 5, id, new FixedVector2(5, 5), 10),
+            CommandEnvelope.MoveGroup(5, 0, 6, new GroupMoveRequest(new[] { id }, new FixedVector2(5, 5))),
         };
         foreach (var command in legal)
         {

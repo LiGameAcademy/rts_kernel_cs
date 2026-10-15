@@ -22,7 +22,7 @@ An engine-independent C# RTS simulation kernel extracted from the [Godot Warcraf
 
 The current implementation uses ordinary C# types and modular composition, focusing on correctness, state ownership and readability without an ECS migration. ECS is not permanently excluded: a mature third-party implementation may be evaluated later against real maintenance needs, project performance measurements and dependency costs. A general-purpose framework is not built in advance. Hosts own input, assets, rendering and networking; the kernel has no Godot reference or scene-tree dependency.
 
-See [framework](docs/FRAMEWORK.md), [navigation](docs/NAVIGATION.md) and [movement](docs/MOVEMENT.md) for contracts (Chinese). Snapshot v9 stores facing, motion progress, order queues and group-planning progress, and validates supplied static grid and height field identities. Versions 1–8 are rejected; cross-version migration remains unsupported.
+See [framework](docs/FRAMEWORK.md), [navigation](docs/NAVIGATION.md) and [movement](docs/MOVEMENT.md) for contracts (Chinese). Snapshot v11 stores facing, motion progress, order queues and group-planning progress, and validates supplied static grid and height field identities. Versions 1–10 are rejected; cross-version migration remains unsupported.
 
 The match owns its random stream. Hosts cannot consume it through a public mutable object. Snapshot `RngState` can be used for diagnostics or a detached stream; the early mutable `RtsMatch.Rng` property has been removed.
 
@@ -71,7 +71,7 @@ Relevant path history was extracted from source commit `05cf2b0`, preserving aut
 MIT, Copyright (c) 2026 李维民. See [LICENSE](LICENSE). No NuGet package or formal release is published at this stage.
 
 
-## Fixed-point migration foundation
+## Fixed-point simulation
 
 `Rts.Kernel.Numerics` provides signed32.32 `SimScalar`, `FixedVector2` and separately
 scaled128-bit `SquaredDistance`. Decimal inputs use `SimScalar.Parse`; arithmetic
@@ -82,9 +82,11 @@ floor roots. The chosen radian period is exactly twice the quantized half-period
 
 Pinned MIT FixPointCS sources, license and source hashes live under
 `third_party/FixPointCS`; the kernel has no dependency on experiments or Godot.
-The current match/command/navigation state still uses the prior spatial contract
-and v10 snapshots (integer Octile path scoring). Adding these types is one migration step, not a claim that the
-production simulation has already adopted fixed point or supports network lockstep.
+Match state, commands, movement, terrain and group planning now use these types.
+Squared matching costs and signed dual potentials use Int128. Exact swept-circle
+predicates compare wider products without floating conversion or BigInteger in the
+hot path. The snapshot format is v11; older formats require the older kernel.
+This is a numeric migration, not a claim of network-lockstep or full M2 acceptance.
 
 ## Integer path weights
 
@@ -93,6 +95,34 @@ A* scores, heuristic and queue ordering use Int64 units: an orthogonal step cost
 metric. `PathResult.Cost` is a nullable `PathCost`; failed searches have no cost.
 These are cell weights, not world distance. Floating conversion is presentation only.
 Equal scores use cell index; this can select a different equally short path from
-the old floating sum. Snapshot v10 rejects v9 to identify this simulation change;
-spatial state itself has not yet migrated to32.32. Future fixed state snapshots
-will receive their own version. Existing saved v9 matches require the old kernel.
+the old floating sum. The intermediate v10 identified integer path scoring;
+v11 now stores fixed spatial state and128-bit matching checkpoints. Both older
+snapshot formats are rejected; tags remain available for their matching kernels.
+
+## Numeric boundaries and verification
+
+Admitted coordinates/elevations are within +/-1,048,576 world units; movement
+speed/radius are positive and at most65,536. Grid extents and command payloads
+are checked before execution. These bounds also keep500-member squared-distance
+matching well below signed128-bit limits; the prototype's128-radius limit is not
+used here. Heading inputs normalize to[-Pi, Pi); stored headings are canonical.
+
+Time remains integer ticks. Movement quantizes speed times the remaining frame
+fraction divided by tick rate, rather than quantizing a reciprocal frame duration
+first. Raw JSON values require an integer-preserving consumer; they are not decimal
+world units. Use `SimScalar.Parse` for decimal authoring input and explicit
+`ToPresentationDouble()` for display. Ideal trig geometry has a bounded approximation
+error; final placement/body separation uses exact raw integer predicates.
+
+`Test.ps1` includes independent arbitrary-precision geometry and exhaustive small
+matching/path references. The experimental harness accepts `--kernel-checks` to
+invoke actual production-kernel group/motion/snapshot scenarios in both CLI and
+Godot. Synthetic parity is not actual-map, crowd quality or performance acceptance.
+The current production group initialization still needs the separately measured
+fixed-work scheduling port before large-crowd performance can pass.
+
+Waypoint advancement computes from the original segment and rounds each coordinate
+once. Snapshot segment validation uses a two-raw-unit bound, not the old floating
+relative epsilon. A nonzero order that cannot produce a raw displacement in a full
+frame and cannot turn reports `movement_below_resolution`; queues follow the usual
+failure policy. Intentional zero-scale turning/holding remains valid.

@@ -8,6 +8,6 @@ public sealed partial class RtsMatch
 
     private void ValidateGroundBodies() => _crowd.ValidateGroundBodies();
 
-    private void AdvanceCrowd(double seconds) =>
-        _crowd.Advance(Frame, Config.TickRate, seconds, _navigation!, ref _pathsDirty);
+    private void AdvanceCrowd(int tickRate) =>
+        _crowd.Advance(Frame, tickRate, _navigation!, ref _pathsDirty);
 }

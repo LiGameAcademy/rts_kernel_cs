@@ -20,7 +20,7 @@ public sealed partial class RtsMatch
             if (MovePathPlanner.TryPlan(_navigation, entity.Position, intent.Move!, out var move, intent.Group is not null))
             {
                 _orders.ActivateWaiting(id, move!);
-                _entities.Update(entity with { Velocity = SimVector2.Zero });
+                _entities.Update(entity with { Velocity = FixedVector2.Zero });
             }
             else
             {

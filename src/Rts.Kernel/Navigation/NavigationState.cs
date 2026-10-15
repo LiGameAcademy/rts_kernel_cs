@@ -24,7 +24,7 @@ internal sealed class NavigationState
     {
         _grid = grid;
         Terrain = terrain;
-        var end = new SimVector2(grid.Origin.X + grid.Width * grid.CellSize,
+        var end = new FixedVector2(grid.Origin.X + grid.Width * grid.CellSize,
             grid.Origin.Y + grid.Height * grid.CellSize);
         if (terrain is not null && (!terrain.TrySample(grid.Origin, out _) || !terrain.TrySample(end, out _)))
             throw new ArgumentException("Height field must cover the entire navigation grid.");
@@ -38,10 +38,10 @@ internal sealed class NavigationState
     private bool IsWalkable(GridCell cell) => _grid.IsWalkable(cell)
         && _occupancy[cell.Y * _grid.Width + cell.X] == 0;
 
-    internal bool TryWorldToCell(SimVector2 position, out GridCell cell) => _grid.TryWorldToCell(position, out cell);
-    internal SimVector2 CellCenter(GridCell cell) => new(
-        _grid.Origin.X + (cell.X + 0.5) * _grid.CellSize,
-        _grid.Origin.Y + (cell.Y + 0.5) * _grid.CellSize);
+    internal bool TryWorldToCell(FixedVector2 position, out GridCell cell) => _grid.TryWorldToCell(position, out cell);
+    internal FixedVector2 CellCenter(GridCell cell) => new(
+        _grid.Origin.X + ((SimScalar)cell.X + SimScalar.FromRatio(1, 2)) * _grid.CellSize,
+        _grid.Origin.Y + ((SimScalar)cell.Y + SimScalar.FromRatio(1, 2)) * _grid.CellSize);
     internal bool CanOccupy(GridCell cell, int clearance)
     {
         if (clearance < 0 || cell.X < 0 || cell.Y < 0 || cell.X >= _grid.Width || cell.Y >= _grid.Height
@@ -57,24 +57,24 @@ internal sealed class NavigationState
             cache[index] = GridPathfinder.HasClearance(_grid, cell, clearance, IsWalkable) ? (byte)1 : (byte)2;
         return cache[index] == 1;
     }
-    internal bool CanStandAt(SimVector2 position, double radius)
+    internal bool CanStandAt(FixedVector2 position, SimScalar radius)
     {
         var endX = _grid.Origin.X + _grid.Width * _grid.CellSize;
         var endY = _grid.Origin.Y + _grid.Height * _grid.CellSize;
         if (!TryWorldToCell(position, out _) || position.X - radius < _grid.Origin.X
             || position.Y - radius < _grid.Origin.Y || position.X + radius > endX || position.Y + radius > endY)
             return false;
-        var left = Math.Max(0, (int)Math.Floor((position.X - radius - _grid.Origin.X) / _grid.CellSize));
-        var top = Math.Max(0, (int)Math.Floor((position.Y - radius - _grid.Origin.Y) / _grid.CellSize));
-        var right = Math.Min(_grid.Width - 1, (int)Math.Floor((position.X + radius - _grid.Origin.X) / _grid.CellSize));
-        var bottom = Math.Min(_grid.Height - 1, (int)Math.Floor((position.Y + radius - _grid.Origin.Y) / _grid.CellSize));
+        var left = (int)Math.Max(0, FixedGridMath.FloorIndex(position.X - radius, _grid.Origin.X, _grid.CellSize));
+        var top = (int)Math.Max(0, FixedGridMath.FloorIndex(position.Y - radius, _grid.Origin.Y, _grid.CellSize));
+        var right = (int)Math.Min(_grid.Width - 1, FixedGridMath.FloorIndex(position.X + radius, _grid.Origin.X, _grid.CellSize));
+        var bottom = (int)Math.Min(_grid.Height - 1, FixedGridMath.FloorIndex(position.Y + radius, _grid.Origin.Y, _grid.CellSize));
         for (var y = top; y <= bottom; y++)
         for (var x = left; x <= right; x++)
         {
             if (IsWalkable(new GridCell(x, y))) continue;
-            var nearest = new SimVector2(Math.Clamp(position.X, _grid.Origin.X + x * _grid.CellSize,
-                _grid.Origin.X + (x + 1.0) * _grid.CellSize), Math.Clamp(position.Y, _grid.Origin.Y + y * _grid.CellSize,
-                _grid.Origin.Y + (y + 1.0) * _grid.CellSize));
+            var nearest = new FixedVector2(SimMath.Clamp(position.X, _grid.Origin.X + x * _grid.CellSize,
+                _grid.Origin.X + (x + 1) * _grid.CellSize), SimMath.Clamp(position.Y, _grid.Origin.Y + y * _grid.CellSize,
+                _grid.Origin.Y + (y + 1) * _grid.CellSize));
             if (CrowdGeometry.Overlap(position, position, radius, nearest, nearest, 0)) return false;
         }
         return true;

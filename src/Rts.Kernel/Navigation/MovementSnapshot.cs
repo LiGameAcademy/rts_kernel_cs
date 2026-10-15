@@ -16,7 +16,7 @@ internal static class MovementSnapshot
                 || (snapshot.Entities.Single(entity => entity.Id == move.EntityId).MovementDefinitionId == 0
                     && (move.WaitFrames != 0 || move.RetryAfterFrame != 0))
                 || move.NextWaypoint < 0 || move.NextWaypoint >= move.Waypoints.Count
-                || move.Waypoints.Any(point => !double.IsFinite(point.X) || !double.IsFinite(point.Y))
+                || move.Waypoints.Any(point => !SimulationDomain.Contains(point.X) || !SimulationDomain.Contains(point.Y))
                 || move.Waypoints[^1] != move.Request.Goal)
                 throw new InvalidDataException("Invalid move order state or noncanonical entity order.");
             previous = move.EntityId;

@@ -11,10 +11,10 @@ public sealed class PathingGrid
     public string ContentHash { get; }
     public int Width { get; }
     public int Height { get; }
-    public double CellSize { get; }
-    public SimVector2 Origin { get; }
+    public SimScalar CellSize { get; }
+    public FixedVector2 Origin { get; }
 
-    public PathingGrid(int width, int height, double cellSize, SimVector2 origin,
+    public PathingGrid(int width, int height, SimScalar cellSize, FixedVector2 origin,
         ReadOnlySpan<byte> flags, ReadOnlySpan<byte> obstacleFlags = default)
     {
         TerrainValidation.Grid(width, height, cellSize, origin);
@@ -38,9 +38,9 @@ public sealed class PathingGrid
         {
             writer.Write(Width);
             writer.Write(Height);
-            writer.Write(CellSize);
-            writer.Write(Origin.X);
-            writer.Write(Origin.Y);
+            writer.Write(CellSize.Raw);
+            writer.Write(Origin.X.Raw);
+            writer.Write(Origin.Y.Raw);
             writer.Write(_flags);
         }
         return Convert.ToHexString(SHA256.HashData(data.ToArray())).ToLowerInvariant();
@@ -48,12 +48,13 @@ public sealed class PathingGrid
 
     public bool Contains(GridCell cell) => cell.X >= 0 && cell.Y >= 0 && cell.X < Width && cell.Y < Height;
 
-    public bool TryWorldToCell(SimVector2 position, out GridCell cell)
+    public bool TryWorldToCell(FixedVector2 position, out GridCell cell)
     {
         cell = default;
-        var x = Math.Floor((position.X - Origin.X) / CellSize);
-        var y = Math.Floor((position.Y - Origin.Y) / CellSize);
-        if (!double.IsFinite(x) || !double.IsFinite(y) || x < 0 || y < 0 || x >= Width || y >= Height)
+        if (!SimulationDomain.Contains(position)) return false;
+        var x = FixedGridMath.FloorIndex(position.X, Origin.X, CellSize);
+        var y = FixedGridMath.FloorIndex(position.Y, Origin.Y, CellSize);
+        if (x < 0 || y < 0 || x >= Width || y >= Height)
             return false;
         cell = new GridCell((int)x, (int)y);
         return true;
@@ -67,20 +68,20 @@ public sealed class PathingGrid
 
 public sealed class TerrainHeights
 {
-    private readonly double[] _heights;
+    private readonly SimScalar[] _heights;
     public string ContentHash { get; }
     public int Width { get; }
     public int Height { get; }
-    public double TileSize { get; }
-    public SimVector2 Origin { get; }
+    public SimScalar TileSize { get; }
+    public FixedVector2 Origin { get; }
 
-    public TerrainHeights(int width, int height, double tileSize, SimVector2 origin, ReadOnlySpan<double> heights)
+    public TerrainHeights(int width, int height, SimScalar tileSize, FixedVector2 origin, ReadOnlySpan<SimScalar> heights)
     {
-        TerrainValidation.Grid(width, height, tileSize, origin);
+        TerrainValidation.Grid(width - 1, height - 1, tileSize, origin);
         if (width < 2 || height < 2 || heights.Length != checked(width * height))
             throw new ArgumentException("Height field requires at least 2x2 vertices and exact buffer length.");
         foreach (var value in heights)
-            if (!double.IsFinite(value)) throw new ArgumentException("Height values must be finite.");
+            if (!SimulationDomain.Contains(value)) throw new ArgumentException("Height values must lie inside the admitted domain.");
         Width = width;
         Height = height;
         TileSize = tileSize;
@@ -91,24 +92,27 @@ public sealed class TerrainHeights
         {
             writer.Write(Width);
             writer.Write(Height);
-            writer.Write(TileSize);
-            writer.Write(Origin.X);
-            writer.Write(Origin.Y);
-            foreach (var elevation in _heights) writer.Write(elevation);
+            writer.Write(TileSize.Raw);
+            writer.Write(Origin.X.Raw);
+            writer.Write(Origin.Y.Raw);
+            foreach (var elevation in _heights) writer.Write(elevation.Raw);
         }
         ContentHash = Convert.ToHexString(SHA256.HashData(data.ToArray())).ToLowerInvariant();
     }
 
-    public bool TrySample(SimVector2 position, out double height)
+    public bool TrySample(FixedVector2 position, out SimScalar height)
     {
         height = 0;
+        if (!SimulationDomain.Contains(position) || position.X < Origin.X || position.Y < Origin.Y
+            || (Int128)position.X.Raw - Origin.X.Raw > (Int128)(Width - 1) * TileSize.Raw
+            || (Int128)position.Y.Raw - Origin.Y.Raw > (Int128)(Height - 1) * TileSize.Raw) return false;
         var x = (position.X - Origin.X) / TileSize;
         var y = (position.Y - Origin.Y) / TileSize;
-        if (!double.IsFinite(x) || !double.IsFinite(y) || x < 0 || y < 0 || x > Width - 1 || y > Height - 1)
+        if (x < 0 || y < 0 || x > Width - 1 || y > Height - 1)
             return false;
         // The last vertex belongs to the final quad, never the next row.
-        var ix = Math.Min((int)Math.Floor(x), Width - 2);
-        var iy = Math.Min((int)Math.Floor(y), Height - 2);
+        var ix = Math.Min(x.FloorToInt(), Width - 2);
+        var iy = Math.Min(y.FloorToInt(), Height - 2);
         var fx = x - ix;
         var fy = y - iy;
         var index = iy * Width + ix;
@@ -122,11 +126,16 @@ public sealed class TerrainHeights
 
 internal static class TerrainValidation
 {
-    internal static void Grid(int width, int height, double spacing, SimVector2 origin)
+    internal static void Grid(int width, int height, SimScalar spacing, FixedVector2 origin)
     {
-        if (width <= 0 || height <= 0 || !double.IsFinite(spacing) || spacing <= 0
-            || !double.IsFinite(origin.X) || !double.IsFinite(origin.Y))
+        if (width <= 0 || height <= 0 || !SimulationDomain.Contains(spacing) || spacing <= 0
+            || !SimulationDomain.Contains(origin.X) || !SimulationDomain.Contains(origin.Y))
             throw new ArgumentException("Invalid grid dimensions, spacing or origin.");
+        var endX = (Int128)origin.X.Raw + (Int128)width * spacing.Raw;
+        var endY = (Int128)origin.Y.Raw + (Int128)height * spacing.Raw;
+        var limit = SimulationDomain.CoordinateLimit.Raw;
+        if (endX > limit || endY > limit)
+            throw new ArgumentException("Grid extent exceeds the admitted world domain.");
         _ = checked(width * height);
     }
 }

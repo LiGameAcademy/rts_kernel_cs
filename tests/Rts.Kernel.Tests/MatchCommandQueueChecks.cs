@@ -7,11 +7,11 @@ internal static class MatchCommandQueueChecks
         var match = new RtsMatch(MatchConfig.Default, 7);
         var commands = new[]
         {
-            CommandEnvelope.Spawn(2, 2, 0, new SimVector2(40, 0)),
-            CommandEnvelope.Spawn(1, 1, 5, new SimVector2(30, 0)),
-            CommandEnvelope.Spawn(1, 0, 9, new SimVector2(20, 0)),
-            CommandEnvelope.Spawn(1, 0, 1, new SimVector2(10, 0)),
-            CommandEnvelope.Spawn(1, 0, 1, new SimVector2(11, 0)),
+            CommandEnvelope.Spawn(2, 2, 0, new FixedVector2(40, 0)),
+            CommandEnvelope.Spawn(1, 1, 5, new FixedVector2(30, 0)),
+            CommandEnvelope.Spawn(1, 0, 9, new FixedVector2(20, 0)),
+            CommandEnvelope.Spawn(1, 0, 1, new FixedVector2(10, 0)),
+            CommandEnvelope.Spawn(1, 0, 1, new FixedVector2(11, 0)),
         };
         foreach (var command in commands)
             check(match.SubmitCommand(command).Accepted, "sorting fixture accepted");
@@ -29,7 +29,7 @@ internal static class MatchCommandQueueChecks
             "snapshot orders by frame, player, sequence, then arrival");
         check(snapshot.NextArrivalOrder == 5, "only accepted commands consume arrival order");
         var restored = RtsMatch.Restore(SnapshotJson.Deserialize(SnapshotJson.Serialize(snapshot)));
-        var later = CommandEnvelope.Spawn(2, 2, 0, new SimVector2(41, 0));
+        var later = CommandEnvelope.Spawn(2, 2, 0, new FixedVector2(41, 0));
         check(match.SubmitCommand(later).Accepted && restored.SubmitCommand(later).Accepted,
             "restored queue accepts new commands");
         check(restored.CaptureSnapshot().PendingCommands.Single(item => item.Command == later).ArrivalOrder == 5,
@@ -45,13 +45,13 @@ internal static class MatchCommandQueueChecks
             check(match.ComputeStateHash() == restored.ComputeStateHash(), "sorted queue restores per-frame state");
             if (frame == 1)
             {
-                check(match.ReadEntities().Select(entity => entity.Position.X).SequenceEqual(new double[] { 10, 11, 20, 30 }),
+                check(match.ReadEntities().Select(entity => entity.Position.X).SequenceEqual(new SimScalar[] { 10, 11, 20, 30 }),
                     "execution sorts player and sequence with stable arrival ties");
                 check(match.CaptureSnapshot().PendingCommands.Count == 2, "future commands remain pending");
             }
             else if (frame == 2)
             {
-                check(match.ReadEntities().Select(entity => entity.Position.X).SequenceEqual(new double[] { 10, 11, 20, 30, 40, 41 }),
+                check(match.ReadEntities().Select(entity => entity.Position.X).SequenceEqual(new SimScalar[] { 10, 11, 20, 30, 40, 41 }),
                     "new submission follows restored same-frame ties");
                 check(match.CaptureSnapshot().PendingCommands.Count == 0, "executed commands leave the queue");
             }

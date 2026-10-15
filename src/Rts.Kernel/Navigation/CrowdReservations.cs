@@ -1,9 +1,9 @@
 namespace Rts.Kernel.Navigation;
 
-internal sealed record CrowdBody(EntityId Id, double Radius, IReadOnlyList<SimVector2> Trace);
+internal sealed record CrowdBody(EntityId Id, SimScalar Radius, IReadOnlyList<FixedVector2> Trace);
 
 /// <summary>Derived, frame-local swept-space reservations. Unprocessed bodies hold their current positions.</summary>
-internal sealed class CrowdReservations(double bucketSize)
+internal sealed class CrowdReservations(SimScalar bucketSize)
 {
     private readonly Dictionary<EntityId, CrowdBody> _bodies = [];
     private readonly Dictionary<(int X, int Y), HashSet<EntityId>> _buckets = [];
@@ -25,7 +25,7 @@ internal sealed class CrowdReservations(double bucketSize)
         }
     }
 
-    internal bool Safe(EntityId id, double radius, IReadOnlyList<SimVector2> trace)
+    internal bool Safe(EntityId id, SimScalar radius, IReadOnlyList<FixedVector2> trace)
     {
         Query(Bounds(trace, radius));
         foreach (var other in _query)
@@ -41,10 +41,10 @@ internal sealed class CrowdReservations(double bucketSize)
     }
 
     // Local A* performs thousands of point/edge queries; avoid allocating a two-point array for each.
-    internal bool Safe(EntityId id, double radius, SimVector2 from, SimVector2 to)
+    internal bool Safe(EntityId id, SimScalar radius, FixedVector2 from, FixedVector2 to)
     {
-        Query(Bounds(Math.Min(from.X, to.X), Math.Min(from.Y, to.Y),
-            Math.Max(from.X, to.X), Math.Max(from.Y, to.Y), radius));
+        Query(Bounds(SimMath.Min(from.X, to.X), SimMath.Min(from.Y, to.Y),
+            SimMath.Max(from.X, to.X), SimMath.Max(from.Y, to.Y), radius));
         foreach (var other in _query)
         {
             if (other == id) continue;
@@ -67,26 +67,26 @@ internal sealed class CrowdReservations(double bucketSize)
             if (_buckets.TryGetValue((x, y), out var found)) _query.UnionWith(found);
     }
 
-    private (int, int, int, int)? Bounds(IReadOnlyList<SimVector2> trace, double radius)
+    private (int, int, int, int)? Bounds(IReadOnlyList<FixedVector2> trace, SimScalar radius)
     {
         var minX = trace[0].X; var maxX = minX;
         var minY = trace[0].Y; var maxY = minY;
         for (var i = 1; i < trace.Count; i++)
         {
-            minX = Math.Min(minX, trace[i].X); maxX = Math.Max(maxX, trace[i].X);
-            minY = Math.Min(minY, trace[i].Y); maxY = Math.Max(maxY, trace[i].Y);
+            minX = SimMath.Min(minX, trace[i].X); maxX = SimMath.Max(maxX, trace[i].X);
+            minY = SimMath.Min(minY, trace[i].Y); maxY = SimMath.Max(maxY, trace[i].Y);
         }
         return Bounds(minX, minY, maxX, maxY, radius);
     }
 
-    private (int, int, int, int)? Bounds(double minX, double minY, double maxX, double maxY, double radius)
+    private (int, int, int, int)? Bounds(SimScalar minX, SimScalar minY, SimScalar maxX, SimScalar maxY, SimScalar radius)
     {
-        var left = Math.Floor((minX - radius) / bucketSize);
-        var top = Math.Floor((minY - radius) / bucketSize);
-        var right = Math.Floor((maxX + radius) / bucketSize);
-        var bottom = Math.Floor((maxY + radius) / bucketSize);
-        if (!double.IsFinite(left + top + right + bottom) || left <= int.MinValue || top <= int.MinValue
-            || right >= int.MaxValue || bottom >= int.MaxValue || (right - left + 1) * (bottom - top + 1) > 4096)
+        var left = FixedGridMath.FloorIndex(minX - radius, SimScalar.Zero, bucketSize);
+        var top = FixedGridMath.FloorIndex(minY - radius, SimScalar.Zero, bucketSize);
+        var right = FixedGridMath.FloorIndex(maxX + radius, SimScalar.Zero, bucketSize);
+        var bottom = FixedGridMath.FloorIndex(maxY + radius, SimScalar.Zero, bucketSize);
+        if (left <= int.MinValue || top <= int.MinValue
+            || right >= int.MaxValue || bottom >= int.MaxValue || ((Int128)right - left + 1) * ((Int128)bottom - top + 1) > 4096)
             return null;
         return ((int)left, (int)top, (int)right, (int)bottom);
     }

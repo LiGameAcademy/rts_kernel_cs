@@ -6,11 +6,11 @@ internal static class CrowdMovementChecks
     internal static void Run(Action<bool, string> check)
     {
         var definition = new[] { new MovementDefinition(1, 60, 4) };
-        var grid = new PathingGrid(32, 32, 10, SimVector2.Zero, new byte[1024]);
-        RtsMatch Create(PathingGrid? map = null, double speed = 60)
+        var grid = new PathingGrid(32, 32, 10, FixedVector2.Zero, new byte[1024]);
+        RtsMatch Create(PathingGrid? map = null, SimScalar? speed = null)
         {
             var m = new RtsMatch(MatchConfig.Default, 7, map ?? grid,
-                movementDefinitions: new[] { definition[0] with { Speed = speed } });
+                movementDefinitions: new[] { definition[0] with { Speed = speed ?? (SimScalar)60 } });
             return m;
         }
         var m = Create();
@@ -27,7 +27,7 @@ internal static class CrowdMovementChecks
             var entities = m.Entities.ToArray();
             var dx = entities[0].Position.X - entities[1].Position.X;
             var dy = entities[0].Position.Y - entities[1].Position.Y;
-            check(dx * dx + dy * dy >= 64 - 1e-8, $"stationary body separation frame {frame}");
+            check(dx * dx + dy * dy >= 64, $"stationary body separation frame {frame}");
             if (frame % 10 == 0)
             {
                 var resume = RtsMatch.Restore(SnapshotJson.Deserialize(SnapshotJson.Serialize(m.CaptureSnapshot())),
@@ -36,13 +36,13 @@ internal static class CrowdMovementChecks
                 check(m.ComputeStateHash() == resume.ComputeStateHash(), $"detour/wait continuation restores frame {frame}");
             }
         }
-        check(m.Entities.First().Position == new SimVector2(275, 155), "moving unit detours around stationary body");
+        check(m.Entities.First().Position == new FixedVector2(275, 155), "moving unit detours around stationary body");
         check(m.Entities.Last().Position == otherPosition && m.ReadCurrentOrder(new(2))!.Kind == UnitOrderKind.Stop,
             "stationary player Stop is never pushed");
 
         var flags = Enumerable.Repeat((byte)2, 32 * 3).ToArray();
         for (var x = 0; x < 32; x++) flags[32 + x] = 0;
-        var corridor = new PathingGrid(32, 3, 10, SimVector2.Zero, flags);
+        var corridor = new PathingGrid(32, 3, 10, FixedVector2.Zero, flags);
         var blocked = Create(corridor);
         blocked.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new(35, 15), 1));
         blocked.SubmitCommand(CommandEnvelope.Spawn(1, 0, 1, new(155, 15), 1));
@@ -52,14 +52,14 @@ internal static class CrowdMovementChecks
         for (var i = 0; i < 240; i++) blocked.Step();
         var events = blocked.DrainEvents();
         check(events.Count(e => e.Detail == "crowd_blocked_timeout") == 1, "three seconds of continuous crowd blockage reports one failure");
-        check(blocked.Entities.First().Position == new SimVector2(25, 15), "timeout continues next queued goal");
-        check(blocked.Entities.Last().Position == new SimVector2(155, 15), "corridor blocker remains stationary");
+        check(blocked.Entities.First().Position == new FixedVector2(25, 15), "timeout continues next queued goal");
+        check(blocked.Entities.Last().Position == new FixedVector2(155, 15), "corridor blocker remains stationary");
 
         var high = Create(speed: 6000);
         high.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new(35, 155), 1));
         high.SubmitCommand(CommandEnvelope.Spawn(1, 0, 1, new(135, 155), 1)); high.Step();
         high.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 2, new(1), new(275, 155), 6000)); high.Step();
-        check(high.Entities.First().Position != new SimVector2(235, 155), "swept test prevents high-speed tunneling through a body");
+        check(high.Entities.First().Position != new FixedVector2(235, 155), "swept test prevents high-speed tunneling through a body");
 
         var overlap = Create();
         overlap.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new(35, 35), 1));
@@ -97,10 +97,10 @@ internal static class CrowdMovementChecks
             opposing.Step();
             var a = opposing.Entities.First().Position; var b = opposing.Entities.Last().Position;
             var dx = a.X - b.X; var dy = a.Y - b.Y;
-            check(dx * dx + dy * dy >= 64 - 1e-8, $"opposing sweep separation frame {frame}");
+            check(dx * dx + dy * dy >= 64, $"opposing sweep separation frame {frame}");
         }
-        check(opposing.Entities.First().Position == new SimVector2(255, 155)
-            && opposing.Entities.Last().Position == new SimVector2(55, 155), "opposing movers route past each other on open ground");
+        check(opposing.Entities.First().Position == new FixedVector2(255, 155)
+            && opposing.Entities.Last().Position == new FixedVector2(55, 155), "opposing movers route past each other on open ground");
 
         var mixedDefinitions = new[] { new MovementDefinition(1, 60, 4), new MovementDefinition(2, 45, 9) };
         var mixed = new RtsMatch(MatchConfig.Default, 7, grid, movementDefinitions: mixedDefinitions);
@@ -112,9 +112,9 @@ internal static class CrowdMovementChecks
             mixed.Step();
             var a = mixed.Entities.First().Position; var b = mixed.Entities.Last().Position;
             var dx = a.X - b.X; var dy = a.Y - b.Y;
-            check(dx * dx + dy * dy >= 169 - 1e-8, $"mixed radius detour separation frame {frame}");
+            check(dx * dx + dy * dy >= 169, $"mixed radius detour separation frame {frame}");
         }
-        check(mixed.Entities.First().Position == new SimVector2(255, 155), "mixed-size actor preserves its frozen clearance during detour");
+        check(mixed.Entities.First().Position == new FixedVector2(255, 155), "mixed-size actor preserves its frozen clearance during detour");
         Console.WriteLine("Crowd movement targeted checks passed");
     }
 }

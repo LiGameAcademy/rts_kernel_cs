@@ -6,11 +6,11 @@ namespace Rts.Kernel;
 public sealed record EntitySnapshot(
     ulong Id,
     int OwnerId,
-    double PositionX,
-    double PositionY,
-    double VelocityX,
-    double VelocityY,
-    double Facing = 0,
+    SimScalar PositionX,
+    SimScalar PositionY,
+    SimScalar VelocityX,
+    SimScalar VelocityY,
+    SimScalar Facing = default,
     ulong MovementDefinitionId = 0);
 
 public sealed record QueuedCommandSnapshot(long ArrivalOrder, CommandEnvelope Command);
@@ -62,9 +62,9 @@ public static class SnapshotValidator
         foreach (var entity in snapshot.Entities)
         {
             if (entity.Id == 0 || entity.OwnerId < 0 || !entityIds.Add(entity.Id)
-                || !double.IsFinite(entity.PositionX) || !double.IsFinite(entity.PositionY)
-                || !double.IsFinite(entity.VelocityX) || !double.IsFinite(entity.VelocityY) || !double.IsFinite(entity.Facing)
-                || entity.Facing < -Math.PI || entity.Facing >= Math.PI)
+                || !SimulationDomain.Contains(entity.PositionX) || !SimulationDomain.Contains(entity.PositionY)
+                || !SimulationDomain.Contains(new FixedVector2(entity.VelocityX, entity.VelocityY)) || !SimulationDomain.Contains(entity.Facing)
+                || entity.Facing < -SimMath.Pi || entity.Facing >= SimMath.Pi)
             {
                 throw new InvalidDataException($"Invalid entity snapshot: {entity.Id}.");
             }
@@ -103,7 +103,7 @@ public static class SnapshotValidator
 
 public static class SnapshotJson
 {
-    public const int CurrentFormatVersion = 10;
+    public const int CurrentFormatVersion = 11;
 
     private static readonly JsonSerializerOptions Options = new()
     {
