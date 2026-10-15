@@ -9,7 +9,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../**/*.cs" Exclude="../Program.cs;../vendor/**/*.cs;../godot_probe/**/*.cs;../**/bin/**/*.cs;../**/obj/**/*.cs" />
-    <Compile Include="../../../src/Rts.Kernel/DeterministicRng.cs" Link="Contracts/DeterministicRng.cs" />
-    <ProjectReference Include="../vendor/FixPointCS/FixPointCS.csproj" />
+    <ProjectReference Include="../../../src/Rts.Kernel/Rts.Kernel.csproj" />
   </ItemGroup>
 </Project>

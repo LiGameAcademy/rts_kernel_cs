@@ -103,6 +103,8 @@ public static class PrototypeRunner
         var movementTraceHash = NumericPrototype.Movement.MovementChecks.Run(Check);
         var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawTrace.ToString()))).ToLowerInvariant();
         return JsonSerializer.Serialize(new { checks, rawTraceHash = digest, inputTraceHash, wideCostTraceHash, movementTraceHash, matchingTraceHash, groupTraceHash, placementTraceHash, formationChainHash, maxSinError, maxAtanError, maxSqrtError,
+            productionNumericMvid = typeof(Rts.Kernel.Numerics.SimScalar).Assembly.ManifestModule.ModuleVersionId.ToString("D"),
+            pinnedMathMvid = typeof(Fixed64).Assembly.ManifestModule.ModuleVersionId.ToString("D"),
             scope = "isolated scalar/input/movement contract prototype; not a production RTS migration" });
     }
 }

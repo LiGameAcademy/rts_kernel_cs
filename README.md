@@ -69,3 +69,19 @@ Reference `external/rts_kernel/src/Rts.Kernel/Rts.Kernel.csproj` from the host. 
 Relevant path history was extracted from source commit `05cf2b0`, preserving authors, dates and messages. Commit hashes changed; see the [mapping](docs/history-map.txt). Historical commits retain pre-extraction project references; standalone builds are supported starting at the repository preparation commit.
 
 MIT, Copyright (c) 2026 李维民. See [LICENSE](LICENSE). No NuGet package or formal release is published at this stage.
+
+
+## Fixed-point migration foundation
+
+`Rts.Kernel.Numerics` provides signed32.32 `SimScalar`, `FixedVector2` and separately
+scaled128-bit `SquaredDistance`. Decimal inputs use `SimScalar.Parse`; arithmetic
+truncates toward zero, JSON writes raw signed64-bit integer tokens, and overflow
+throws. Floating conversion is an explicit presentation boundary. Squared values
+remain wide until a checked length conversion; scalar/wide roots use exact integer
+floor roots. The chosen radian period is exactly twice the quantized half-period.
+
+Pinned MIT FixPointCS sources, license and source hashes live under
+`third_party/FixPointCS`; the kernel has no dependency on experiments or Godot.
+The current match/command/navigation state still uses the prior spatial contract
+and v9 snapshots. Adding these types is one migration step, not a claim that the
+production simulation has already adopted fixed point or supports network lockstep.

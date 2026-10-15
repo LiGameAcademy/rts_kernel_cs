@@ -58,6 +58,8 @@ RtsMatch CreateMovingMatch()
     return match;
 }
 
+NumericFoundationChecks.Run(Check);
+
 var original = CreateMovingMatch();
 var moving = original.Entities.Single();
 Check(moving.Id.Value == 1, "entity ids start at one");
