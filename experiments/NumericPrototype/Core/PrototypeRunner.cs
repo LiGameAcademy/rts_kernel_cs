@@ -99,6 +99,7 @@ public static class PrototypeRunner
         var inputTraceHash = InputQuantizationChecks.Run(Check);
         var wideCostTraceHash = WideCostChecks.Run(Check);
         var formationChainHash = NumericPrototype.Placement.PlacementChainProbe.RunSynthetic(Check);
+        NumericPrototype.Placement.PlacementWorkChecks.Run(Check);
         var placementTraceHash = NumericPrototype.Placement.PlacementChecks.Run(Check);
         var groupTraceHash = NumericPrototype.Groups.GroupPlanningChecks.Run(Check);
         NumericPrototype.Matching.MatchingPreparationChecks.Run(Check);

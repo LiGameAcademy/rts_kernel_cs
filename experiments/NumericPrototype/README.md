@@ -309,3 +309,28 @@ New checks compare every preparation phase, exact budgets, restored identities,
 duals/seeds, ties, subsequent matching states and assignments against the original
 synchronous algorithm. This changes preview activation frames; production double/v9
 is unchanged. Final placement remains synchronous pending the next step.
+
+
+## Scheduled final placement
+
+The latest preview uses experimental snapshot format3 and rejects formats1–2.
+Cold connectivity construction advances mask/component/flood work in1048576-unit
+steps; clearance-mask cells cost the square of their clearance width, seed scans1,
+flood cells9. Warm cache data reserves exactly the same derived total work before
+becoming available, so cache temperature cannot change activation frames.
+
+Final candidate/body/failure processing advances under262144 units per tick:
+candidate tests64, retained-body insertion or failed-member/pass transitions1.
+Only the full failure fixed point commits new goals. Cancellation discards pending
+final placement and replans survivors with canceled bodies retained; replacement
+starts a new job while old goals remain visible. Matching, connectivity and final
+placement do not run heavy work together on the completion tick.
+
+A final-placement snapshot stores a bounded tick cursor and reconstructs derived
+work by replay on restore. This deliberately expensive reference restore is outside
+planning timing, not a production recovery-performance claim. Completed outcomes
+are checked against replay; warm/cold reservation, mixed clearances, failure cascades,
+late cancellation, replacement and all-canceled jobs have dedicated checks.
+PlacementMs is cumulative; PlacementPeakMs is the maximum final-placement tick.
+StateHash includes the new schedule; compare OutcomeHash and the synchronous reference
+for outcome equality. Full moving-crowd traffic and production adoption remain separate.

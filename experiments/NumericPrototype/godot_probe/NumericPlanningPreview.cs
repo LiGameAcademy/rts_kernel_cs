@@ -92,7 +92,7 @@ public partial class NumericPlanningPreview : Node2D
             _units = _session.ReadUnits();
             var info = _session.Metrics();
             _status.Text = $"{_session.Count}成员 | {(info.Planning ? "规划中" : "已完成")} | 帧 {info.Frame} | 候选 {info.Prepared} | 匹配行 {info.MatchingRow} | 成功 {info.Succeeded} / 失败 {info.Failed} | {(_paused ? "已暂停" : "运行中")}\n"
-                + $"创建 {info.CreateMs:F1}ms · 逻辑步峰值 {info.PeakTickMs:F1}ms · 落点 {info.PlacementMs:F1}ms · 分配 {info.AllocatedBytes / 1048576.0:F1}MB（不含素材/绘制，不代表性能达标）";
+                + $"创建 {info.CreateMs:F1}ms · 逻辑步峰值 {info.PeakTickMs:F1}ms · 落点累计 {info.PlacementMs:F1}ms / 峰值 {info.PlacementPeakMs:F1}ms · 分配 {info.AllocatedBytes / 1048576.0:F1}MB（不含素材/绘制，不代表性能达标）";
             if (_selftest && ++_frames == 1) { Save(); _session.Tick(); Load(); }
             if (_selftest && !_session.Planning && !_capturing)
             {

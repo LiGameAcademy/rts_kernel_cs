@@ -9,7 +9,7 @@ internal static class PlanningLoadProbe
     private sealed record Sample(int Members, string Formation, int Repeat, int Frames, int Succeeded, int Failed,
         double CreateMs, double PeakTickMs, double PlacementMs, long AllocatedBytes, string StateHash,
         double MatchingMs, double CandidateMs, double ReachabilityMs,
-        double MatchingPeakMs, double CandidatePeakMs, double MatchingInitializationMs, double PreparationPeakMs, string OutcomeHash);
+        double MatchingPeakMs, double CandidatePeakMs, double MatchingInitializationMs, double PreparationPeakMs, string OutcomeHash, double PlacementPeakMs);
     internal static object Run(string assetsDirectory)
     {
         var samples = new List<Sample>();
@@ -40,11 +40,14 @@ internal static class PlanningLoadProbe
                     metrics.Succeeded, metrics.Failed, metrics.CreateMs, metrics.PeakTickMs, metrics.PlacementMs, metrics.AllocatedBytes, hash,
                     metrics.MatchingMs, metrics.CandidateMs, metrics.ReachabilityMs,
                     metrics.MatchingPeakMs, metrics.CandidatePeakMs, metrics.MatchingInitializationMs, metrics.PreparationPeakMs,
-                    Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(session.ReadUnits()))))));
+                    OutcomeIdentity(session.ReadUnits()), metrics.PlacementPeakMs));
             }
         }
         return new { WorldIdentity = world, Scope = "planning only; no movement/traffic performance conclusion", Samples = samples };
     }
+    private static string OutcomeIdentity(PreviewUnit[] units) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(units))));
+
     private static string InputQuantizerRaw(long value) => (value / (decimal)PrototypeScalar.Scale)
         .ToString(System.Globalization.CultureInfo.InvariantCulture);
 }

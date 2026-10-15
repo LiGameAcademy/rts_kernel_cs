@@ -15,9 +15,9 @@ public sealed record PreviewUnit(ulong Id, PreviewPoint Start, PreviewPoint? Goa
 public sealed record PreviewMetrics(int Frame, bool Planning, int Prepared, int MatchingRow,
     int Succeeded, int Failed, double CreateMs, double LastTickMs, double PeakTickMs, double PlacementMs, long AllocatedBytes,
     double MatchingMs, double CandidateMs, double ReachabilityMs,
-    double MatchingPeakMs, double CandidatePeakMs, double MatchingInitializationMs, double PreparationPeakMs);
+    double MatchingPeakMs, double CandidatePeakMs, double MatchingInitializationMs, double PreparationPeakMs, double PlacementPeakMs);
 internal sealed record PreviewSaved(int Format, string Fixture, int Frame, ulong NextId,
-    GroupJobSnapshot? Job, PlacementOutcome[] Outcomes);
+    GroupJobSnapshot? Job, PlacementOutcome[] Outcomes, bool Pending, PlacementWorkSnapshot? Placement);
 
 /// <summary>Interactive planning only. Frozen starts and final goals; never invents crowd movement.</summary>
 public sealed class PlanningPreviewSession : IDisposable
@@ -25,7 +25,9 @@ public sealed class PlanningPreviewSession : IDisposable
     private readonly MovementWorld _world;
     private readonly PlacementMember[] _members;
     private readonly string _fixture;
-    private readonly PlacementReachability _reachability;
+    private readonly PlacementConnectivity _connectivity;
+    private PlacementWork? _placement;
+    private bool _pending;
     private GroupPlanningJob? _job;
     private PlacementOutcome[] _outcomes = [];
     private int _frame;
@@ -34,12 +36,14 @@ public sealed class PlanningPreviewSession : IDisposable
     private double _lastMs;
     private double _peakMs;
     private double _placementMs;
+    private double _placementPeakMs;
     private long _allocated;
-    private double _reachabilityStart;
+
     public long BodyRadius => _members[0].Radius;
     public ulong Leader => _members[Count / 2].Id;
     public int Count => _members.Length;
-    public bool Planning => _job is not null && !_job.Ready;
+    public bool Planning => _pending;
+    internal string PlanningStage => _job is null ? "Idle" : !_job.Ready ? "Matching" : _placement?.Stage ?? "AwaitPlacement";
     public string WorldIdentity => _world.Identity;
 
     public PlanningPreviewSession(string assetsDirectory, int count)
@@ -47,7 +51,7 @@ public sealed class PlanningPreviewSession : IDisposable
         if (count is < 2 or > 500) throw new ArgumentOutOfRangeException(nameof(count));
         _world = new(File.ReadAllText(Path.Combine(assetsDirectory, "map-parsed/echoisles/pathing.json")),
             File.ReadAllText(Path.Combine(assetsDirectory, "map-parsed/echoisles/terrain-heightfield.json")));
-        _reachability = new PlacementReachability(_world);
+        _connectivity = new PlacementConnectivity(_world);
         using var balance = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(assetsDirectory, "slk-exported/Units/UnitBalance.json")));
         var radius = MovementWorld.Number(balance.RootElement.GetProperty("records").EnumerateArray()
             .Single(value => value.GetProperty("unitBalanceID").GetString() == "hfoo"), "collision");
@@ -85,15 +89,21 @@ public sealed class PlanningPreviewSession : IDisposable
         var job = new GroupPlanningJob(input, _world, scheduledPreparation: true);
         _job?.Dispose();
         _job = job;
+        _placement = null;
+        _pending = true;
         _nextId++;
         _createMs = watch.Elapsed.TotalMilliseconds;
         _allocated = GC.GetAllocatedBytesForCurrentThread() - before;
         _peakMs = 0;
-        _placementMs = 0;
-        _reachabilityStart = _reachability.BuildMs;
+        _placementMs = _placementPeakMs = 0;
     }
 
-    public bool Cancel(ulong member) => Planning && _job!.Cancel(member);
+    public bool Cancel(ulong member)
+    {
+        if (!Planning || !_job!.Cancel(member)) return false;
+        _placement = null; // Rebuild final placement using the surviving assignment and retained canceled bodies.
+        return true;
+    }
 
     public void Tick()
     {
@@ -101,18 +111,23 @@ public sealed class PlanningPreviewSession : IDisposable
         if (!Planning) { _lastMs = 0; return; }
         var before = GC.GetAllocatedBytesForCurrentThread();
         var watch = Stopwatch.StartNew();
-        _job!.Advance(_world, GroupPlanningQueue.ProductionColumnsPerFrame, GroupPlanningQueue.ProductionCandidatesPerFrame);
-        if (_job.Ready)
+        if (!_job!.Ready)
+        {
+            _job.Advance(_world, GroupPlanningQueue.ProductionColumnsPerFrame, GroupPlanningQueue.ProductionCandidatesPerFrame);
+        }
+        else
         {
             var placementWatch = Stopwatch.StartNew();
-            var assignments = _job.Assignments().ToDictionary(item => item.Member, item => item.Slot);
-            var active = _members.Where(member => assignments.ContainsKey(member.Id)).ToArray();
-            var bodies = _members.Where(member => !assignments.ContainsKey(member.Id))
-                .Select(member => new PlacementBody(member.Start, member.Radius)).ToArray();
-            if (active.Length > 0)
-                _outcomes = FixedPlacement.PlanPrepared(_world, active, _job, assignments, bodies, _reachability);
-            else _outcomes = [];
-            _placementMs = placementWatch.Elapsed.TotalMilliseconds;
+            _placement ??= CreatePlacement(_job);
+            _placement.Advance();
+            if (_placement.Complete)
+            {
+                _outcomes = _placement.Results();
+                _pending = false;
+            }
+            var elapsed = placementWatch.Elapsed.TotalMilliseconds;
+            _placementMs += elapsed;
+            _placementPeakMs = Math.Max(_placementPeakMs, elapsed);
         }
         _lastMs = watch.Elapsed.TotalMilliseconds;
         _peakMs = Math.Max(_peakMs, _lastMs);
@@ -124,9 +139,9 @@ public sealed class PlanningPreviewSession : IDisposable
         return new(_frame, Planning, _job?.PreparedCount ?? 0, _job?.MatchingRow ?? 0,
             _outcomes.Count(item => item.Goal.HasValue), _outcomes.Count(item => !item.Goal.HasValue),
             _createMs, _lastMs, _peakMs, _placementMs, _allocated,
-            _job?.MatchingMs ?? 0, _job?.CandidateMs ?? 0, _reachability.BuildMs - _reachabilityStart,
+            _job?.MatchingMs ?? 0, _job?.CandidateMs ?? 0, _placement?.ConnectivityMs ?? 0,
             _job?.MatchingPeakMs ?? 0, _job?.CandidatePeakMs ?? 0, _job?.MatchingInitializationMs ?? 0,
-            _job?.PreparationPeakMs ?? 0);
+            _job?.PreparationPeakMs ?? 0, _placementPeakMs);
     }
 
     public PreviewUnit[] ReadUnits()
@@ -152,12 +167,13 @@ public sealed class PlanningPreviewSession : IDisposable
         return _outcomes.SequenceEqual(expected);
     }
 
-    public string Capture() => JsonSerializer.Serialize(new PreviewSaved(2, _fixture, _frame, _nextId, _job?.Capture(), _outcomes));
+    public string Capture() => JsonSerializer.Serialize(new PreviewSaved(3, _fixture, _frame, _nextId, _job?.Capture(), _outcomes, _pending, _placement?.Capture()));
     public void Restore(string json)
     {
         var saved = JsonSerializer.Deserialize<PreviewSaved>(json) ?? throw new InvalidDataException("Missing preview snapshot.");
-        if (saved.Format != 2 || saved.Fixture != _fixture || saved.Frame < 0 || saved.NextId == 0 || saved.Outcomes is null
-            || saved.Job is not null && (saved.Job.Input is null || saved.Job.Input.Members is null
+        if (saved.Format != 3 || saved.Fixture != _fixture || saved.Frame < 0 || saved.NextId == 0 || saved.Outcomes is null
+            || saved.Pending && saved.Job is null || saved.Placement is not null && saved.Job is null
+            || saved.Job is not null && (saved.Job.Preparation is null || saved.Job.Input is null || saved.Job.Input.Members is null
                 || saved.Job.Input.Id >= saved.NextId || !saved.Job.Input.Members.SequenceEqual(
                     _members.Select(member => new GroupMember(member.Id, member.Start))))
             || saved.Outcomes.Any(item => item is null || !_members.Any(member => member.Id == item.Member)
@@ -165,14 +181,43 @@ public sealed class PlanningPreviewSession : IDisposable
             || saved.Outcomes.Select(item => item.Member).Distinct().Count() != saved.Outcomes.Length)
             throw new InvalidDataException("Preview snapshot does not match fixture/state.");
         var job = saved.Job is null ? null : GroupPlanningJob.Restore(saved.Job, _world);
+        PlacementWork? placement = null;
+        try
+        {
+            if (saved.Placement is not null)
+            {
+                if (job is null || !job.Ready) throw new InvalidDataException("Placement requires a ready matching job.");
+                placement = CreatePlacement(job);
+                placement.Restore(saved.Placement);
+            }
+            if (job is not null && (saved.Pending == (placement?.Complete ?? false)
+                || !saved.Pending && !job.Ready))
+                throw new InvalidDataException("Preview pending/placement state disagrees.");
+            if (placement is { Complete: true } && !placement.Results().SequenceEqual(saved.Outcomes))
+                throw new InvalidDataException("Completed placement outcomes do not match restored work.");
+        }
+        catch
+        {
+            job?.Dispose();
+            throw;
+        }
         _job?.Dispose();
         _job = job;
+        _placement = placement;
+        _pending = saved.Pending;
         _frame = saved.Frame;
         _nextId = saved.NextId;
         _outcomes = saved.Outcomes.ToArray();
-        _lastMs = _peakMs = _placementMs = _createMs = 0;
-        _reachabilityStart = _reachability.BuildMs;
+        _lastMs = _peakMs = _placementMs = _placementPeakMs = _createMs = 0;
         _allocated = 0; // Diagnostics are deliberately outside simulation state.
+    }
+
+    private PlacementWork CreatePlacement(GroupPlanningJob job)
+    {
+        var assignments = job.Assignments().ToDictionary(item => item.Member, item => item.Slot);
+        return new(_world, _members.Where(member => assignments.ContainsKey(member.Id)).ToArray(), job, assignments,
+            _members.Where(member => !assignments.ContainsKey(member.Id))
+                .Select(member => new PlacementBody(member.Start, member.Radius)).ToArray(), _connectivity);
     }
 
     public void Dispose() => _job?.Dispose();
