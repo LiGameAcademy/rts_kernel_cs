@@ -46,7 +46,7 @@ Invoke-Captured $dotnet @('build', $cli, '-c', 'Debug', '-p:NuGetAudit=false') (
 Invoke-Captured $dotnet @('restore', $project, '--source', $packages, '--ignore-failed-sources', '-p:NuGetAudit=false') (Join-Path $logs 'godot-restore.log') | Out-Null
 Invoke-Captured $dotnet @('build', $project, '--no-restore', '-c', 'Debug', '-p:NuGetAudit=false') (Join-Path $logs 'godot-build.log') | Out-Null
 $errors = '(?m)^ERROR:|SCRIPT ERROR|Parse Error|Failed to load|Failed loading|Unhandled exception|Could not instantiate'
-$import = Invoke-Captured $godot @('--headless', '--path', $projectDirectory, '--editor', '--import', '--quit') (Join-Path $logs 'import.log')
+$import = Invoke-Captured $godot @('--headless', '--path', $projectDirectory, '--editor', '--import') (Join-Path $logs 'import.log')
 if ($import -match $errors) { throw "Godot import reported errors: $logs" }
 $cliAssembly = Join-Path $PSScriptRoot 'bin/Debug/net10.0/NumericPrototype.dll'
 $cliCore = Join-Path $PSScriptRoot 'bin/Debug/net10.0/NumericPrototype.Core.dll'
