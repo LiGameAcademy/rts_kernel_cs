@@ -18,7 +18,7 @@ dotnet restore $project --source $packages --ignore-failed-sources -p:NuGetAudit
 if ($LASTEXITCODE -ne 0) { throw 'Preview restore failed.' }
 dotnet build $project --no-restore -c Debug -p:NuGetAudit=false
 if ($LASTEXITCODE -ne 0) { throw 'Preview build failed.' }
-& $godot --headless --path $directory --editor --import --quit *> (Join-Path $logs 'import.log')
+& $godot --headless --path $directory --editor --import *> (Join-Path $logs 'import.log')
 $importExit = $LASTEXITCODE
 $importText = [IO.File]::ReadAllText((Join-Path $logs 'import.log'))
 $errors = 'SCRIPT ERROR|Parse Error|Failed to load|Failed loading|(?m)^ERROR:'
