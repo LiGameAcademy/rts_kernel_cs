@@ -1,7 +1,7 @@
 param([string]$ReportPath = "")
 $ErrorActionPreference = 'Stop'
 $project = Join-Path $PSScriptRoot 'TrafficPrototype.csproj'
-$expectedDigest = '9f0e066e6eecd72ce91f7e98b068c3c80adbf772dcf6a740f9941e91f5a31998'
+$expectedDigest = 'ab2057caad06d97a8517a6801da1084b429a568823f68640675a086a183e1fcc'
 $reports = @()
 foreach ($configuration in @('Debug', 'Release')) {
     dotnet build $project -c $configuration -p:NuGetAudit=false

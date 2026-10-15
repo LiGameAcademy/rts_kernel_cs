@@ -18,4 +18,14 @@ The exchange case deliberately remains blocked: temporal safety does not generat
 ./experiments/TrafficPrototype/Test-Prototype.ps1 -ReportPath <local-report.json>
 ```
 
-Not yet validated: continuous group coordination/yield plans, useful-progress thresholds, static navigation, unequal motion profiles, waypoint timing, snapshot continuation of long-lived traffic plans, 300/500 performance, or Godot visuals. The 64-member size is an early probe bound, not a reduction in the project's 500-member requirement.
+Not yet validated: a scalable continuous group coordinator, useful-progress thresholds, real static navigation, unequal motion profiles, waypoint timing, production snapshot continuation of traffic plans, 300/500 performance, or Godot visuals. The 64-member size is an early probe bound, not a reduction in the project's 500-member requirement.
+
+## Second probe: a tiny shared passage oracle
+
+`PassageReference` explores complete joint states for **two** radius-4 bodies on **at most 16** cardinal cells, spaced 10 units apart. The map is the union of these walkable squares; the radius fits their half-width. This intentionally small exact search is a feasibility oracle, not a candidate 500-body algorithm. It can move a temporarily settled group member into a passing pocket and return it after the other member passes. With that member under Stop in the bottleneck, the oracle instead exhausts its finite state graph without moving the blocker.
+
+Every work quantum dequeues a state, tests a joint transition, or follows a reconstruction parent. Budget exhaustion leaves the work in progress. Input map/goal/Stop/order identity is frozen; the chosen path is unchanged under different work chunk sizes. Checkpoints store input and exact consumed work, reconstructing the tiny cursor by bounded deterministic replay. This demonstrates continuation semantics, not an acceptable production restore cost.
+
+`PassagePlayback` is a two-body fixture executor. Stop and successor commands invalidate the old shared plan before the next step; a stale revision, different target or different map cannot install that plan again. A member stopped in the passing pocket remains there while the other finishes. This does not select when real group members finish or how subsequent queued orders join a new plan.
+
+The actual three-second replan trigger, useful-progress metrics, retry limits and real group lifecycle remain to be assessed. The reference does not silently implement a new timeout or claim to solve the project's 500-body reorder. No original-game behavior is asserted by these synthetic fixtures.

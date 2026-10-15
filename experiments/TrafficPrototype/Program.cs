@@ -9,8 +9,8 @@ void Check(bool condition, string message)
     checks++;
     if (!condition) throw new InvalidOperationException(message);
 }
-var observations = MotionChecks.Run(Check);
+var observations = MotionChecks.Run(Check).Concat(PassageChecks.Run(Check)).ToArray();
 var canonical = JsonSerializer.Serialize(observations);
 var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
-Console.WriteLine(JsonSerializer.Serialize(new { scope = "linear-frame-reference-only", checks, digest, observations,
-    productionChanged = false, bigIntegerReference = true, resolvesTrafficDeadlocks = false }));
+Console.WriteLine(JsonSerializer.Serialize(new { scope = "linear-frame-and-two-body-passage-reference", checks, digest, observations,
+    productionChanged = false, bigIntegerReference = true, resolvesGeneralTraffic = false }));
