@@ -4,6 +4,6 @@
 *.yml text eol=lf
 *.ps1 text eol=lf
 
-# Preserve pinned upstream bytes for the numeric experiment source manifest.
-experiments/NumericPrototype/vendor/FixPointCS/Fixed*.cs -text
-experiments/NumericPrototype/vendor/FixPointCS/LICENSE.txt -text
+# Preserve pinned upstream bytes; the production kernel and probe share this dependency.
+third_party/FixPointCS/Fixed*.cs -text
+third_party/FixPointCS/LICENSE.txt -text

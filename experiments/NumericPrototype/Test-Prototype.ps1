@@ -2,13 +2,7 @@ param([string]$AssetsDirectory = "", [string]$ReportPath = "")
 $ErrorActionPreference = 'Stop'
 $prototype = Join-Path $PSScriptRoot 'NumericPrototype.csproj'
 $expectedHash = '9f4c05d906c21313a8e2d615b87b1a0a54140d84a56792caece87ec1db938975'
-$vendor = Join-Path $PSScriptRoot 'vendor/FixPointCS'
-$manifest = Get-Content (Join-Path $vendor 'SOURCE.json') -Raw | ConvertFrom-Json
-foreach ($entry in $manifest.files.PSObject.Properties) {
-    $source = Join-Path $vendor (Split-Path $entry.Name -Leaf)
-    $actual = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actual -ne $entry.Value.sha256) { throw "Pinned vendor file mismatch: $($entry.Name)" }
-}
+& (Join-Path $PSScriptRoot '../../tools/Test-DependencyIntegrity.ps1')
 $expectedInputHash = '6d8de2d1136af0129063576981e9caa3f3cb1c68398d8ca07e8cc959dbe95621'
 $expectedWideHash = '4227d7416bf64430462b07089e0ae94bcca4d3a0daa8c98774c9729d17d30ba2'
 $expectedMovementHash = '4cf7cd8ca7c2ab68272da6963cb44e53243082a84b97e267b18e0ffe0ad6a531'

@@ -14,7 +14,7 @@ scope describe those steps, rather than the latest complete state.
 
 ## Step 1 contract findings
 
-- FixPointCS source is unmodified, pinned to `a852f05b428a942f8dc274ee516a893ae224e0d4`. `vendor/FixPointCS/SOURCE.json` records Git blob and SHA256 identities. MIT license is included. Its local SDK project is ours; the three numeric sources are third-party files and intentionally retain upstream layout.
+- FixPointCS source is unmodified, pinned to `a852f05b428a942f8dc274ee516a893ae224e0d4`. `../../third_party/FixPointCS/SOURCE.json` records Git blob and SHA256 identities. MIT license is included. Its local SDK project is ours; the three numeric sources are third-party files and intentionally retain upstream layout.
 - Candidate multiplication floors negative fractions. The proposed project contract truncates toward zero. `PrototypeScalar` uses checked Int128 intermediate arithmetic for this probe; candidate integer square root and trigonometric functions are tested separately. This is evidence that raw vendor API calls cannot silently define project semantics, not approval of the wrapper as a production API.
 - Checked compilation reproduces an OverflowException in the original SplitMix64 implementation. The core fix explicitly declares its existing modulo-2^64 operations unchecked. Known-answer vectors and restored-state continuation are tested by compiling the actual source into the checked probe. Normal builds keep the same sequence.
 - Add/multiply/divide overflow, zero divisor, negative root, negative grid flooring and lossless .NET raw JSON round-trip are exercised. Decimal command ingestion/quantization is NOT implemented yet. JSON behavior in a .NET reader says nothing about JavaScript precision.
@@ -214,3 +214,14 @@ execution does not certify Godot Release/export, cross-machine determinism, prod
 game readiness, full command/event integration, moving crowd or300/500 performance.
 The Godot parity script is an explicit local check; CI continues running the pure
 CLI probe without requiring the engine or proprietary source assets.
+
+
+## Shared production numeric primitives
+
+The approved fixed-point direction now has a production boundary under
+src/Rts.Kernel/Numerics. The experiment consumes that project's scalar arithmetic
+and exact input parser; its reference algorithms and trace surface remain isolated.
+Pinned FixPointCS sources and MIT notice live under third_party/FixPointCS, with
+byte identities checked by tools/Test-DependencyIntegrity.ps1 from both test runners.
+The kernel never references experiments. This foundation does not yet switch match
+state, navigation, group algorithms or v9 snapshots to fixed point.

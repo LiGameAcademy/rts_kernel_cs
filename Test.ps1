@@ -2,6 +2,7 @@ param([string]$Configuration = "Release")
 $ErrorActionPreference = "Stop"
 Push-Location $PSScriptRoot
 try {
+    & (Join-Path $PSScriptRoot "tools/Test-DependencyIntegrity.ps1")
     dotnet restore RtsKernel.sln -m:1
     if ($LASTEXITCODE -ne 0) { throw "Restore failed" }
     dotnet build RtsKernel.sln --no-restore -m:1 -c $Configuration

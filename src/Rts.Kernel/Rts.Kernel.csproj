@@ -6,4 +6,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <RootNamespace>Rts.Kernel</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../third_party/FixPointCS/FixPointCS.csproj" />
+  </ItemGroup>
 </Project>
