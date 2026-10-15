@@ -284,3 +284,28 @@ mixed radii/negative coordinates, and cold restores against a warmed session.
 This change preserves the experimental snapshot format and activation frames.
 Final placement and initial matching preparation are still synchronous: lower
 placement allocation/time does not establish a30Hz performance pass.
+
+
+## Scheduled matching preparation
+
+The interactive preview now uses experimental snapshot format2 (format1 is rejected).
+Frozen cost generation, canonical input hashing, row/column minima and stable zero
+seeding advance under262144 integer work units per tick; decimal hashing costs8
+units per input value, other inspections1. Matching starts on the following tick.
+The existing matcher and standalone group probes remain reference paths, retaining
+all prior golden traces. Prepared costs stay shared/read-only; mutable dual/seed
+arrays are copied when transferred to the matcher.
+
+A preparation snapshot stores a bounded replay cursor. Hash state and arrays are
+derived and reconstructed outside measured ticks on restore; this is an expensive
+reference restore, not a production low-latency save implementation. Replacing a
+plan, restoring a session, resetting/exiting the Godot scene and normal completion
+release its incremental hashing resource. Wall-clock metrics remain non-authoritative.
+MatchingInitializationMs now totals preparation across ticks; PreparationPeakMs is
+the maximum preparation tick. OutcomeHash excludes scheduling so later frame changes
+can be distinguished from assignment/goal regressions.
+
+New checks compare every preparation phase, exact budgets, restored identities,
+duals/seeds, ties, subsequent matching states and assignments against the original
+synchronous algorithm. This changes preview activation frames; production double/v9
+is unchanged. Final placement remains synchronous pending the next step.

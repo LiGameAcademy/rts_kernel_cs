@@ -60,9 +60,13 @@ public partial class NumericPlanningPreview : Node2D
         catch (Exception error) { GD.PushError(error.ToString()); GetTree().Quit(1); }
     }
 
+    public override void _ExitTree() => _session?.Dispose();
+
     private void Reset(int count)
     {
-        _session = new PlanningPreviewSession(_assets, count);
+        var session = new PlanningPreviewSession(_assets, count);
+        _session?.Dispose();
+        _session = session;
         _map = _session.ReadMap();
         var pixels = new byte[_map.Width * _map.Height * 4];
         for (var index = 0; index < _map.Walkable.Length; index++)

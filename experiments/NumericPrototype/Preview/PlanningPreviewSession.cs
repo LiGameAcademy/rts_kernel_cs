@@ -15,12 +15,12 @@ public sealed record PreviewUnit(ulong Id, PreviewPoint Start, PreviewPoint? Goa
 public sealed record PreviewMetrics(int Frame, bool Planning, int Prepared, int MatchingRow,
     int Succeeded, int Failed, double CreateMs, double LastTickMs, double PeakTickMs, double PlacementMs, long AllocatedBytes,
     double MatchingMs, double CandidateMs, double ReachabilityMs,
-    double MatchingPeakMs, double CandidatePeakMs, double MatchingInitializationMs);
+    double MatchingPeakMs, double CandidatePeakMs, double MatchingInitializationMs, double PreparationPeakMs);
 internal sealed record PreviewSaved(int Format, string Fixture, int Frame, ulong NextId,
     GroupJobSnapshot? Job, PlacementOutcome[] Outcomes);
 
 /// <summary>Interactive planning only. Frozen starts and final goals; never invents crowd movement.</summary>
-public sealed class PlanningPreviewSession
+public sealed class PlanningPreviewSession : IDisposable
 {
     private readonly MovementWorld _world;
     private readonly PlacementMember[] _members;
@@ -82,7 +82,8 @@ public sealed class PlanningPreviewSession
         var ideals = FixedFormation.Create((FixedFormationKind)formation, Count, FixedPlacement.Spacing(_world, _members), goal, 0);
         var input = new GroupPlanInput(_nextId, _members.Select(member => new GroupMember(member.Id, member.Start)).ToArray(),
             ideals, _members[Count / 2].Id, false);
-        var job = new GroupPlanningJob(input, _world);
+        var job = new GroupPlanningJob(input, _world, scheduledPreparation: true);
+        _job?.Dispose();
         _job = job;
         _nextId++;
         _createMs = watch.Elapsed.TotalMilliseconds;
@@ -124,7 +125,8 @@ public sealed class PlanningPreviewSession
             _outcomes.Count(item => item.Goal.HasValue), _outcomes.Count(item => !item.Goal.HasValue),
             _createMs, _lastMs, _peakMs, _placementMs, _allocated,
             _job?.MatchingMs ?? 0, _job?.CandidateMs ?? 0, _reachability.BuildMs - _reachabilityStart,
-            _job?.MatchingPeakMs ?? 0, _job?.CandidatePeakMs ?? 0, _job?.MatchingInitializationMs ?? 0);
+            _job?.MatchingPeakMs ?? 0, _job?.CandidatePeakMs ?? 0, _job?.MatchingInitializationMs ?? 0,
+            _job?.PreparationPeakMs ?? 0);
     }
 
     public PreviewUnit[] ReadUnits()
@@ -150,11 +152,11 @@ public sealed class PlanningPreviewSession
         return _outcomes.SequenceEqual(expected);
     }
 
-    public string Capture() => JsonSerializer.Serialize(new PreviewSaved(1, _fixture, _frame, _nextId, _job?.Capture(), _outcomes));
+    public string Capture() => JsonSerializer.Serialize(new PreviewSaved(2, _fixture, _frame, _nextId, _job?.Capture(), _outcomes));
     public void Restore(string json)
     {
         var saved = JsonSerializer.Deserialize<PreviewSaved>(json) ?? throw new InvalidDataException("Missing preview snapshot.");
-        if (saved.Format != 1 || saved.Fixture != _fixture || saved.Frame < 0 || saved.NextId == 0 || saved.Outcomes is null
+        if (saved.Format != 2 || saved.Fixture != _fixture || saved.Frame < 0 || saved.NextId == 0 || saved.Outcomes is null
             || saved.Job is not null && (saved.Job.Input is null || saved.Job.Input.Members is null
                 || saved.Job.Input.Id >= saved.NextId || !saved.Job.Input.Members.SequenceEqual(
                     _members.Select(member => new GroupMember(member.Id, member.Start))))
@@ -163,6 +165,7 @@ public sealed class PlanningPreviewSession
             || saved.Outcomes.Select(item => item.Member).Distinct().Count() != saved.Outcomes.Length)
             throw new InvalidDataException("Preview snapshot does not match fixture/state.");
         var job = saved.Job is null ? null : GroupPlanningJob.Restore(saved.Job, _world);
+        _job?.Dispose();
         _job = job;
         _frame = saved.Frame;
         _nextId = saved.NextId;
@@ -171,6 +174,8 @@ public sealed class PlanningPreviewSession
         _reachabilityStart = _reachability.BuildMs;
         _allocated = 0; // Diagnostics are deliberately outside simulation state.
     }
+
+    public void Dispose() => _job?.Dispose();
 
     private static PreviewPoint Point(FixedPoint value) => new(value.X, value.Y);
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();

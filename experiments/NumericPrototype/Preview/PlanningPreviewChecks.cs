@@ -14,14 +14,14 @@ internal static class PlanningPreviewChecks
         }
         foreach (var count in new[] { 65, 300, 500 })
         {
-            var session = new PlanningPreviewSession(assetsDirectory, count);
+            using var session = new PlanningPreviewSession(assetsDirectory, count);
             var map = session.ReadMap();
             string Number(long raw) => (raw / (decimal)PrototypeScalar.Scale).ToString(System.Globalization.CultureInfo.InvariantCulture);
             session.Plan(0, Number(map.Origin.X + map.Width * map.CellSize / 2), Number(map.Origin.Y + map.Height * map.CellSize / 2));
             session.Tick();
             Check(session.Cancel(1), "pending member cancellation accepted");
             var snapshot = session.Capture();
-            var clone = new PlanningPreviewSession(assetsDirectory, count);
+            using var clone = new PlanningPreviewSession(assetsDirectory, count);
             clone.Restore(snapshot);
             while (session.Planning)
             {
@@ -36,7 +36,7 @@ internal static class PlanningPreviewChecks
             var completed = session.Capture();
             clone.Restore(completed);
             Check(clone.Capture() == completed, "completed preview snapshot restores");
-            var corrupt = completed.Replace("\"Format\":1", "\"Format\":2");
+            var corrupt = completed.Replace("\"Format\":2", "\"Format\":3");
             try { session.Restore(corrupt); Check(false, "invalid preview format accepted"); }
             catch (InvalidDataException) { Check(true, "invalid preview rejected"); }
             Check(session.Capture() == completed, "failed restore is atomic");
@@ -47,7 +47,7 @@ internal static class PlanningPreviewChecks
     }
     private static void VerifyWarmCache(string assetsDirectory, Action<bool, string> check)
     {
-        var warm = new PlanningPreviewSession(assetsDirectory, 65);
+        using var warm = new PlanningPreviewSession(assetsDirectory, 65);
         var map = warm.ReadMap();
         string Number(long raw) => (raw / (decimal)PrototypeScalar.Scale).ToString(System.Globalization.CultureInfo.InvariantCulture);
         var x = Number(map.Origin.X + map.Width * map.CellSize / 2);
@@ -55,7 +55,7 @@ internal static class PlanningPreviewChecks
         warm.Plan(0, x, y);
         while (warm.Planning) warm.Tick();
         warm.Plan(1, x, y);
-        var cold = new PlanningPreviewSession(assetsDirectory, 65);
+        using var cold = new PlanningPreviewSession(assetsDirectory, 65);
         cold.Restore(warm.Capture());
         while (warm.Planning)
         {
