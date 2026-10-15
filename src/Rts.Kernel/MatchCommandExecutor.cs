@@ -138,7 +138,7 @@ internal sealed class MatchCommandExecutor
             Publish(frame, MatchEventKind.CommandRejected, EntityId.None, "movement_definition_missing");
             return;
         }
-        if (!CanSpawnGround(command, navigation))
+        if (!CanSpawnGround(command.Position, command.MovementDefinitionId, navigation))
         {
             Publish(frame, MatchEventKind.CommandRejected, EntityId.None, "spawn_ground_unavailable");
             return;
@@ -164,16 +164,17 @@ internal sealed class MatchCommandExecutor
         _entities.Update(entity with { Velocity = command.Velocity });
     }
 
-    private bool CanSpawnGround(CommandEnvelope command, NavigationState? navigation)
+    internal bool CanSpawnGround(FixedVector2 position, ulong movementDefinitionId, NavigationState? navigation)
     {
-        if (command.MovementDefinitionId == 0) return true;
-        var definition = _movementDefinitions.TryGet(command.MovementDefinitionId, out var found) ? found : null;
-        if (definition is null || navigation is null || !navigation.TryWorldToCell(command.Position, out var cell)
+        if (!SimulationDomain.Contains(position)) return false;
+        if (movementDefinitionId == 0) return true;
+        var definition = _movementDefinitions.TryGet(movementDefinitionId, out var found) ? found : null;
+        if (definition is null || navigation is null || !navigation.TryWorldToCell(position, out var cell)
             || !navigation.CanOccupy(cell, MovementDefinitions.ClearanceCells(definition, navigation.Grid.CellSize))
-            || !navigation.CanStandAt(command.Position, definition.Radius))
+            || !navigation.CanStandAt(position, definition.Radius))
             return false;
         return !_entities.Live.Where(entity => entity.MovementDefinitionId != 0).Any(entity =>
-            CrowdGeometry.Overlap(command.Position, command.Position, definition.Radius,
+            CrowdGeometry.Overlap(position, position, definition.Radius,
                 entity.Position, entity.Position, ReadDefinition(entity.Id)!.Radius));
     }
 
