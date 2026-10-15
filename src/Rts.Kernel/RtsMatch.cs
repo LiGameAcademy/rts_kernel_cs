@@ -42,6 +42,10 @@ public sealed partial class RtsMatch
     /// <summary>Detached read-only entity list in ID order. Later steps do not change its contents.</summary>
     public IReadOnlyList<EntityState> ReadEntities() => _entities.ReadAll();
 
+    /// <summary>Current committed placement only; does not reserve space or guarantee a future command.</summary>
+    public bool CanSpawn(FixedVector2 position, ulong movementDefinitionId = 0) =>
+        _commandExecutor.CanSpawnGround(position, movementDefinitionId, _navigation);
+
     public PathResult FindPath(GridCell start, GridCell goal, int clearanceCells = 0,
         int maxExpandedNodes = int.MaxValue) =>
         (_navigation ?? throw new InvalidOperationException("Match has no pathing grid."))

@@ -142,6 +142,7 @@ CheckThrows<ArgumentException>(() => new TerrainHeights(2, 2, 128, default, new 
 SnapshotDiagnosticChecks.Run(Check);
 EntityReadChecks.Run(Check);
 EntityLifecycleChecks.Run(Check);
+SpawnPlacementQueryChecks.Run(Check);
 CommandContractChecks.Run(Check);
 MatchCommandQueueChecks.Run(Check);
 MatchEventBufferChecks.Run(Check);

@@ -126,3 +126,5 @@ once. Snapshot segment validation uses a two-raw-unit bound, not the old floatin
 relative epsilon. A nonzero order that cannot produce a raw displacement in a full
 frame and cannot turn reports `movement_below_resolution`; queues follow the usual
 failure policy. Intentional zero-scale turning/holding remains valid.
+
+`RtsMatch.CanSpawn(position, movementDefinitionId)` reuses committed ground-placement rules without reserving space, IDs, randomness or events. Queued/future commands are not applied by this query; Spawn validates again at execution. Definition zero keeps the diagnostic point-entity behavior.
