@@ -8,9 +8,9 @@ internal static class SnapshotDiagnosticChecks
         var grid = new PathingGrid(4, 4, 10, default, new byte[16]);
         var match = new RtsMatch(MatchConfig.Default, 1, grid);
         match.SubmitCommand(CommandEnvelope.SetObstacle(2, 0, 0, 1, new GridArea(1, 1, 1, 1)));
-        match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 1, new EntityId(1), new SimVector2(15, 15), 10));
+        match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 1, new EntityId(1), new FixedVector2(15, 15), 10));
         match.SubmitCommand(CommandEnvelope.MoveGroup(2, 0, 2,
-            new GroupMoveRequest(new[] { new EntityId(1) }, new SimVector2(25, 25))));
+            new GroupMoveRequest(new[] { new EntityId(1) }, new FixedVector2(25, 25))));
         match.SubmitCommand(CommandEnvelope.Spawn(2, 0, 3, default, 1));
         var saved = match.CaptureSnapshot();
 
@@ -29,7 +29,7 @@ internal static class SnapshotDiagnosticChecks
         Expect(0, c => c with { Obstacle = c.Obstacle! with { Area = new GridArea(2, 1, 1, 1) } },
             "pendingCommands[0].command.obstacle.area");
         Expect(1, c => c with { Move = c.Move! with { Speed = 20 } }, "pendingCommands[1].command.move");
-        Expect(2, c => c with { Group = c.Group! with { Goal = new SimVector2(35, 35) } }, "pendingCommands[2].group");
+        Expect(2, c => c with { Group = c.Group! with { Goal = new FixedVector2(35, 35) } }, "pendingCommands[2].group");
         Expect(3, c => c with { MovementDefinitionId = 2 }, "pendingCommands[3].movementDefinitionId");
 
         var commands = saved.PendingCommands.ToArray();

@@ -1,22 +1,40 @@
 namespace Rts.Kernel.Navigation;
 
-/// <summary>Diagnostic motion parameters; production hosts must obtain them from authoritative unit definitions.</summary>
-public sealed record MotionParameters(
-    double TurnRate = 0.5,
-    bool ScaleTurnSpeed = true,
-    double FullSpeedDegrees = 25,
-    double MinimumSpeedDegrees = 140,
-    double MinimumTurnScale = 0.12,
-    bool ScaleSlopeSpeed = true,
-    double MaximumSlopeDegrees = 30,
-    double UphillScale = 0.6,
-    double DownhillScale = 0.85)
+/// <summary>Frozen rule parameters. Turn rate uses revolutions/second; angles below are degrees.</summary>
+public sealed record MotionParameters
 {
-    internal bool IsValid => double.IsFinite(TurnRate) && TurnRate >= 0.05 && TurnRate <= double.MaxValue / Math.Tau
-        && double.IsFinite(FullSpeedDegrees) && FullSpeedDegrees >= 0
-        && double.IsFinite(MinimumSpeedDegrees) && MinimumSpeedDegrees > FullSpeedDegrees && MinimumSpeedDegrees <= 180
-        && Fraction(MinimumTurnScale) && double.IsFinite(MaximumSlopeDegrees)
-        && MaximumSlopeDegrees > 0 && MaximumSlopeDegrees < 90 && Fraction(UphillScale) && Fraction(DownhillScale);
+    public SimScalar TurnRate { get; init; }
+    public bool ScaleTurnSpeed { get; init; }
+    public SimScalar FullSpeedDegrees { get; init; }
+    public SimScalar MinimumSpeedDegrees { get; init; }
+    public SimScalar MinimumTurnScale { get; init; }
+    public bool ScaleSlopeSpeed { get; init; }
+    public SimScalar MaximumSlopeDegrees { get; init; }
+    public SimScalar UphillScale { get; init; }
+    public SimScalar DownhillScale { get; init; }
 
-    private static bool Fraction(double value) => double.IsFinite(value) && value >= 0 && value <= 1;
+    [System.Text.Json.Serialization.JsonConstructor]
+    public MotionParameters() : this(TurnRate: null) { }
+
+    public MotionParameters(SimScalar? TurnRate = null, bool ScaleTurnSpeed = true,
+        SimScalar? FullSpeedDegrees = null, SimScalar? MinimumSpeedDegrees = null,
+        SimScalar? MinimumTurnScale = null, bool ScaleSlopeSpeed = true,
+        SimScalar? MaximumSlopeDegrees = null, SimScalar? UphillScale = null, SimScalar? DownhillScale = null)
+    {
+        this.TurnRate = TurnRate ?? SimScalar.FromRatio(1, 2);
+        this.ScaleTurnSpeed = ScaleTurnSpeed;
+        this.FullSpeedDegrees = FullSpeedDegrees ?? (SimScalar)25;
+        this.MinimumSpeedDegrees = MinimumSpeedDegrees ?? (SimScalar)140;
+        this.MinimumTurnScale = MinimumTurnScale ?? SimScalar.FromRatio(3, 25);
+        this.ScaleSlopeSpeed = ScaleSlopeSpeed;
+        this.MaximumSlopeDegrees = MaximumSlopeDegrees ?? (SimScalar)30;
+        this.UphillScale = UphillScale ?? SimScalar.FromRatio(3, 5);
+        this.DownhillScale = DownhillScale ?? SimScalar.FromRatio(17, 20);
+    }
+
+    internal bool IsValid => TurnRate >= SimScalar.FromRatio(1, 20) && TurnRate <= SimulationDomain.CapabilityLimit
+        && FullSpeedDegrees >= 0 && MinimumSpeedDegrees > FullSpeedDegrees && MinimumSpeedDegrees <= 180
+        && Fraction(MinimumTurnScale) && MaximumSlopeDegrees > 0 && MaximumSlopeDegrees < 90
+        && Fraction(UphillScale) && Fraction(DownhillScale);
+    private static bool Fraction(SimScalar value) => value >= 0 && value <= 1;
 }

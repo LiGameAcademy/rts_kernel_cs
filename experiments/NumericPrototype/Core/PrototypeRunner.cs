@@ -20,6 +20,7 @@ public static class PrototypeRunner
             CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
             CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
             if (arguments.Length == 0) return RunChecks();
+            if (arguments.Length == 1 && arguments[0] == "--kernel-checks") return FixedKernelProbe.Run();
             if (arguments.Length != 2) throw new ArgumentException("Expected one probe mode and an input directory.");
             return arguments[0] switch
             {

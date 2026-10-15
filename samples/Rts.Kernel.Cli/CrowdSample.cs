@@ -5,7 +5,7 @@ internal static class CrowdSample
 {
     internal static void Run()
     {
-        var grid = new PathingGrid(32, 32, 10, SimVector2.Zero, new byte[1024]);
+        var grid = new PathingGrid(32, 32, 10, FixedVector2.Zero, new byte[1024]);
         var match = new RtsMatch(MatchConfig.Default, 7, grid,
             movementDefinitions: new[] { new MovementDefinition(1, 60, 4) });
         match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new(35, 155), 1));

@@ -28,15 +28,15 @@ internal sealed class UnitOrderBook
         && ((queue.Current is not null && queue.Current.Source != OrderSource.UnitAi)
             || queue.Pending.Any(order => order.Source != OrderSource.UnitAi));
 
-    internal SimVector2 PlacementStart(EntityState entity, OrderMode mode) =>
+    internal FixedVector2 PlacementStart(EntityState entity, OrderMode mode) =>
         mode == OrderMode.Append && _queues.TryGetValue(entity.Id, out var queue)
             ? queue.Pending.LastOrDefault()?.Move?.Goal ?? queue.Current?.Move?.Goal ?? entity.Position
             : entity.Position;
 
-    internal IEnumerable<SimVector2> RetainedGoals(EntityId id) =>
+    internal IEnumerable<FixedVector2> RetainedGoals(EntityId id) =>
         _queues.TryGetValue(id, out var queue)
             ? queue.Pending.Prepend(queue.Current).Where(intent => intent?.Move is not null).Select(intent => intent!.Move!.Goal)
-            : Enumerable.Empty<SimVector2>();
+            : Enumerable.Empty<FixedVector2>();
 
     internal IEnumerable<(EntityId Id, UnitOrderIntent Intent)> Intents()
     {
@@ -142,20 +142,13 @@ internal sealed class UnitOrderBook
             }
             if (!navigation!.TryWorldToCell(entity.Position, out var current)
                 || !navigation.CanTraverse(current, cells[item.NextWaypoint], item.Request.ClearanceCells)
-                || (item.NextWaypoint == 0 && current != cells[0]))
+                || (item.NextWaypoint == 0 && entity.Position != item.Waypoints[0]))
                 throw new InvalidDataException("Entity position does not match its current move segment.");
             if (item.NextWaypoint > 0)
             {
                 var from = item.Waypoints[item.NextWaypoint - 1];
                 var to = item.Waypoints[item.NextWaypoint];
-                var dx = to.X - from.X;
-                var dy = to.Y - from.Y;
-                var px = entity.Position.X - from.X;
-                var py = entity.Position.Y - from.Y;
-                var lengthSquared = dx * dx + dy * dy;
-                var dot = px * dx + py * dy;
-                if (Math.Abs(px * dy - py * dx) > 1e-7 * Math.Max(1, lengthSquared)
-                    || dot < -1e-7 || dot > lengthSquared + 1e-7)
+                if (!WaypointProgress.Contains(from, to, entity.Position))
                     throw new InvalidDataException("Entity position lies outside its saved move segment.");
             }
             _moves.Add(entity.Id, new MoveOrder(item.Request,

@@ -67,7 +67,7 @@ internal static class NavigationChecks
         var changedFlags = new byte[49]; changedFlags[0] = 2;
         Invalid(() => RtsMatch.Restore(snapshot, new PathingGrid(7, 7, 32, default, changedFlags)), "different map rejected");
         Invalid(() => RtsMatch.Restore(snapshot, new PathingGrid(7, 7, 64, default, new byte[49])), "different spacing rejected");
-        Invalid(() => RtsMatch.Restore(snapshot, new PathingGrid(7, 7, 32, new SimVector2(1, 0), new byte[49])),
+        Invalid(() => RtsMatch.Restore(snapshot, new PathingGrid(7, 7, 32, new FixedVector2(1, 0), new byte[49])),
             "different origin rejected");
         Invalid(() => RtsMatch.Restore(snapshot with { FormatVersion = 1 }, grid), "old snapshot format rejected");
         var duplicate = snapshot.Navigation! with { Obstacles = new[] { snapshot.Navigation.Obstacles[0], snapshot.Navigation.Obstacles[0] } };
@@ -79,7 +79,7 @@ internal static class NavigationChecks
         invalidPending[0] = invalidPending[0] with { Command = invalidPending[0].Command with { Obstacle = new ObstacleCommand(0) } };
         Invalid(() => RtsMatch.Restore(snapshot with { PendingCommands = invalidPending }, grid), "malformed pending payload rejected");
         check(!match.SubmitCommand(CommandEnvelope.SetObstacle(6, 0, 99, 1, wall)
-            with { Velocity = new SimVector2(double.NaN, 0) }).Accepted, "unused obstacle fields cannot carry invalid state");
+            with { Velocity = new FixedVector2(SimScalar.MaxValue, 0) }).Accepted, "unused obstacle fields cannot carry invalid state");
         var outside = snapshot.Navigation with { Obstacles = new[] { new NavigationObstacle(20, new GridArea(int.MaxValue, 0, 1, 1)) } };
         Invalid(() => RtsMatch.Restore(snapshot with { Navigation = outside }, grid), "out of map snapshot rejected without overflow");
         check(match.ComputeStateHash() == restored.ComputeStateHash(), "failed restore leaves live match unchanged");

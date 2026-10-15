@@ -1,15 +1,15 @@
 namespace Rts.Kernel.Navigation;
 
-public sealed record GroupPlanningMember(ulong EntityId, SimVector2 Start);
+public sealed record GroupPlanningMember(ulong EntityId, FixedVector2 Start);
 public sealed record GroupPlanningSnapshot(ulong GroupId, CommandEnvelope Command,
-    IReadOnlyList<GroupPlanningMember> Members, double Heading, double Spacing,
+    IReadOnlyList<GroupPlanningMember> Members, SimScalar Heading, SimScalar Spacing,
     IReadOnlyList<ulong> Canceled, SlotMatchingSnapshot? Matching, int PreparedCandidates = 0);
 public sealed record GroupPlanningView(ulong GroupId, int Members, int Canceled, int MatchingRow);
 
 internal sealed class GroupPlanningJob
 {
     private readonly GroupPlanningMember[] _members;
-    private readonly IReadOnlyList<SimVector2> _ideals;
+    private readonly IReadOnlyList<FixedVector2> _ideals;
     private readonly HashSet<ulong> _canceled = [];
     private readonly List<IReadOnlyList<GridCell>> _candidates = [];
     private SlotMatchingWork? _matching;
@@ -17,8 +17,8 @@ internal sealed class GroupPlanningJob
     internal ulong Id { get; }
     internal CommandEnvelope Command { get; }
     internal IReadOnlyList<GroupPlanningMember> Members { get; }
-    internal double Heading { get; }
-    internal double Spacing { get; }
+    internal SimScalar Heading { get; }
+    internal SimScalar Spacing { get; }
     internal int CanceledCount => _canceled.Count;
     internal int MatchingRow => _matching?.NextRow ?? 0;
     internal bool AllCanceled => _canceled.Count == _members.Length;
@@ -26,14 +26,14 @@ internal sealed class GroupPlanningJob
     internal IEnumerable<GroupPlanningMember> ActiveMembers => _members.Where(member => !_canceled.Contains(member.EntityId));
 
     internal GroupPlanningJob(ulong id, CommandEnvelope command, IReadOnlyList<PlacementMember> members,
-        double heading, double spacing)
+        SimScalar heading, SimScalar spacing)
         : this(id, command, members.Select(member => new GroupPlanningMember(member.Id.Value, member.Start)).ToArray(),
             heading, spacing)
     {
     }
 
     private GroupPlanningJob(ulong id, CommandEnvelope command, GroupPlanningMember[] members,
-        double heading, double spacing)
+        SimScalar heading, SimScalar spacing)
     {
         Id = id;
         Command = command.Freeze();

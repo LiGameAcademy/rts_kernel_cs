@@ -38,7 +38,7 @@ internal static class LocalDetour
             remainingNodes -= path.ExpandedNodes;
             if (remainingNodes <= 0 && path.Status != PathStatus.Found) return null;
             if (path.Status != PathStatus.Found) continue;
-            var points = new List<SimVector2> { entity.Position };
+            var points = new List<FixedVector2> { entity.Position };
             points.AddRange(path.Cells.Skip(1).Select(navigation.CellCenter));
             if (points[^1] != order.Waypoints[targetIndex]) points.Add(order.Waypoints[targetIndex]);
             points.AddRange(order.Waypoints.Skip(targetIndex + 1));

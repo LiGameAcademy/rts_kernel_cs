@@ -56,7 +56,7 @@ public sealed partial class RtsMatch
 
         AdvanceGroupPlanning();
         ActivateQueuedMoves();
-        AdvanceMovement(1.0 / Config.TickRate);
+        AdvanceMovement(Config.TickRate);
     }
 
     public bool TryGetEntity(EntityId entityId, out EntityState? state) =>

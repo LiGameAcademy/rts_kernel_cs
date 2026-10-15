@@ -6,7 +6,7 @@ internal static class GroupArrivalChecks
     internal static void Run(Action<bool, string> check)
     {
         LocalArrivalChecks.Run(check);
-        var grid = new PathingGrid(64, 64, 10, SimVector2.Zero, new byte[4096]);
+        var grid = new PathingGrid(64, 64, 10, FixedVector2.Zero, new byte[4096]);
         var definitions = new[] { new MovementDefinition(1, 60, 4), new MovementDefinition(2, 20, 6) };
         RtsMatch Create(int count)
         {

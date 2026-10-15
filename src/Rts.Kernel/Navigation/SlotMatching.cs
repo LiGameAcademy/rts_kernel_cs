@@ -1,7 +1,7 @@
 namespace Rts.Kernel.Navigation;
 
 public sealed record SlotMatchingSnapshot(int Row, int Column, bool Searching,
-    double[] U, double[] V, int[] Occupant, int[] Previous, double[] Minimum, bool[] Used);
+    Int128[] U, Int128[] V, int[] Occupant, int[] Previous, Int128[] Minimum, bool[] Used);
 
 /// <summary>Exact Hungarian assignment; each advance charges a fixed number of inspected columns.</summary>
 internal sealed class SlotMatchingWork
@@ -9,7 +9,7 @@ internal sealed class SlotMatchingWork
     // Slot 0 belongs to the anchor. _members maps remaining rows back to entity input indices.
     // Costs use zero-based rows/columns and squared world distance.
     private readonly int[] _members;
-    private readonly double[] _costs;
+    private readonly Int128[] _costs;
     private readonly int _n;
     private readonly int _count;
     private int _row = 1;
@@ -17,46 +17,43 @@ internal sealed class SlotMatchingWork
     private bool _searching;
     // Hungarian arrays use indices 1..n; column 0 is the synthetic augmenting-path root.
     // u/v are row/column potentials, occupant maps columns to rows, previous links the search tree.
-    private double[] _u;
-    private double[] _v;
+    private Int128[] _u;
+    private Int128[] _v;
     private int[] _occupant;
     private int[] _previous;
-    private double[] _minimum;
+    private Int128[] _minimum;
     private bool[] _used;
 
-    internal SlotMatchingWork(IReadOnlyList<SimVector2> positions, IReadOnlyList<SimVector2> slots, int anchor)
+    internal SlotMatchingWork(IReadOnlyList<FixedVector2> positions, IReadOnlyList<FixedVector2> slots, int anchor)
     {
         _count = positions.Count;
         _members = Enumerable.Range(0, _count).Where(i => i != anchor).ToArray();
         _n = _members.Length;
-        _costs = new double[_n * _n];
+        _costs = new Int128[_n * _n];
         foreach (var p in positions.Concat(slots))
-            if (!double.IsFinite(p.X) || !double.IsFinite(p.Y)) throw new ArgumentException("Nonfinite match point.");
-        _u = new double[_n + 1];
-        _v = new double[_n + 1];
+            if (!SimulationDomain.Contains(p.X) || !SimulationDomain.Contains(p.Y)) throw new ArgumentException("Nonfinite match point.");
+        _u = new Int128[_n + 1];
+        _v = new Int128[_n + 1];
         _occupant = new int[_n + 1];
         _previous = new int[_n + 1];
-        _minimum = new double[_n + 1];
+        _minimum = new Int128[_n + 1];
         _used = new bool[_n + 1];
         for (var i = 0; i < _n; i++)
         {
-            var minimum = double.PositiveInfinity;
+            var minimum = Int128.MaxValue;
             for (var j = 0; j < _n; j++)
             {
-                var dx = positions[_members[i]].X - slots[j + 1].X;
-                var dy = positions[_members[i]].Y - slots[j + 1].Y;
-                var cost = dx * dx + dy * dy;
-                if (!double.IsFinite(cost)) throw new ArgumentException("Assignment cost overflow.");
+                var cost = SquaredDistance.Between(positions[_members[i]], slots[j + 1]).Raw;
                 _costs[i * _n + j] = cost;
-                minimum = Math.Min(minimum, cost);
+                minimum = Int128.Min(minimum, cost);
             }
             _u[i + 1] = minimum;
         }
         for (var j = 0; j < _n; j++)
         {
-            var minimum = double.PositiveInfinity;
+            var minimum = Int128.MaxValue;
             for (var i = 0; i < _n; i++)
-                minimum = Math.Min(minimum, _costs[i * _n + j] - _u[i + 1]);
+                minimum = Int128.Min(minimum, _costs[i * _n + j] - _u[i + 1]);
             _v[j + 1] = minimum;
         }
         // Seed exact zero-cost matches in row/column order; tie order is deterministic.
@@ -91,20 +88,20 @@ internal sealed class SlotMatchingWork
                 }
                 _occupant[0] = _row;
                 _column = 0;
-                Array.Fill(_minimum, double.MaxValue);
+                Array.Fill(_minimum, Int128.MaxValue);
                 Array.Clear(_used);
                 _searching = true;
             }
             _used[_column] = true;
             var nextColumn = 0;
-            var delta = double.PositiveInfinity;
+            var delta = Int128.MaxValue;
             var activeRow = _occupant[_column];
             var offset = (activeRow - 1) * _n;
             var potential = _u[activeRow];
             for (var j = 1; j <= _n; j++)
             {
                 if (_used[j]) continue;
-                var reduced = _costs[offset + j - 1] - potential - _v[j];
+                var reduced = checked(_costs[offset + j - 1] - potential - _v[j]);
                 if (reduced < _minimum[j])
                 {
                     _minimum[j] = reduced;
@@ -117,15 +114,15 @@ internal sealed class SlotMatchingWork
                     nextColumn = j;
                 }
             }
-            if (!double.IsFinite(delta)) throw new ArgumentException("Assignment arithmetic overflow.");
+            if (delta == Int128.MaxValue) throw new InvalidOperationException("No augmenting column.");
             for (var j = 0; j <= _n; j++)
             {
                 if (_used[j])
                 {
-                    _u[_occupant[j]] += delta;
-                    _v[j] -= delta;
+                    _u[_occupant[j]] = checked(_u[_occupant[j]] + delta);
+                    _v[j] = checked(_v[j] - delta);
                 }
-                else if (_minimum[j] != double.MaxValue) _minimum[j] -= delta;
+                else if (_minimum[j] != Int128.MaxValue) _minimum[j] = checked(_minimum[j] - delta);
             }
             // Charge the whole inspected column batch, even if it crosses the frame budget.
             // Resume only between batches: these cursor/potential fields are snapshot authority.
@@ -158,15 +155,17 @@ internal sealed class SlotMatchingWork
     internal void Restore(SlotMatchingSnapshot state)
     {
         Validate(state, _n);
-        _row = state.Row;
-        _column = state.Column;
-        _searching = state.Searching;
-        _u = state.U.ToArray();
-        _v = state.V.ToArray();
-        _occupant = state.Occupant.ToArray();
-        _previous = state.Previous.ToArray();
-        _minimum = state.Minimum.ToArray();
-        _used = state.Used.ToArray();
+        // Reconstruct from immutable inputs; do not trust forged dual values in a snapshot.
+        var batches = 0;
+        while ((_row != state.Row || _column != state.Column || _searching != state.Searching)
+            && !Complete && _row <= state.Row && batches++ <= _n * _n + _n)
+            Advance(1);
+        var actual = Capture();
+        if (actual.Row != state.Row || actual.Column != state.Column || actual.Searching != state.Searching
+            || !actual.U.SequenceEqual(state.U) || !actual.V.SequenceEqual(state.V)
+            || !actual.Minimum.SequenceEqual(state.Minimum) || !actual.Used.SequenceEqual(state.Used)
+            || !actual.Occupant.SequenceEqual(state.Occupant) || !actual.Previous.SequenceEqual(state.Previous))
+            throw new InvalidDataException("Matching snapshot does not match its immutable inputs.");
     }
 
     internal static void Validate(SlotMatchingSnapshot state, int n)
@@ -176,7 +175,8 @@ internal sealed class SlotMatchingWork
             || new[] { state.U.Length, state.V.Length, state.Occupant.Length, state.Previous.Length,
                 state.Minimum.Length, state.Used.Length }.Any(length => length != n + 1)
             || state.Row < 1 || state.Row > n + 1 || state.Column < 0 || state.Column > n
-            || state.U.Concat(state.V).Concat(state.Minimum).Any(value => !double.IsFinite(value))
+            || state.U.Concat(state.V).Any(value => value <= -(Int128.One << 120) || value >= (Int128.One << 120))
+            || state.Minimum.Any(value => value < 0 || (value != Int128.MaxValue && value >= (Int128.One << 120)))
             || state.Occupant.Any(value => value < 0 || value > n)
             || state.Previous.Any(value => value < 0 || value > n)
             || state.Occupant.Skip(1).Where(value => value != 0).Distinct().Count()
@@ -203,7 +203,7 @@ internal sealed class SlotMatchingWork
 
 internal static class SlotMatching
 {
-    internal static int[] Assign(IReadOnlyList<SimVector2> positions, IReadOnlyList<SimVector2> slots, int anchor)
+    internal static int[] Assign(IReadOnlyList<FixedVector2> positions, IReadOnlyList<FixedVector2> slots, int anchor)
     {
         var work = new SlotMatchingWork(positions, slots, anchor);
         while (!work.Complete) work.Advance(int.MaxValue);

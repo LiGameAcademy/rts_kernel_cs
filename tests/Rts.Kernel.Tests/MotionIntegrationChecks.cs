@@ -8,10 +8,10 @@ internal static class MotionIntegrationChecks
         var id = new EntityId(1);
         var grid = new PathingGrid(20, 6, 10, default, new byte[120]);
         var ramp = new TerrainHeights(21, 7, 10, default,
-            Enumerable.Range(0, 147).Select(i => (i % 21) * 10.0).ToArray());
-        var flat = new TerrainHeights(21, 7, 10, default, new double[147]);
-        bool Near(double left, double right) => Math.Abs(left - right) < 1e-10;
-        RtsMatch Create(SimVector2 start, TerrainHeights? terrain, double facing = 0)
+            Enumerable.Range(0, 147).Select(i => (SimScalar)((i % 21) * 10)).ToArray());
+        var flat = new TerrainHeights(21, 7, 10, default, new SimScalar[147]);
+        bool Near(SimScalar left, SimScalar right) => SimMath.Abs(left - right) <= SimScalar.FromRaw(512);
+        RtsMatch Create(FixedVector2 start, TerrainHeights? terrain, SimScalar facing = default)
         {
             var match = new RtsMatch(MatchConfig.Default, 7, grid, terrain);
             match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, start));
@@ -20,65 +20,65 @@ internal static class MotionIntegrationChecks
             var saved = match.CaptureSnapshot();
             return RtsMatch.Restore(saved with { Entities = new[] { saved.Entities[0] with { Facing = facing } } }, grid, terrain);
         }
-        void Move(RtsMatch match, SimVector2 goal, double speed, MotionParameters? motion)
+        void Move(RtsMatch match, FixedVector2 goal, SimScalar speed, MotionParameters? motion)
         {
             check(match.SubmitCommand(CommandEnvelope.MoveTo(match.Frame + 1, 0, match.Frame, id, goal, speed,
                 motion: motion)).Accepted, "motion command accepted at submission");
             match.Step();
         }
-        var east = Create(new SimVector2(15, 15), flat);
-        Move(east, new SimVector2(195, 15), 30, new MotionParameters());
-        var north = Create(new SimVector2(15, 15), flat, Math.PI / 2);
-        Move(north, new SimVector2(15, 55), 30, new MotionParameters());
+        var east = Create(new FixedVector2(15, 15), flat);
+        Move(east, new FixedVector2(195, 15), 30, new MotionParameters());
+        var north = Create(new FixedVector2(15, 15), flat, SimMath.Pi / 2);
+        Move(north, new FixedVector2(15, 55), 30, new MotionParameters());
         check(Near(east.Entities.Single().Position.X - 15, north.Entities.Single().Position.Y - 15),
             "flat ground speed independent of planar movement direction");
-        var uphill = Create(new SimVector2(15, 15), ramp);
-        Move(uphill, new SimVector2(195, 15), 30, new MotionParameters());
-        check(Near(uphill.Entities.Single().Position.X, 15.6), "real elevation rise limits uphill speed");
-        var downhill = Create(new SimVector2(185, 15), ramp, -Math.PI);
-        Move(downhill, new SimVector2(5, 15), 30, new MotionParameters());
-        check(Near(downhill.Entities.Single().Position.X, 184.15), "real elevation drop limits downhill speed");
-        var reverse = Create(new SimVector2(15, 15), null);
-        Move(reverse, new SimVector2(5, 15), 30, new MotionParameters(ScaleSlopeSpeed: false));
-        check(Near(reverse.Entities.Single().Position.X, 14.88), "opposite heading applies minimum turn speed");
-        check(Near(reverse.Entities.Single().Facing, -Math.PI / 30), "opposite heading rotates by one frame budget");
+        var uphill = Create(new FixedVector2(15, 15), ramp);
+        Move(uphill, new FixedVector2(195, 15), 30, new MotionParameters());
+        check(Near(uphill.Entities.Single().Position.X, SimScalar.Parse("15.6")), "real elevation rise limits uphill speed");
+        var downhill = Create(new FixedVector2(185, 15), ramp, -SimMath.Pi);
+        Move(downhill, new FixedVector2(5, 15), 30, new MotionParameters());
+        check(Near(downhill.Entities.Single().Position.X, SimScalar.Parse("184.15")), "real elevation drop limits downhill speed");
+        var reverse = Create(new FixedVector2(15, 15), null);
+        Move(reverse, new FixedVector2(5, 15), 30, new MotionParameters(ScaleSlopeSpeed: false));
+        check(Near(reverse.Entities.Single().Position.X, SimScalar.Parse("14.88")), "opposite heading applies minimum turn speed");
+        check(Near(reverse.Entities.Single().Facing, -SimMath.Pi / 30), "opposite heading rotates by one frame budget");
         var stoppedFacing = reverse.Entities.Single().Facing;
         var stoppedPosition = reverse.Entities.Single().Position;
         reverse.SubmitCommand(CommandEnvelope.Stop(3, 0, 3, id));
         reverse.Step();
         check(reverse.Entities.Single().Facing == stoppedFacing && reverse.Entities.Single().Position == stoppedPosition,
             "stop preserves authoritative facing and stops movement");
-        var turnInPlace = Create(new SimVector2(15, 15), null);
-        Move(turnInPlace, new SimVector2(5, 15), 30,
+        var turnInPlace = Create(new FixedVector2(15, 15), null);
+        Move(turnInPlace, new FixedVector2(5, 15), 30,
             new MotionParameters(MinimumTurnScale: 0, ScaleSlopeSpeed: false));
-        check(turnInPlace.Entities.Single().Position == new SimVector2(15, 15)
+        check(turnInPlace.Entities.Single().Position == new FixedVector2(15, 15)
             && turnInPlace.Entities.Single().Facing < 0, "zero speed scale still allows turning");
         for (var i = 0; i < 10; i++) turnInPlace.Step();
         check(turnInPlace.Entities.Single().Position.X < 15, "turning eventually releases zero speed threshold");
-        var missing = Create(new SimVector2(15, 15), null);
-        Move(missing, new SimVector2(195, 15), 30, null);
-        Move(missing, new SimVector2(5, 15), 30, new MotionParameters());
+        var missing = Create(new FixedVector2(15, 15), null);
+        Move(missing, new FixedVector2(195, 15), 30, null);
+        Move(missing, new FixedVector2(5, 15), 30, new MotionParameters());
         check(missing.DrainEvents().Single().Detail == "motion_requires_height_field"
-            && missing.ReadMoveOrders().Single().Request.Goal == new SimVector2(195, 15),
+            && missing.ReadMoveOrders().Single().Request.Goal == new FixedVector2(195, 15),
             "missing terrain rejection preserves previous order");
-        var frozen = Create(new SimVector2(15, 15), ramp, Math.PI / 2);
-        Move(frozen, new SimVector2(195, 15), 30, new MotionParameters(UphillScale: 0));
-        check(frozen.Entities.Single().Position == new SimVector2(15, 15)
-            && frozen.Entities.Single().Facing < Math.PI / 2, "zero uphill speed still turns without translating");
+        var frozen = Create(new FixedVector2(15, 15), ramp, SimMath.Pi / 2);
+        Move(frozen, new FixedVector2(195, 15), 30, new MotionParameters(UphillScale: 0));
+        check(frozen.Entities.Single().Position == new FixedVector2(15, 15)
+            && frozen.Entities.Single().Facing < SimMath.Pi / 2, "zero uphill speed still turns without translating");
 
         var walls = new byte[48];
         for (var y = 0; y < 4; y++) walls[y * 8 + 3] = 2;
         var cornerGrid = new PathingGrid(8, 6, 10, default, walls);
         var corners = new RtsMatch(MatchConfig.Default, 7, cornerGrid);
-        corners.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new SimVector2(15, 15)));
+        corners.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new FixedVector2(15, 15)));
         corners.Step();
-        Move(corners, new SimVector2(65, 15), 1200,
+        Move(corners, new FixedVector2(65, 15), 1200,
             new MotionParameters(ScaleTurnSpeed: false, ScaleSlopeSpeed: false));
-        check(Math.Abs(corners.Entities.Single().Facing) <= Math.PI / 30 + 1e-10,
+        check(SimMath.Abs(corners.Entities.Single().Facing) <= SimMath.Pi / 30 + SimScalar.FromRaw(512),
             "crossing multiple waypoints cannot multiply turn time budget");
         for (var i = 0; i < 5; i++) corners.Step();
-        check(corners.Entities.Single().Position == new SimVector2(65, 15) && !corners.IsMoving(id)
-            && corners.Entities.Single().Velocity == SimVector2.Zero, "motion arrives precisely and clears velocity");
+        check(corners.Entities.Single().Position == new FixedVector2(65, 15) && !corners.IsMoving(id)
+            && corners.Entities.Single().Velocity == FixedVector2.Zero, "motion arrives precisely and clears velocity");
         var arrivalFacing = corners.Entities.Single().Facing;
         corners.Step();
         check(corners.Entities.Single().Facing == arrivalFacing, "arrival retains final authoritative facing");

@@ -28,11 +28,10 @@ public sealed partial class RtsMatch
         var members = PrepareGroupMembers(command, groupId);
         if (members.Count == 0) return;
         var anchorMember = members.FirstOrDefault(member => member.Id == request.LeaderId) ?? members[0];
-        var mean = new SimVector2(members.Sum(member => member.Start.X / members.Count),
-            members.Sum(member => member.Start.Y / members.Count));
+        var mean = MeanStart(members);
         var dx = request.Goal.X - mean.X;
         var dy = request.Goal.Y - mean.Y;
-        var heading = request.Heading ?? (dx == 0 && dy == 0 ? _entities.Get(anchorMember.Id).Facing : Math.Atan2(dy, dx));
+        var heading = request.Heading ?? (dx == 0 && dy == 0 ? _entities.Get(anchorMember.Id).Facing : SimMath.Atan2(dy, dx));
         heading = MotionRules.Normalize(heading);
         IReadOnlyList<PlacementGoal> goals;
         try
@@ -64,6 +63,18 @@ public sealed partial class RtsMatch
         ApplyGroupGoals(command, groupId, heading, goals);
     }
 
+    private static FixedVector2 MeanStart(IReadOnlyList<PlacementMember> members)
+    {
+        Int128 x = 0;
+        Int128 y = 0;
+        foreach (var member in members)
+        {
+            x += member.Start.X.Raw;
+            y += member.Start.Y.Raw;
+        }
+        return FixedVector2.FromRaw(checked((long)(x / members.Count)), checked((long)(y / members.Count)));
+    }
+
     private IReadOnlyList<PlacementMember> PrepareGroupMembers(CommandEnvelope command, ulong groupId)
     {
         var members = new List<PlacementMember>();
@@ -81,7 +92,7 @@ public sealed partial class RtsMatch
                 error = "motion_requires_height_field";
             else
             {
-                var retained = new List<SimVector2> { entity.Position };
+                var retained = new List<FixedVector2> { entity.Position };
                 retained.AddRange(_orders.RetainedGoals(id));
                 members.Add(new PlacementMember(id, _orders.PlacementStart(entity, command.Mode), definition, Clearance(definition), retained));
             }
@@ -104,13 +115,13 @@ public sealed partial class RtsMatch
         return occupied;
     }
 
-    private void ApplyGroupGoals(CommandEnvelope command, ulong groupId, double heading, IReadOnlyList<PlacementGoal> goals) =>
+    private void ApplyGroupGoals(CommandEnvelope command, ulong groupId, SimScalar heading, IReadOnlyList<PlacementGoal> goals) =>
         SubmitGroupGoals(command, groupId, heading, goals, MatchCommandExecutor.MoveSubmission.Command);
 
-    private void CommitPlannedGroupGoals(CommandEnvelope command, ulong groupId, double heading, IReadOnlyList<PlacementGoal> goals) =>
+    private void CommitPlannedGroupGoals(CommandEnvelope command, ulong groupId, SimScalar heading, IReadOnlyList<PlacementGoal> goals) =>
         SubmitGroupGoals(command, groupId, heading, goals, MatchCommandExecutor.MoveSubmission.PlannedGroup);
 
-    private void SubmitGroupGoals(CommandEnvelope command, ulong groupId, double heading,
+    private void SubmitGroupGoals(CommandEnvelope command, ulong groupId, SimScalar heading,
         IReadOnlyList<PlacementGoal> goals, MatchCommandExecutor.MoveSubmission submission)
     {
         var request = command.Group!;

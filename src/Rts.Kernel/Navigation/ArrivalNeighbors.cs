@@ -1,6 +1,6 @@
 namespace Rts.Kernel.Navigation;
 
-internal sealed record ArrivalMember(EntityId Id, int Slot, SimVector2 Goal, double Radius);
+internal sealed record ArrivalMember(EntityId Id, int Slot, FixedVector2 Goal, SimScalar Radius);
 
 /// <summary>Derived immutable neighbours of assigned endpoints; active membership is checked by the match.</summary>
 internal sealed class ArrivalNeighbors
@@ -9,8 +9,7 @@ internal sealed class ArrivalNeighbors
     internal ArrivalNeighbors(NavigationState navigation, IReadOnlyList<ArrivalMember> members)
     {
         // Final corridor length plus both bodies: 2 * (rA + rB) + 2 cells.
-        var cells = (int)Math.Min(int.MaxValue, Math.Max(1,
-            Math.Ceiling(members.Max(member => member.Radius) * 4 / navigation.Grid.CellSize) + 2));
+        var cells = FixedGridMath.BucketCells(members.Max(member => member.Radius), 4, navigation.Grid.CellSize, 2);
         var buckets = new Dictionary<(int X, int Y), List<ArrivalMember>>();
         foreach (var member in members)
         {
@@ -36,8 +35,8 @@ internal sealed class ArrivalNeighbors
     }
     internal IReadOnlyList<ArrivalMember> Prior(EntityId id) => _prior[id];
 
-    internal static bool BlocksApproach(SimVector2 body, double radius, SimVector2 current,
-        double movingRadius, MoveOrder moving, double cellSize)
+    internal static bool BlocksApproach(FixedVector2 body, SimScalar radius, FixedVector2 current,
+        SimScalar movingRadius, MoveOrder moving, SimScalar cellSize)
     {
         // Only the final approach can require assembly ordering. Distant crossing remains crowd navigation.
         var remaining = radius + movingRadius + cellSize * 2;
@@ -45,9 +44,7 @@ internal sealed class ArrivalNeighbors
         {
             var to = moving.Waypoints[i];
             var from = i == moving.NextWaypoint ? current : moving.Waypoints[i - 1];
-            var dx = to.X - from.X; var dy = to.Y - from.Y;
-            var length = Math.Sqrt(dx * dx + dy * dy);
-            if (!double.IsFinite(length)) return true;
+            var length = SquaredDistance.Between(from, to).Length;
             if (length > remaining)
                 from = new(to.X + (from.X - to.X) * (remaining / length),
                     to.Y + (from.Y - to.Y) * (remaining / length));

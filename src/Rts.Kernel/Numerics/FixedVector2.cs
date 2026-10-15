@@ -6,6 +6,7 @@ public readonly record struct FixedVector2(SimScalar X, SimScalar Y)
     public static FixedVector2 Zero => default;
     public static FixedVector2 FromRaw(long x, long y) => new(SimScalar.FromRaw(x), SimScalar.FromRaw(y));
     public override string ToString() => $"({X}, {Y})";
+    [System.Text.Json.Serialization.JsonIgnore]
     public SimScalar Length => SquaredDistance.Between(Zero, this).Length;
     public static FixedVector2 operator +(FixedVector2 a, FixedVector2 b) => new(a.X + b.X, a.Y + b.Y);
     public static FixedVector2 operator -(FixedVector2 a, FixedVector2 b) => new(a.X - b.X, a.Y - b.Y);

@@ -5,9 +5,9 @@ internal static class LocalArrivalChecks
 {
     internal static void Run(Action<bool, string> check)
     {
-        var grid = new PathingGrid(64, 64, 10, SimVector2.Zero, new byte[4096]);
+        var grid = new PathingGrid(64, 64, 10, FixedVector2.Zero, new byte[4096]);
         var definitions = new[] { new MovementDefinition(1, 60, 4) };
-        RtsMatch Create(SimVector2[] starts, SimVector2[] goals)
+        RtsMatch Create(FixedVector2[] starts, FixedVector2[] goals)
         {
             var match = new RtsMatch(MatchConfig.Default, 7, grid, movementDefinitions: definitions);
             for (var i = 0; i < starts.Length; i++)
@@ -19,12 +19,12 @@ internal static class LocalArrivalChecks
             for (var i = 0; i < starts.Length; i++)
             {
                 var request = new MoveRequest(goals[i], 60);
-                var path = new List<SimVector2> { starts[i] };
+                var path = new List<FixedVector2> { starts[i] };
                 var position = starts[i];
                 while (position != goals[i])
                 {
-                    position = new(position.X + Math.Sign(goals[i].X - position.X) * 10,
-                        position.Y + Math.Sign(goals[i].Y - position.Y) * 10);
+                    position = new(position.X + (goals[i].X - position.X).Raw.CompareTo(0) * 10,
+                        position.Y + (goals[i].Y - position.Y).Raw.CompareTo(0) * 10);
                     path.Add(position);
                 }
                 moves.Add(new((ulong)i + 1, request, path, 1));
@@ -53,11 +53,11 @@ internal static class LocalArrivalChecks
         check(adjacent.Entities.Single(e => e.Id == new EntityId(2)).Position.Y < 115,
             "nearby nonconflicting final corridors advance together");
 
-        foreach (var priorGoal in new[] { new SimVector2(85, 65), new SimVector2(105, 65) })
+        foreach (var priorGoal in new[] { new FixedVector2(85, 65), new FixedVector2(105, 65) })
         {
             var conflict = Create([new(65, 65), new(75, 35)], [priorGoal, new(75, 65)]);
             conflict.Step();
-            check(conflict.Entities.Single(e => e.Id == new EntityId(2)).Position == new SimVector2(75, 35)
+            check(conflict.Entities.Single(e => e.Id == new EntityId(2)).Position == new FixedVector2(75, 35)
                 && conflict.ReadMoveOrders().Single(o => o.EntityId == 2).WaitFrames == 0,
                 "conflicting final corridor yields without charging physical timeout");
             var restored = RtsMatch.Restore(conflict.CaptureSnapshot(), grid, movementDefinitions: definitions);
@@ -68,7 +68,7 @@ internal static class LocalArrivalChecks
                     "cached local neighbors rebuild identical decisions after restore");
             }
             check(conflict.Entities.All(e => !conflict.IsMoving(e.Id))
-                && conflict.Entities.Single(e => e.Id == new EntityId(2)).Position == new SimVector2(75, 65),
+                && conflict.Entities.Single(e => e.Id == new EntityId(2)).Position == new FixedVector2(75, 65),
                 "local conflict releases after earlier corridor clears");
             check(!conflict.DrainEvents().Any(e => e.Kind == MatchEventKind.MoveFailed),
                 "local corridor ordering does not strand either assigned member");

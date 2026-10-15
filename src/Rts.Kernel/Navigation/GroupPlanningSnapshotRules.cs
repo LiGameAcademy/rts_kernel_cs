@@ -17,8 +17,8 @@ internal static class GroupPlanningSnapshotRules
                 || !command.HasValidOrderMetadata || !command.HasValidMovePayload || !command.HasValidObstaclePayload || command.ExecuteFrame <= 0 || command.ExecuteFrame > snapshot.Frame
                 || command.PlayerId < 0 || command.Sequence < 0 || job.Members is null || job.Canceled is null
                 || job.Members.Count <= RtsMatch.ImmediateGroupMembers || job.Members.Count > FormationLayout.MaximumMembers
-                || !double.IsFinite(job.Heading) || job.Heading < -Math.PI || job.Heading >= Math.PI
-                || !double.IsFinite(job.Spacing) || job.Spacing <= 0
+                || !SimulationDomain.Contains(job.Heading) || job.Heading < -SimMath.Pi || job.Heading >= SimMath.Pi
+                || !SimulationDomain.Contains(job.Spacing) || job.Spacing <= 0
                 || job.PreparedCandidates < 0 || job.PreparedCandidates > job.Members.Count
                 || (job.PreparedCandidates > 0 && job.Matching is null))
                 throw new InvalidDataException("Invalid group planning identity or geometry.");
@@ -29,7 +29,7 @@ internal static class GroupPlanningSnapshotRules
                 if (member is null || member.EntityId <= last
                     || !command.Group!.EntityIds.Contains(new EntityId(member.EntityId))
                     || !snapshot.Entities.Any(entity => entity.Id == member.EntityId)
-                    || !double.IsFinite(member.Start.X) || !double.IsFinite(member.Start.Y))
+                    || !SimulationDomain.Contains(member.Start.X) || !SimulationDomain.Contains(member.Start.Y))
                     throw new InvalidDataException("Invalid group planning member.");
                 last = member.EntityId;
             }

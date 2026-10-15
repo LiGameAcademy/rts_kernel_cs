@@ -10,26 +10,26 @@ internal static class OrderQueueChecks
         RtsMatch Create()
         {
             var match = new RtsMatch(MatchConfig.Default, 7, grid);
-            match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new SimVector2(5, 5)));
+            match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new FixedVector2(5, 5)));
             match.Step();
             match.DrainEvents();
             return match;
         }
-        CommandEnvelope Move(long frame, long sequence, double x, OrderMode mode = OrderMode.Replace,
-            OrderSource source = OrderSource.Player, double speed = 300) =>
-            CommandEnvelope.MoveTo(frame, 0, sequence, id, new SimVector2(x, 5), speed, mode: mode, source: source);
+        CommandEnvelope Move(long frame, long sequence, SimScalar x, OrderMode mode = OrderMode.Replace,
+            OrderSource source = OrderSource.Player, SimScalar? speed = null) =>
+            CommandEnvelope.MoveTo(frame, 0, sequence, id, new FixedVector2(x, 5), speed ?? (SimScalar)300, mode: mode, source: source);
         var queued = Create();
         queued.SubmitCommand(Move(2, 1, 25));
         queued.SubmitCommand(Move(2, 2, 45, OrderMode.Append));
         queued.SubmitCommand(Move(2, 3, 65, OrderMode.Append));
         queued.Step();
-        check(queued.Entities.Single().Position == new SimVector2(15, 5)
+        check(queued.Entities.Single().Position == new FixedVector2(15, 5)
             && queued.ReadUnitOrders().Single().Pending.Count == 2, "append keeps current goal and does not multiply frame movement");
         var savedView = queued.ReadUnitOrders();
         var restored = RtsMatch.Restore(SnapshotJson.Deserialize(SnapshotJson.Serialize(queued.CaptureSnapshot())), grid);
         queued.Step();
         restored.Step();
-        check(queued.Entities.Single().Position == new SimVector2(25, 5)
+        check(queued.Entities.Single().Position == new FixedVector2(25, 5)
             && queued.ReadUnitOrders().Single().Current is null, "arrival keeps pending intents until next frame");
         check(savedView.Single().Current!.Move!.Goal.X == 25 && savedView.Single().Pending.Count == 2,
             "captured order views retain copied state after simulation advances");
@@ -42,7 +42,7 @@ internal static class OrderQueueChecks
             check(queued.ComputeStateHash() == restored.ComputeStateHash() && queued.ComputeStateHash() == handoff.ComputeStateHash(),
                 "active and handoff snapshots continue identically");
         }
-        check(queued.Entities.Single().Position == new SimVector2(65, 5) && queued.ReadUnitOrders().Count == 0,
+        check(queued.Entities.Single().Position == new FixedVector2(65, 5) && queued.ReadUnitOrders().Count == 0,
             "FIFO goals arrive precisely and remove finished queue");
         check(queued.DrainEvents().Select(item => item.Frame).SequenceEqual(new long[] { 3, 5, 7 }),
             "each queued goal completes once on its own frame");
@@ -70,7 +70,7 @@ internal static class OrderQueueChecks
         stopped.SubmitCommand(CommandEnvelope.Stop(3, 0, 3, id));
         stopped.SubmitCommand(Move(3, 4, 45, source: OrderSource.UnitAi));
         stopped.Step();
-        check(stopped.Entities.Single().Position == new SimVector2(15, 5) && !stopped.IsMoving(id)
+        check(stopped.Entities.Single().Position == new FixedVector2(15, 5) && !stopped.IsMoving(id)
             && stopped.ReadUnitOrders().Single().Current!.Kind == UnitOrderKind.Stop
             && stopped.ReadUnitOrders().Single().Pending.Count == 0, "stop cancels queue and blocks same-frame unit AI");
         var stoppedCopy = RtsMatch.Restore(SnapshotJson.Deserialize(SnapshotJson.Serialize(stopped.CaptureSnapshot())), grid);
@@ -122,7 +122,7 @@ internal static class OrderQueueChecks
         failure.Step();
         blockedCopy.Step();
         check(failure.ReadUnitOrders().Single().Pending.Count == 1 && !failure.IsMoving(id)
-            && failure.Entities.Single().Velocity == SimVector2.Zero, "failed queued goal retains next intent without using frame movement");
+            && failure.Entities.Single().Velocity == FixedVector2.Zero, "failed queued goal retains next intent without using frame movement");
         check(failure.DrainEvents().Any(item => item.Kind == MatchEventKind.MoveFailed && item.Frame == 4),
             "blocked queued goal reports deterministic failure event");
         for (var i = 0; i < 12; i++)
@@ -131,7 +131,7 @@ internal static class OrderQueueChecks
             blockedCopy.Step();
             check(failure.ComputeStateHash() == blockedCopy.ComputeStateHash(), "blocked pending goals restore and resume consistently");
         }
-        check(failure.Entities.Single().Position == new SimVector2(65, 5) && !failure.IsMoving(id),
+        check(failure.Entities.Single().Position == new FixedVector2(65, 5) && !failure.IsMoving(id),
             "remaining queued goal starts from current location and detours around new obstacle");
 
         var reordered = Create();
@@ -139,7 +139,7 @@ internal static class OrderQueueChecks
         reordered.SubmitCommand(Move(2, 1, 25));
         reordered.SubmitCommand(Move(2, 2, 45, OrderMode.Append));
         reordered.Step();
-        check(reordered.ReadUnitOrders().Single().Pending.Select(order => order.Move!.Goal.X).SequenceEqual(new double[] { 45, 65 }),
+        check(reordered.ReadUnitOrders().Single().Pending.Select(order => order.Move!.Goal.X).SequenceEqual(new SimScalar[] { 45, 65 }),
             "same-frame intent order follows sequence, not submission order");
         var ties = Create();
         ties.SubmitCommand(Move(2, 1, 25));
@@ -151,7 +151,7 @@ internal static class OrderQueueChecks
             "equal command sequences preserve arrival order through pending-command restore");
         var activeFailure = Create();
         activeFailure.SubmitCommand(Move(2, 1, 65, speed: 30));
-        activeFailure.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 2, id, new SimVector2(5, 35), 300, mode: OrderMode.Append));
+        activeFailure.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 2, id, new FixedVector2(5, 35), 300, mode: OrderMode.Append));
         activeFailure.Step();
         activeFailure.SubmitCommand(CommandEnvelope.SetObstacle(3, 0, 3, 1, new GridArea(1, 0, 1, 4)));
         activeFailure.Step();
@@ -165,7 +165,7 @@ internal static class OrderQueueChecks
             activeFailureCopy.Step();
             check(activeFailure.ComputeStateHash() == activeFailureCopy.ComputeStateHash(), "active failure handoff restores consistently");
         }
-        check(activeFailure.Entities.Single().Position == new SimVector2(5, 35), "queue resumes in reachable area after active path fails");
+        check(activeFailure.Entities.Single().Position == new FixedVector2(5, 35), "queue resumes in reachable area after active path fails");
 
         var full = Create();
         full.SubmitCommand(Move(2, 0, 65, speed: 1));

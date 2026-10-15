@@ -22,7 +22,7 @@
 
 现阶段使用普通 C# 类型与模块化组合，重点完善正确性、状态边界与可读性，不启动 ECS 迁移。ECS 不作为永久禁用项；后续可根据实际维护问题、真实性能证据及依赖成本评估成熟第三方实现，不提前自建通用框架。设计以实际游戏需求为依据，不预先构建通用引擎。宿主负责输入、资源读取、渲染和网络；内核不引用 Godot，也不依赖场景树或节点生命周期。
 
-框架职责见 [框架说明](docs/FRAMEWORK.md)；导航 API 见 [导航说明](docs/NAVIGATION.md)，目标移动与快照 v9 见 [移动说明](docs/MOVEMENT.md)。v1–v8 快照不再接受；本项目尚不支持跨版本存档迁移。
+框架职责见 [框架说明](docs/FRAMEWORK.md)；导航 API 见 [导航说明](docs/NAVIGATION.md)，目标移动与快照 v11 见 [移动说明](docs/MOVEMENT.md)。v1–v10 快照不再接受；本项目尚不支持跨版本存档迁移。
 
 对局随机流由内核独占，宿主不能通过公开对象消费随机数。快照的 `RngState` 可用于诊断或建立独立随机流；移除了早期的可变 `RtsMatch.Rng` 公开属性。
 
@@ -70,3 +70,13 @@ git submodule update --init --recursive
 从源仓库 `05cf2b0` 提取相关路径历史，保留原作者、时间及提交说明；提取后哈希发生变化，见 [提交映射](docs/history-map.txt)。早期提交保留了拆分前的项目引用，独立构建入口从拆分整理提交开始可用。
 
 MIT，Copyright (c) 2026 李维民。见 [LICENSE](LICENSE)。暂不发布 NuGet 包或正式 Release。
+
+## 正式数值与宿主边界
+
+位置、速度、朝向、地形及群体规划已切换到`Rts.Kernel.Numerics`的32.32 `SimScalar`和`FixedVector2`；平方距离与匹配符号势用Int128。十进制配置用`SimScalar.Parse`，算术截向零，负网格索引向下取整，越界明确拒绝。JSON保存raw Int64，不是世界单位小数；显示转换显式调用`ToPresentationDouble()`，不将显示值反写规则。
+
+坐标/高度允许±1,048,576，速度/半径为正且不超过65,536；网格范围和命令先校验。时间保持整数tick；位移从原始路段计算，每坐标一次舍入，恢复校验采用两个raw单位的边界。低于一整帧位移分辨率且无法继续转向的运动报告`movement_below_resolution`，沿用失败后续队规则。
+
+MIT FixPointCS固定源码、许可证及hash在`third_party/FixPointCS`；开方与扫掠碰撞使用项目的精确整数实现，高阶乘积比较不引入通用大数框架。原型可用`--kernel-checks`在CLI/Godot运行同一正式内核情景。Godot验证工具的`-UseImportedProject`明确表示复用已导入工程、只验运行，不将编辑器原生导入失败记为通过。
+
+v11拒绝旧快照；旧tag保留。不以数值迁移和合成检查通过宣称完整M2、联机或300/500拥挤性能验收通过，宿主升级另行固定已验证的子模块提交。

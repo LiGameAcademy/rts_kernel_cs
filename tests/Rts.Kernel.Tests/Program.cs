@@ -50,21 +50,24 @@ if (args.Contains("--crowd-only"))
 RtsMatch CreateMovingMatch()
 {
     var match = new RtsMatch(MatchConfig.Default, 1234);
-    Check(match.SubmitCommand(CommandEnvelope.Spawn(1, 1, 0, new SimVector2(10, 20))).Accepted, "spawn accepted");
+    Check(match.SubmitCommand(CommandEnvelope.Spawn(1, 1, 0, new FixedVector2(10, 20))).Accepted, "spawn accepted");
     match.Step();
     var id = match.Entities.Single().Id;
-    Check(match.SubmitCommand(CommandEnvelope.SetVelocity(2, 1, 1, id, new SimVector2(30, -15))).Accepted, "velocity accepted");
+    Check(match.SubmitCommand(CommandEnvelope.SetVelocity(2, 1, 1, id, new FixedVector2(30, -15))).Accepted, "velocity accepted");
     match.Step();
     return match;
 }
 
 NumericFoundationChecks.Run(Check);
+FixedGeometryChecks.Run(Check);
+FixedNumericStateChecks.Run(Check);
+FixedMatchingChecks.Run(Check);
 
 var original = CreateMovingMatch();
 var moving = original.Entities.Single();
 Check(moving.Id.Value == 1, "entity ids start at one");
-Check(moving.Position == new SimVector2(11, 19.5), "fixed tick movement");
-Check(!original.SubmitCommand(CommandEnvelope.Spawn(original.Frame, 1, 2, SimVector2.Zero)).Accepted, "past command rejected");
+Check(moving.Position == new FixedVector2(11, SimScalar.FromRatio(39, 2)), "fixed tick movement");
+Check(!original.SubmitCommand(CommandEnvelope.Spawn(original.Frame, 1, 2, FixedVector2.Zero)).Accepted, "past command rejected");
 Check(original.SubmitCommand(CommandEnvelope.Stop(10, 1, 3, moving.Id)).Accepted, "future command accepted");
 
 var snapshotJson = SnapshotJson.Serialize(original.CaptureSnapshot());
@@ -114,29 +117,28 @@ right.Step();
 Check(left.ComputeStateHash() == right.ComputeStateHash(), "same inputs converge after interleaved stepping");
 
 var rejected = new RtsMatch(MatchConfig.Default, 99);
-rejected.SubmitCommand(CommandEnvelope.SetVelocity(1, 4, 0, new EntityId(999), new SimVector2(1, 1)));
+rejected.SubmitCommand(CommandEnvelope.SetVelocity(1, 4, 0, new EntityId(999), new FixedVector2(1, 1)));
 rejected.Step();
 var rejectionEvent = rejected.DrainEvents().Single();
 Check(rejectionEvent.Kind == MatchEventKind.CommandRejected, "execution rejection is an event");
 Check(rejectionEvent.Frame == 1, "event carries simulation frame");
 
 var rawFlags = new byte[] { 0, 2, 4, 8 };
-var grid = new PathingGrid(2, 2, 32, new SimVector2(-32, -32), rawFlags, new byte[] { 2, 0, 0, 0 });
+var grid = new PathingGrid(2, 2, 32, new FixedVector2(-32, -32), rawFlags, new byte[] { 2, 0, 0, 0 });
 rawFlags[2] = 2;
 Check(!grid.IsWalkable(new GridCell(0, 0)), "obstacle flags combined");
 Check(grid.IsWalkable(new GridCell(0, 1)), "no-fly flag permits walking and input buffers are copied");
 Check(!grid.IsWalkable(new GridCell(2, 0)), "out of bounds blocked");
-Check(grid.TryWorldToCell(new SimVector2(-0.01, -0.01), out var cell) && cell == new GridCell(0, 0), "negative origin and floor semantics");
-Check(!grid.TryWorldToCell(new SimVector2(32, 0), out _), "upper edge excluded");
-Check(!grid.TryWorldToCell(new SimVector2(double.NaN, 0), out _), "nonfinite coordinate rejected");
+Check(grid.TryWorldToCell(new FixedVector2(SimScalar.FromRatio(-1, 100), SimScalar.FromRatio(-1, 100)), out var cell) && cell == new GridCell(0, 0), "negative origin and floor semantics");
+Check(!grid.TryWorldToCell(new FixedVector2(32, 0), out _), "upper edge excluded");
+Check(!grid.TryWorldToCell(new FixedVector2(SimScalar.MaxValue, 0), out _), "out-of-domain coordinate rejected");
 CheckThrows<ArgumentException>(() => new PathingGrid(2, 2, 32, default, new byte[3]), "truncated map rejected");
-var terrain = new TerrainHeights(2, 2, 128, new SimVector2(-128, -128), new double[] { 0, 10, 20, 30 });
-Check(terrain.TrySample(new SimVector2(-64, -64), out var altitude) && altitude == 15, "bilinear height sample");
-Check(terrain.TrySample(SimVector2.Zero, out altitude) && altitude == 30, "last corner samples final quad");
-Check(!terrain.TrySample(new SimVector2(1, 0), out _), "height outside map explicitly missing");
-CheckThrows<ArgumentException>(() => new TerrainHeights(2, 2, 128, default, new double[] {0, 0, 0, double.NaN}), "nonfinite height rejected");
+var terrain = new TerrainHeights(2, 2, 128, new FixedVector2(-128, -128), new SimScalar[] { 0, 10, 20, 30 });
+Check(terrain.TrySample(new FixedVector2(-64, -64), out var altitude) && altitude == 15, "bilinear height sample");
+Check(terrain.TrySample(FixedVector2.Zero, out altitude) && altitude == 30, "last corner samples final quad");
+Check(!terrain.TrySample(new FixedVector2(1, 0), out _), "height outside map explicitly missing");
+CheckThrows<ArgumentException>(() => new TerrainHeights(2, 2, 128, default, new SimScalar[] {0, 0, 0, SimScalar.MaxValue}), "out-of-domain height rejected");
 
-FrameworkTraceChecks.Run(Check);
 SnapshotDiagnosticChecks.Run(Check);
 EntityReadChecks.Run(Check);
 EntityLifecycleChecks.Run(Check);
@@ -158,5 +160,7 @@ GroupPlanningChecks.Run(Check);
 GroupSupersessionChecks.Run(Check);
 OrderQueueChecks.Run(Check);
 OrderSnapshotChecks.Run(Check);
+
+FrameworkTraceChecks.Run(Check);
 
 Console.WriteLine($"Rts.Kernel.Tests PASS ({checks} checks)");

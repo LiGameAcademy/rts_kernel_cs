@@ -9,10 +9,10 @@ internal static class OrdersSample
         var match = new RtsMatch(MatchConfig.Default, 7, grid);
         var id = new EntityId(1);
         var motion = new MotionParameters(ScaleSlopeSpeed: false);
-        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new SimVector2(5, 5)));
+        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, new FixedVector2(5, 5)));
         match.Step();
-        match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 1, id, new SimVector2(65, 5), 30, motion: motion));
-        match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 2, id, new SimVector2(25, 5), 30,
+        match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 1, id, new FixedVector2(65, 5), 30, motion: motion));
+        match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, 2, id, new FixedVector2(25, 5), 30,
             motion: motion, mode: OrderMode.Append));
         for (var i = 0; i < 25; i++) match.Step();
         Console.WriteLine($"orders frame={match.Frame} hash={match.ComputeStateHash()}");

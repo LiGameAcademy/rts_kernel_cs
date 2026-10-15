@@ -5,11 +5,11 @@ namespace Rts.Kernel.Navigation;
 /// <summary>Stable nearest-first candidates; only materialize the prefix that placement actually visits.</summary>
 internal sealed class PlacementCandidates : IReadOnlyList<GridCell>
 {
-    private readonly PriorityQueue<GridCell, (double Distance, int Y, int X)> _pending;
+    private readonly PriorityQueue<GridCell, (Int128 Distance, int Y, int X)> _pending;
     private readonly List<GridCell> _ordered = [];
     public int Count { get; }
 
-    internal PlacementCandidates(List<(GridCell Element, (double Distance, int Y, int X) Priority)> entries)
+    internal PlacementCandidates(List<(GridCell Element, (Int128 Distance, int Y, int X) Priority)> entries)
     {
         Count = entries.Count;
         _pending = new(entries);

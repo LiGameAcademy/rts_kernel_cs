@@ -19,8 +19,8 @@ public sealed record CommandEnvelope(
     long Sequence,
     CommandKind Kind,
     EntityId EntityId,
-    SimVector2 Position,
-    SimVector2 Velocity,
+    FixedVector2 Position,
+    FixedVector2 Velocity,
     ObstacleCommand? Obstacle = null,
     MoveRequest? Move = null,
     OrderMode Mode = OrderMode.Replace,
@@ -30,30 +30,30 @@ public sealed record CommandEnvelope(
     /// <summary>Diagnostic navigation command; building ownership rules are not implemented yet.</summary>
     public static CommandEnvelope SetObstacle(long executeFrame, int playerId, long sequence,
         ulong obstacleId, GridArea area) => new(executeFrame, playerId, sequence, CommandKind.SetObstacle,
-            EntityId.None, SimVector2.Zero, SimVector2.Zero, new ObstacleCommand(obstacleId, area));
+            EntityId.None, FixedVector2.Zero, FixedVector2.Zero, new ObstacleCommand(obstacleId, area));
 
     public static CommandEnvelope RemoveObstacle(long executeFrame, int playerId, long sequence,
         ulong obstacleId) => new(executeFrame, playerId, sequence, CommandKind.RemoveObstacle,
-            EntityId.None, SimVector2.Zero, SimVector2.Zero, new ObstacleCommand(obstacleId));
+            EntityId.None, FixedVector2.Zero, FixedVector2.Zero, new ObstacleCommand(obstacleId));
 
     internal bool HasValidObstaclePayload => Kind switch
     {
         CommandKind.SetObstacle => Obstacle is { Id: > 0, Area: { } area } && area.IsValid && EntityId.IsNone
-            && Position == SimVector2.Zero && Velocity == SimVector2.Zero,
+            && Position == FixedVector2.Zero && Velocity == FixedVector2.Zero,
         CommandKind.RemoveObstacle => Obstacle is { Id: > 0, Area: null } && EntityId.IsNone
-            && Position == SimVector2.Zero && Velocity == SimVector2.Zero,
+            && Position == FixedVector2.Zero && Velocity == FixedVector2.Zero,
         _ => Obstacle is null,
     };
 
     public static CommandEnvelope MoveTo(long executeFrame, int playerId, long sequence,
-        EntityId entityId, SimVector2 goal, double speed, int clearanceCells = 0, MotionParameters? motion = null,
+        EntityId entityId, FixedVector2 goal, SimScalar speed, int clearanceCells = 0, MotionParameters? motion = null,
         OrderMode mode = OrderMode.Replace, OrderSource source = OrderSource.Player) =>
-        new(executeFrame, playerId, sequence, CommandKind.MoveTo, entityId, SimVector2.Zero, SimVector2.Zero,
+        new(executeFrame, playerId, sequence, CommandKind.MoveTo, entityId, FixedVector2.Zero, FixedVector2.Zero,
             Move: new MoveRequest(goal, speed, clearanceCells, motion), Mode: mode, Source: source);
 
     internal bool HasValidMovePayload => Kind == CommandKind.MoveTo
         ? Move is { IsValid: true } && !EntityId.IsNone && Obstacle is null
-            && Position == SimVector2.Zero && Velocity == SimVector2.Zero
+            && Position == FixedVector2.Zero && Velocity == FixedVector2.Zero
         : Move is null;
 
     internal bool HasValidOrderMetadata => Enum.IsDefined(Mode) && Enum.IsDefined(Source) && (Kind switch
@@ -65,11 +65,11 @@ public sealed record CommandEnvelope(
 
     public static CommandEnvelope MoveGroup(long executeFrame, int playerId, long sequence, GroupMoveRequest group,
         OrderMode mode = OrderMode.Replace, OrderSource source = OrderSource.Player) =>
-        new(executeFrame, playerId, sequence, CommandKind.GroupMove, EntityId.None, SimVector2.Zero, SimVector2.Zero,
+        new(executeFrame, playerId, sequence, CommandKind.GroupMove, EntityId.None, FixedVector2.Zero, FixedVector2.Zero,
             Mode: mode, Source: source, Group: group.IsValid ? group.Freeze() : group);
 
     internal bool HasValidGroupPayload => (Kind == CommandKind.GroupMove
-        ? Group is { IsValid: true } && EntityId.IsNone && Position == SimVector2.Zero && Velocity == SimVector2.Zero
+        ? Group is { IsValid: true } && EntityId.IsNone && Position == FixedVector2.Zero && Velocity == FixedVector2.Zero
         : Group is null) && (Kind == CommandKind.SpawnEntity || MovementDefinitionId == 0);
 
     // Shared by command admission and snapshot restore; execution context is checked later.
@@ -80,8 +80,8 @@ public sealed record CommandEnvelope(
         if (!HasValidObstaclePayload) return "invalid_obstacle_payload";
         if (!HasValidMovePayload) return "invalid_move_payload";
         if (!HasValidOrderMetadata) return "invalid_order_metadata";
-        if (!double.IsFinite(Position.X) || !double.IsFinite(Position.Y)
-            || !double.IsFinite(Velocity.X) || !double.IsFinite(Velocity.Y))
+        if (!SimulationDomain.Contains(Position.X) || !SimulationDomain.Contains(Position.Y)
+            || !SimulationDomain.IsVelocity(Velocity))
             return "invalid_command_geometry";
         if (!HasValidGroupPayload) return "invalid_group_payload";
 
@@ -96,23 +96,23 @@ public sealed record CommandEnvelope(
         long executeFrame,
         int playerId,
         long sequence,
-        SimVector2 position, ulong movementDefinitionId = 0) =>
-        new(executeFrame, playerId, sequence, CommandKind.SpawnEntity, EntityId.None, position, SimVector2.Zero, MovementDefinitionId: movementDefinitionId);
+        FixedVector2 position, ulong movementDefinitionId = 0) =>
+        new(executeFrame, playerId, sequence, CommandKind.SpawnEntity, EntityId.None, position, FixedVector2.Zero, MovementDefinitionId: movementDefinitionId);
 
     public static CommandEnvelope SetVelocity(
         long executeFrame,
         int playerId,
         long sequence,
         EntityId entityId,
-        SimVector2 velocity) =>
-        new(executeFrame, playerId, sequence, CommandKind.SetVelocity, entityId, SimVector2.Zero, velocity);
+        FixedVector2 velocity) =>
+        new(executeFrame, playerId, sequence, CommandKind.SetVelocity, entityId, FixedVector2.Zero, velocity);
 
     public static CommandEnvelope Stop(
         long executeFrame,
         int playerId,
         long sequence,
         EntityId entityId, OrderSource source = OrderSource.Player) =>
-        new(executeFrame, playerId, sequence, CommandKind.Stop, entityId, SimVector2.Zero, SimVector2.Zero, Source: source);
+        new(executeFrame, playerId, sequence, CommandKind.Stop, entityId, FixedVector2.Zero, FixedVector2.Zero, Source: source);
 }
 
 public readonly record struct CommandAcceptance(bool Accepted, string Error)

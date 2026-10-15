@@ -113,7 +113,7 @@ internal sealed class MatchCommandExecutor
         if (command.Mode == OrderMode.Replace && submission == MoveSubmission.Command)
             CancelGroupPlans(frame, entity.Id, command.Source);
         _orders.ReplaceMove(entity.Id, intent, order!);
-        _entities.Update(entity with { Velocity = SimVector2.Zero });
+        _entities.Update(entity with { Velocity = FixedVector2.Zero });
         return true;
     }
 
@@ -127,7 +127,7 @@ internal sealed class MatchCommandExecutor
         {
             CancelGroupPlans(frame, entity.Id, command.Source);
             _orders.Stop(entity.Id, command.Source);
-            _entities.Update(entity with { Velocity = SimVector2.Zero });
+            _entities.Update(entity with { Velocity = FixedVector2.Zero });
         }
     }
 

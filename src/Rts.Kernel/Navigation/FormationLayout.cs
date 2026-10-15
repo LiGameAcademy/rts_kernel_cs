@@ -7,11 +7,11 @@ public static class FormationLayout
 {
     public const int MaximumMembers = 500;
 
-    public static IReadOnlyList<SimVector2> Create(FormationKind kind, int count, double spacing,
-        SimVector2 anchor, double heading)
+    public static IReadOnlyList<FixedVector2> Create(FormationKind kind, int count, SimScalar spacing,
+        FixedVector2 anchor, SimScalar heading)
     {
-        if (!Enum.IsDefined(kind) || count is < 1 or > MaximumMembers || !double.IsFinite(spacing) || spacing <= 0
-            || !double.IsFinite(anchor.X) || !double.IsFinite(anchor.Y) || !double.IsFinite(heading))
+        if (!Enum.IsDefined(kind) || count is < 1 or > MaximumMembers || !SimulationDomain.Contains(spacing) || spacing <= 0
+            || !SimulationDomain.Contains(anchor.X) || !SimulationDomain.Contains(anchor.Y))
             throw new ArgumentException("Invalid formation geometry.");
         var local = kind switch
         {
@@ -21,18 +21,18 @@ public static class FormationLayout
             FormationKind.Circle => Circle(count, spacing),
             _ => throw new ArgumentException("Unknown formation."),
         };
-        var cos = Math.Cos(heading);
-        var sin = Math.Sin(heading);
-        var result = local.Select(p => new SimVector2(anchor.X + p.X * cos - p.Y * sin,
+        var cos = SimMath.Cos(heading);
+        var sin = SimMath.Sin(heading);
+        var result = local.Select(p => new FixedVector2(anchor.X + p.X * cos - p.Y * sin,
             anchor.Y + p.X * sin + p.Y * cos)).ToArray();
-        if (result.Any(p => !double.IsFinite(p.X) || !double.IsFinite(p.Y)))
+        if (result.Any(p => !SimulationDomain.Contains(p.X) || !SimulationDomain.Contains(p.Y)))
             throw new ArgumentException("Formation geometry overflow.");
         return Array.AsReadOnly(result);
     }
 
-    private static List<SimVector2> Compact(int count, double spacing)
+    private static List<FixedVector2> Compact(int count, SimScalar spacing)
     {
-        var points = new List<SimVector2> { SimVector2.Zero };
+        var points = new List<FixedVector2> { FixedVector2.Zero };
         var directions = new (int X, int Y)[] { (1, 0), (0, 1), (-1, 1), (-1, 0), (0, -1), (1, -1) };
         for (var ring = 1; points.Count < count; ring++)
         {
@@ -41,7 +41,7 @@ public static class FormationLayout
             foreach (var direction in directions)
             for (var step = 0; step < ring && points.Count < count; step++)
             {
-                points.Add(new SimVector2(spacing * (x + y * 0.5), spacing * Math.Sqrt(3) * y * 0.5));
+                points.Add(new FixedVector2(spacing * (x + (SimScalar)y / 2), spacing * SimMath.Sqrt(3) * y / 2));
                 x += direction.X;
                 y += direction.Y;
             }
@@ -49,48 +49,49 @@ public static class FormationLayout
         return points;
     }
 
-    private static List<SimVector2> Rectangle(int count, double spacing)
+    private static List<FixedVector2> Rectangle(int count, SimScalar spacing)
     {
-        var columns = (int)Math.Ceiling(Math.Sqrt(count));
+        var columns = 1;
+        while (columns * columns < count) columns++;
         if (columns % 2 == 0) columns++;
-        var points = new List<SimVector2>();
+        var points = new List<FixedVector2>();
         for (var i = 0; i < count; i++)
         {
             var column = i % columns;
             var lateral = column == 0 ? 0 : (column + 1) / 2 * (column % 2 == 1 ? -1 : 1);
-            points.Add(new SimVector2(-(i / columns) * spacing, lateral * spacing));
+            points.Add(new FixedVector2(-(i / columns) * spacing, lateral * spacing));
         }
         return points;
     }
 
-    private static List<SimVector2> Wedge(int count, double spacing)
+    private static List<FixedVector2> Wedge(int count, SimScalar spacing)
     {
-        var points = new List<SimVector2> { SimVector2.Zero };
+        var points = new List<FixedVector2> { FixedVector2.Zero };
         for (var i = 1; i < count; i++)
         {
             var row = (i + 1) / 2;
-            points.Add(new SimVector2(-row * spacing, row * spacing * (i % 2 == 1 ? -1 : 1)));
+            points.Add(new FixedVector2(-row * spacing, row * spacing * (i % 2 == 1 ? -1 : 1)));
         }
         return points;
     }
 
-    private static List<SimVector2> Circle(int count, double spacing)
+    private static List<FixedVector2> Circle(int count, SimScalar spacing)
     {
-        var points = new List<SimVector2> { SimVector2.Zero };
+        var points = new List<FixedVector2> { FixedVector2.Zero };
         if (count == 1) return points;
         var followers = count - 1;
-        var radius = followers < 3 ? spacing : Math.Max(spacing, spacing / (2 * Math.Sin(Math.PI / followers)));
+        var radius = followers < 3 ? spacing : SimMath.Max(spacing, spacing / (2 * SimMath.Sin(SimMath.Pi / followers)));
         for (var i = 0; i < followers; i++)
         {
-            var angle = 2 * Math.PI * i / followers;
-            points.Add(new SimVector2(Math.Cos(angle) * radius, Math.Sin(angle) * radius));
+            var angle = 2 * SimMath.Pi * i / followers;
+            points.Add(new FixedVector2(SimMath.Cos(angle) * radius, SimMath.Sin(angle) * radius));
         }
         return points;
     }
 
     /// <summary>Minimum total squared ideal-slot distance, with one explicit anchor. Equal costs are stable.</summary>
-    public static IReadOnlyList<int> Match(IReadOnlyList<SimVector2> positions,
-        IReadOnlyList<SimVector2> slots, int anchorIndex)
+    public static IReadOnlyList<int> Match(IReadOnlyList<FixedVector2> positions,
+        IReadOnlyList<FixedVector2> slots, int anchorIndex)
     {
         ArgumentNullException.ThrowIfNull(positions);
         ArgumentNullException.ThrowIfNull(slots);
