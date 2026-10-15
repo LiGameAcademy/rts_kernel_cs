@@ -35,6 +35,8 @@ internal sealed class NavigationState
         GridPathfinder.FindPathCore(_grid, start, goal, maxExpandedNodes, clearanceCells,
             IsWalkable);
 
+    internal bool IsWalkableCell(GridCell cell) => IsWalkable(cell);
+
     private bool IsWalkable(GridCell cell) => _grid.IsWalkable(cell)
         && _occupancy[cell.Y * _grid.Width + cell.X] == 0;
 
