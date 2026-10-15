@@ -23,3 +23,6 @@ jobs:
       - name: Numeric contract probe (experimental)
         shell: pwsh
         run: ./experiments/NumericPrototype/Test-Prototype.ps1
+      - name: Traffic contract reference (experimental)
+        shell: pwsh
+        run: ./experiments/TrafficPrototype/Test-Prototype.ps1
