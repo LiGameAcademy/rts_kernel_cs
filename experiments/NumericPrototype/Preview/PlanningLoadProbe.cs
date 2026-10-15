@@ -9,7 +9,7 @@ internal static class PlanningLoadProbe
     private sealed record Sample(int Members, string Formation, int Repeat, int Frames, int Succeeded, int Failed,
         double CreateMs, double PeakTickMs, double PlacementMs, long AllocatedBytes, string StateHash,
         double MatchingMs, double CandidateMs, double ReachabilityMs,
-        double MatchingPeakMs, double CandidatePeakMs, double MatchingInitializationMs);
+        double MatchingPeakMs, double CandidatePeakMs, double MatchingInitializationMs, double PreparationPeakMs, string OutcomeHash);
     internal static object Run(string assetsDirectory)
     {
         var samples = new List<Sample>();
@@ -20,7 +20,7 @@ internal static class PlanningLoadProbe
             string? baseline = null;
             for (var repeat = 1; repeat <= 2; repeat++)
             {
-                var session = new PlanningPreviewSession(assetsDirectory, count);
+                using var session = new PlanningPreviewSession(assetsDirectory, count);
                 var map = session.ReadMap();
                 world = session.WorldIdentity;
                 var x = map.Origin.X + map.Width * map.CellSize / 2;
@@ -39,7 +39,8 @@ internal static class PlanningLoadProbe
                 samples.Add(new(count, ((Placement.FixedFormationKind)formation).ToString(), repeat, frames,
                     metrics.Succeeded, metrics.Failed, metrics.CreateMs, metrics.PeakTickMs, metrics.PlacementMs, metrics.AllocatedBytes, hash,
                     metrics.MatchingMs, metrics.CandidateMs, metrics.ReachabilityMs,
-                    metrics.MatchingPeakMs, metrics.CandidatePeakMs, metrics.MatchingInitializationMs));
+                    metrics.MatchingPeakMs, metrics.CandidatePeakMs, metrics.MatchingInitializationMs, metrics.PreparationPeakMs,
+                    Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(session.ReadUnits()))))));
             }
         }
         return new { WorldIdentity = world, Scope = "planning only; no movement/traffic performance conclusion", Samples = samples };

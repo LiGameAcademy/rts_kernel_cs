@@ -62,6 +62,20 @@ internal sealed class WideMatchingWork
                 }
     }
 
+    // Preparation has validated/generated the frozen costs. This is an internal ownership boundary.
+    internal WideMatchingWork(int count, Int128[] costs, string identity, Int128[] u, Int128[] v, int[] occupant)
+    {
+        _n = count;
+        _costs = costs;
+        _identity = identity;
+        _u = u.ToArray();
+        _v = v.ToArray();
+        _occupant = occupant.ToArray();
+        _previous = new int[count + 1];
+        _minimum = new Int128?[count + 1];
+        _used = new bool[count + 1];
+    }
+
     internal bool Complete => _row > _n;
     internal int NextRow => _row;
     private Int128 Reduced(int row, int column) =>
@@ -153,6 +167,13 @@ internal sealed class WideMatchingWork
         if (saved is null || saved.Format != 1 || saved.Batches < 0 || saved.Batches > count * count)
             throw new InvalidDataException("Invalid experimental matching snapshot.");
         var candidate = new WideMatchingWork(count, costs, costLimit);
+        return RestorePrepared(candidate, saved);
+    }
+
+    internal static WideMatchingWork RestorePrepared(WideMatchingWork candidate, MatchingSnapshot saved)
+    {
+        if (saved is null || saved.Format != 1 || saved.Batches < 0 || saved.Batches > candidate._n * candidate._n)
+            throw new InvalidDataException("Invalid experimental matching snapshot.");
         if (saved.Identity != candidate._identity) throw new InvalidDataException("Matching input differs.");
         while (candidate._batches < saved.Batches && !candidate.Complete) candidate.Advance(1);
         // Advance may skip seeded rows at zero cost, including the final completion transition.

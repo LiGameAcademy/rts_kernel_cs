@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using System.Diagnostics;
 using NumericPrototype.Matching;
 using NumericPrototype.Movement;
@@ -8,11 +9,12 @@ internal sealed record GroupMember(ulong Id, FixedPoint Start);
 internal sealed record GroupPlanInput(ulong Id, GroupMember[] Members, FixedPoint[] Ideals,
     ulong Leader, bool UnitAi);
 internal sealed record GroupJobSnapshot(GroupPlanInput Input, ulong[] Canceled,
-    int Prepared, MatchingSnapshot? Matching);
+    int Prepared, MatchingSnapshot? Matching,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] MatchingPreparationSnapshot? Preparation = null);
 internal sealed record CandidateCell(int X, int Y);
 
 /// <summary>Numeric experiment for stable assignment and candidate preparation, not final placement.</summary>
-internal sealed class GroupPlanningJob
+internal sealed class GroupPlanningJob : IDisposable
 {
     private readonly GroupPlanInput _input;
     private readonly int[] _followers;
@@ -20,12 +22,16 @@ internal sealed class GroupPlanningJob
     private readonly HashSet<ulong> _canceled = [];
     private readonly List<CandidateCell[]> _candidates = [];
     private WideMatchingWork? _matching;
+    private readonly MatchingPreparation? _preparation;
+    internal string PreparationStage => _preparation?.Stage.ToString() ?? "Legacy";
+    internal const int PreparationWorkPerFrame = 262144;
     // Wall-clock diagnostics never participate in scheduling or snapshots.
     internal double MatchingMs { get; private set; }
     internal double CandidateMs { get; private set; }
     internal double MatchingPeakMs { get; private set; }
     internal double CandidatePeakMs { get; private set; }
     internal double MatchingInitializationMs { get; private set; }
+    internal double PreparationPeakMs { get; private set; }
     internal int PreparedCount => _candidates.Count;
     internal int MatchingRow => _matching?.NextRow ?? 0;
     internal bool IsCanceled(ulong member) => _canceled.Contains(member);
@@ -34,7 +40,7 @@ internal sealed class GroupPlanningJob
     internal bool AllCanceled => _canceled.Count == _input.Members.Length;
     internal bool Ready => _matching is { Complete: true } && _candidates.Count == _input.Members.Length;
 
-    internal GroupPlanningJob(GroupPlanInput input, MovementWorld world)
+    internal GroupPlanningJob(GroupPlanInput input, MovementWorld world, bool scheduledPreparation = false)
     {
         if (input is null || input.Id == 0 || input.Members is null || input.Ideals is null
             || input.Members.Length is < 2 or > 500 || input.Ideals.Length != input.Members.Length
@@ -62,6 +68,12 @@ internal sealed class GroupPlanningJob
         if (anchor < 0) anchor = 0; // Current kernel fallback, including absent leader.
         _followers = Enumerable.Range(0, input.Members.Length).Where(index => index != anchor).ToArray();
         _costs = new Int128[_followers.Length * _followers.Length];
+        if (scheduledPreparation)
+        {
+            _preparation = new(_followers.Select(index => _input.Members[index].Start).ToArray(),
+                _input.Ideals.Skip(1).ToArray(), _costs);
+            return;
+        }
         for (var row = 0; row < _followers.Length; row++)
         for (var column = 0; column < _followers.Length; column++)
         {
@@ -82,14 +94,25 @@ internal sealed class GroupPlanningJob
         if (columnBudget <= 0 || candidateBudget <= 0) throw new ArgumentOutOfRangeException(nameof(columnBudget));
         var watch = Stopwatch.StartNew();
         var charged = 0;
-        if (_matching is null)
+        var preparing = _preparation is { Complete: false };
+        if (preparing)
+        {
+            charged = _preparation!.Advance(Math.Min(columnBudget, PreparationWorkPerFrame));
+            if (_preparation.Complete) _matching = _preparation.CreateWork();
+        }
+        else if (_matching is null)
         {
             _matching = new WideMatchingWork(_followers.Length, _costs, WideMatchingWork.MaximumFormationCost);
             charged = 2 * _followers.Length * _followers.Length;
             MatchingInitializationMs = watch.Elapsed.TotalMilliseconds;
         }
-        charged += _matching.Advance(Math.Max(1, columnBudget - charged));
+        if (!preparing) charged += _matching!.Advance(Math.Max(1, columnBudget - charged));
         var matchingMs = watch.Elapsed.TotalMilliseconds;
+        if (preparing)
+        {
+            MatchingInitializationMs += matchingMs;
+            PreparationPeakMs = Math.Max(PreparationPeakMs, matchingMs);
+        }
         MatchingMs += matchingMs;
         MatchingPeakMs = Math.Max(MatchingPeakMs, matchingMs);
         watch.Restart();
@@ -121,26 +144,44 @@ internal sealed class GroupPlanningJob
     internal FixedPoint Ideal(int slot) => _input.Ideals[slot];
 
     internal GroupJobSnapshot Capture() => new(Copy(_input), _canceled.Order().ToArray(),
-        _candidates.Count, _matching?.Capture());
+        _candidates.Count, _matching?.Capture(), _preparation?.Capture());
 
     internal static GroupPlanningJob Restore(GroupJobSnapshot state, MovementWorld world)
     {
         if (state is null || state.Canceled is null || state.Input is null || state.Input.Members is null
             || state.Prepared < 0 || state.Prepared > state.Input.Members.Length
-            || state.Prepared > 0 && state.Matching is null
+            || state.Prepared > 0 && state.Matching is null && state.Preparation is null
             || !state.Canceled.SequenceEqual(state.Canceled.Order().Distinct()))
             throw new InvalidDataException("Invalid group planning snapshot.");
         GroupPlanningJob job;
-        try { job = new GroupPlanningJob(state.Input, world); }
+        try { job = new GroupPlanningJob(state.Input, world, state.Preparation is not null); }
         catch (ArgumentException error) { throw new InvalidDataException("Invalid group snapshot input.", error); }
-        foreach (var member in state.Canceled)
-            if (!job.Cancel(member)) throw new InvalidDataException("Unknown canceled group member.");
-        if (state.Matching is not null)
-            job._matching = WideMatchingWork.Restore(job._followers.Length, job._costs, state.Matching, WideMatchingWork.MaximumFormationCost);
-        while (job._candidates.Count < state.Prepared)
-            job._candidates.Add(Candidates(world, job._input.Ideals[job._candidates.Count]));
-        return job;
+        try
+        {
+            foreach (var member in state.Canceled)
+                if (!job.Cancel(member)) throw new InvalidDataException("Unknown canceled group member.");
+            if (state.Preparation is not null)
+            {
+                job._preparation!.Restore(state.Preparation);
+                if (job._preparation.Complete != (state.Matching is not null))
+                    throw new InvalidDataException("Matching does not agree with preparation stage.");
+            }
+            if (state.Matching is not null)
+                job._matching = job._preparation is null
+                    ? WideMatchingWork.Restore(job._followers.Length, job._costs, state.Matching, WideMatchingWork.MaximumFormationCost)
+                    : WideMatchingWork.RestorePrepared(job._preparation.CreateWork(), state.Matching);
+            while (job._candidates.Count < state.Prepared)
+                job._candidates.Add(Candidates(world, job._input.Ideals[job._candidates.Count]));
+            return job;
+        }
+        catch
+        {
+            job.Dispose();
+            throw;
+        }
     }
+
+    public void Dispose() => _preparation?.Dispose();
 
     internal string CandidateTrace() => System.Text.Json.JsonSerializer.Serialize(_candidates);
     private static GroupPlanInput Copy(GroupPlanInput input) => input with

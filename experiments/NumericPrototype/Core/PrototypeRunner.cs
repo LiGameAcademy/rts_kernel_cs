@@ -101,6 +101,7 @@ public static class PrototypeRunner
         var formationChainHash = NumericPrototype.Placement.PlacementChainProbe.RunSynthetic(Check);
         var placementTraceHash = NumericPrototype.Placement.PlacementChecks.Run(Check);
         var groupTraceHash = NumericPrototype.Groups.GroupPlanningChecks.Run(Check);
+        NumericPrototype.Matching.MatchingPreparationChecks.Run(Check);
         var matchingTraceHash = NumericPrototype.Matching.MatchingChecks.Run(Check);
         var movementTraceHash = NumericPrototype.Movement.MovementChecks.Run(Check);
         var digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawTrace.ToString()))).ToLowerInvariant();
