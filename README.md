@@ -83,5 +83,16 @@ floor roots. The chosen radian period is exactly twice the quantized half-period
 Pinned MIT FixPointCS sources, license and source hashes live under
 `third_party/FixPointCS`; the kernel has no dependency on experiments or Godot.
 The current match/command/navigation state still uses the prior spatial contract
-and v9 snapshots. Adding these types is one migration step, not a claim that the
+and v10 snapshots (integer Octile path scoring). Adding these types is one migration step, not a claim that the
 production simulation has already adopted fixed point or supports network lockstep.
+
+## Integer path weights
+
+A* scores, heuristic and queue ordering use Int64 units: an orthogonal step costs
+10,000,000 and a diagonal step14,142,135, exactly retaining the previous1.4142135
+metric. `PathResult.Cost` is a nullable `PathCost`; failed searches have no cost.
+These are cell weights, not world distance. Floating conversion is presentation only.
+Equal scores use cell index; this can select a different equally short path from
+the old floating sum. Snapshot v10 rejects v9 to identify this simulation change;
+spatial state itself has not yet migrated to32.32. Future fixed state snapshots
+will receive their own version. Existing saved v9 matches require the old kernel.

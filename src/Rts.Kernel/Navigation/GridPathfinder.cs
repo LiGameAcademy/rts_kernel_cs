@@ -2,13 +2,15 @@ namespace Rts.Kernel.Navigation;
 
 public enum PathStatus { Found, InvalidEndpoint, Unreachable, NodeLimitReached }
 
-/// <summary>Cell path includes both endpoints. Cost uses the existing game's Octile metric.</summary>
-public sealed record PathResult(PathStatus Status, IReadOnlyList<GridCell> Cells, double Cost, int ExpandedNodes);
+/// <summary>Cell path includes both endpoints. Only a found path has an Octile cell-weight cost.</summary>
+public sealed record PathResult(PathStatus Status, IReadOnlyList<GridCell> Cells, PathCost? Cost, int ExpandedNodes);
 
 /// <summary>Synchronous static ground path query. Search state belongs to each call.</summary>
 public static class GridPathfinder
 {
-    private const double DiagonalCost = 1.4142135;
+    // A simple path has at most Int32.MaxValue-1 edges, so even its maximum
+    // score is below 3.1e16. Int64.MaxValue is reserved for unvisited cells only.
+    private const long Unvisited = long.MaxValue;
 
     public static PathResult FindPath(PathingGrid grid, GridCell start, GridCell goal,
         int maxExpandedNodes = int.MaxValue, int clearanceCells = 0)
@@ -40,15 +42,15 @@ public static class GridPathfinder
         if (!CanOccupy(start) || !CanOccupy(goal))
             return Failure(PathStatus.InvalidEndpoint, 0);
 
-        var costs = new double[count];
-        Array.Fill(costs, double.PositiveInfinity);
+        var costs = new long[count];
+        Array.Fill(costs, Unvisited);
         var parents = new int[count];
         Array.Fill(parents, -1);
         var closed = new bool[count];
         var startIndex = (start.Y - area.Y) * area.Width + start.X - area.X;
         var goalIndex = (goal.Y - area.Y) * area.Width + goal.X - area.X;
         // Index explicitly breaks equal-score ties; queue implementation order is irrelevant.
-        var open = new PriorityQueue<(int Index, double Cost), (double Score, int Index)>();
+        var open = new PriorityQueue<(int Index, long Cost), (long Score, int Index)>();
         costs[startIndex] = 0;
         open.Enqueue((startIndex, 0), (Heuristic(start, goal), startIndex));
         var expanded = 0;
@@ -60,7 +62,7 @@ public static class GridPathfinder
             closed[index] = true;
             expanded++;
             if (index == goalIndex)
-                return new PathResult(PathStatus.Found, Reconstruct(parents, index, area.Width, area.X, area.Y), costs[index], expanded);
+                return new PathResult(PathStatus.Found, Reconstruct(parents, index, area.Width, area.X, area.Y), PathCost.FromUnits(costs[index]), expanded);
             var cell = new GridCell(index % area.Width + area.X, index / area.Width + area.Y);
             for (var dy = -1; dy <= 1; dy++)
             for (var dx = -1; dx <= 1; dx++)
@@ -73,11 +75,11 @@ public static class GridPathfinder
                     || !CanOccupy(new GridCell(next.X, cell.Y)))) continue;
                 if (canTraverse is not null && !canTraverse(cell, next)) continue;
                 var nextIndex = (next.Y - area.Y) * area.Width + next.X - area.X;
-                var candidate = costs[index] + (diagonal ? DiagonalCost : 1);
+                var candidate = checked(costs[index] + (diagonal ? PathCost.DiagonalUnits : PathCost.UnitsPerStep));
                 if (closed[nextIndex] || candidate >= costs[nextIndex]) continue;
                 costs[nextIndex] = candidate;
                 parents[nextIndex] = index;
-                open.Enqueue((nextIndex, candidate), (candidate + Heuristic(next, goal), nextIndex));
+                open.Enqueue((nextIndex, candidate), (checked(candidate + Heuristic(next, goal)), nextIndex));
             }
         }
         return Failure(PathStatus.Unreachable, expanded);
@@ -93,11 +95,12 @@ public static class GridPathfinder
         return true;
     }
 
-    private static double Heuristic(GridCell from, GridCell to)
+    private static long Heuristic(GridCell from, GridCell to)
     {
         var dx = Math.Abs(from.X - to.X);
         var dy = Math.Abs(from.Y - to.Y);
-        return Math.Max(dx, dy) + (DiagonalCost - 1) * Math.Min(dx, dy);
+        return checked(Math.Max(dx, dy) * PathCost.UnitsPerStep
+            + (PathCost.DiagonalUnits - PathCost.UnitsPerStep) * Math.Min(dx, dy));
     }
 
     private static IReadOnlyList<GridCell> Reconstruct(int[] parents, int index, int width, int originX, int originY)
@@ -113,5 +116,5 @@ public static class GridPathfinder
     }
 
     private static PathResult Failure(PathStatus status, int expanded) =>
-        new(status, Array.Empty<GridCell>(), double.PositiveInfinity, expanded);
+        new(status, Array.Empty<GridCell>(), null, expanded);
 }
