@@ -6,6 +6,8 @@ using Rts.Kernel.Navigation;
 
 internal static class FrameworkTraceChecks
 {
+    // #86: v10 records integer Octile ties by cell index. Equal-cost old floating
+    // paths can differ; independent path optimality checks justify this numeric migration.
     internal static void Run(Action<bool, string> check)
     {
         foreach (var count in new[] { 64, 65, 500 })
@@ -26,11 +28,11 @@ internal static class FrameworkTraceChecks
             var digest = Trace(match, 24, grid, null, definitions, check);
             var expected = count switch
             {
-                64 => "261ca76fc688de67a6906fb2206041d3582a7d4607b6f0219a330bb9d2f58f74",
-                65 => "63502e6b3de8ce55a3c8dd5cc05fe7529e154fc13279fcc38105d6fd5630ff15",
-                _ => "5f8618b1b92e8128475d5fbfe9b15ef7a043cf97b0e067cf2c7d7fa43f93fbe1",
+                64 => "4c01c7fe2dff40b1f6a51bfade3854baa295f8530d503a93dc549c49854718d0",
+                65 => "33fc65b3947c72f39a6fded2b10a592294eaf7c394c3bd7487c16438dc6cb975",
+                _ => "a312302c2e69c8cc601f3ac44114402e9276d83101630f5f7ee2e869b25519bc",
             };
-            check(digest == expected, $"group {count} per-frame hashes/events agree with cc09efb baseline");
+            check(digest == expected, $"group {count} per-frame hashes/events agree with v10 integer-score baseline");
         }
 
         var motionGrid = new PathingGrid(16, 16, 10, default, new byte[256]);
@@ -46,8 +48,8 @@ internal static class FrameworkTraceChecks
         moving.SubmitCommand(CommandEnvelope.SetObstacle(9, 0, 13, 1, new GridArea(6, 3, 1, 8)));
         moving.SubmitCommand(CommandEnvelope.RemoveObstacle(13, 0, 14, 1));
         check(Trace(moving, 60, motionGrid, heights, definitionsWithMotion, check)
-            == "2bf86c5f392c75f1d81fe12c9654079ec6b4cc942f281c29ab017c3efe74c052",
-            "diagnostic/production motion hashes/events agree with cc09efb baseline");
+            == "923036647bab016cc7e72a922be7d3e2927d3d8dac861edab498ee0ca7009948",
+            "diagnostic/production motion hashes/events agree with v10 integer-score baseline");
     }
 
     private static string Trace(RtsMatch match, int frames, PathingGrid grid, TerrainHeights? heights,
