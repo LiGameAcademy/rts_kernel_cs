@@ -149,7 +149,11 @@ internal sealed class CrowdStepper
         alternativeStep = null;
         var soft = _orders.ReadCurrent(entity.Id)?.Group?.SoftLanding == true;
         var detour = soft ? SoftGoalPath.Find(navigation, reservations, entity, definition, order) : null;
-        detour ??= LocalDetour.Find(navigation, reservations, entity, definition, order);
+        // Near a soft slot, grid-centre rejoining can undo a legal lateral step.
+        // Keep bounded soft endpoints and world-space sidesteps; distant/exact paths retain A*.
+        var nearSoftGoal = soft && SquaredDistance.Between(entity.Position, order.Request.Goal).Length
+            <= navigation.Grid.CellSize * LocalDetour.RadiusCells;
+        if (!nearSoftGoal) detour ??= LocalDetour.Find(navigation, reservations, entity, definition, order);
         if (soft) detour ??= LocalSidestep.Find(navigation, reservations, entity, definition, order, tickRate);
         if (detour is null) return false;
         var step = MovementStepper.Compute(entity, detour, tickRate, navigation.Terrain);
