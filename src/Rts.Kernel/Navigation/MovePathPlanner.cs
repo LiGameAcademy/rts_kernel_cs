@@ -4,11 +4,16 @@ namespace Rts.Kernel.Navigation;
 internal static class MovePathPlanner
 {
     internal static bool TryPlan(NavigationState? navigation, FixedVector2 position, MoveRequest request,
-        out MoveOrder? order, bool preferDirect = false)
+        out MoveOrder? order, bool preferDirect = false, bool allowStraight = false)
     {
         order = null;
         if (navigation is null || !navigation.TryWorldToCell(position, out var start)
             || !navigation.TryWorldToCell(request.Goal, out var goal)) return false;
+        if (allowStraight && StraightMovePath.TryFind(navigation, position, request.Goal, request.ClearanceCells) is { } direct)
+        {
+            order = new MoveOrder(request, direct);
+            return true;
+        }
         var cells = preferDirect ? DirectGridPath.TryFind(navigation, start, goal, request.ClearanceCells) : null;
         if (cells is null)
         {

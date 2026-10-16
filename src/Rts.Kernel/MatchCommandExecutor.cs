@@ -105,7 +105,7 @@ internal sealed class MatchCommandExecutor
             else Publish(frame, MatchEventKind.CommandRejected, entity.Id, "order_queue_full");
             return false; // No path is frozen for a future order; current movement stays intact.
         }
-        if (!MovePathPlanner.TryPlan(navigation, entity.Position, request, out var order, group is not null))
+        if (!MovePathPlanner.TryPlan(navigation, entity.Position, request, out var order, group is not null, group?.SoftLanding == true))
         {
             Publish(frame, MatchEventKind.CommandRejected, command.EntityId, "move_path_unavailable");
             return false; // Invalid replacement preserves both current and pending orders.

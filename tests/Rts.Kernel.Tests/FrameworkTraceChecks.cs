@@ -6,8 +6,8 @@ using Rts.Kernel.Navigation;
 
 internal static class FrameworkTraceChecks
 {
-    // #89: v11 stores raw32.32 state and signed128-bit matching work. Precision,
-    // exact collision and input-domain checks independently verify this numeric migration.
+    // #104: v12 adds explicit soft-group policy and permits bounded alternate endpoints.
+    // Serialization changes every digest; live/restored state and event checks remain mandatory.
     internal static void Run(Action<bool, string> check)
     {
         foreach (var count in new[] { 64, 65, 500 })
@@ -28,10 +28,10 @@ internal static class FrameworkTraceChecks
             var digest = Trace(match, 24, grid, null, definitions, check);
             var expected = count switch
             {
-                64 => "a0f85d51d6238d8431128f9728baae5dcf557fd7a81809204e53a60f7c09b8fd",
-                65 => "2c3fd832f30c4abd543e57302f7f70f7fe66a7878bf4eb692fc75f3492d1c448",
+                64 => "8585dc95b7864dc8e0e874ba520ffbfcc79a806beff6a9ea8d0648c25b97e12a",
+                65 => "e2a13238cb1c0463f0e6c96d9652fa4406709a4e93cd1258cb605e307b4e6b34",
                 // #102: time-aligned crowd collision changes the 500-unit motion trace.
-                _ => "8ea03f57e5826d2e83b53c58eca4264d5800f798c25037e1e6b7c14e8e3a1334",
+                _ => "8d4831d6b4d80188c765df3b5bd43aa265bdf8cf6b7e53b7a04c2ee18e9264f4",
             };
             if (digest != expected) Console.WriteLine($"Changed trace {count}: {digest}");
             check(digest == expected, $"group {count} per-frame hashes/events agree with the recorded collision baseline");
@@ -50,8 +50,8 @@ internal static class FrameworkTraceChecks
         moving.SubmitCommand(CommandEnvelope.SetObstacle(9, 0, 13, 1, new GridArea(6, 3, 1, 8)));
         moving.SubmitCommand(CommandEnvelope.RemoveObstacle(13, 0, 14, 1));
         check(Trace(moving, 60, motionGrid, heights, definitionsWithMotion, check)
-            == "53bcad7178db095eb97c2d8dc15c3f96194e7dc4cbac304edd1b4caf6d54fef4",
-            "diagnostic/production motion hashes/events agree with v11 fixed-state baseline");
+            == "aae053c0b39af474016434ca0e9d46e66136495738528691ed1992fe7cf244f3",
+            "diagnostic/production motion hashes/events agree with v12 fixed-state baseline");
     }
 
     private static string Trace(RtsMatch match, int frames, PathingGrid grid, TerrainHeights? heights,

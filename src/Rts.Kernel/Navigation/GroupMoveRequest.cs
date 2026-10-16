@@ -11,9 +11,9 @@ public sealed record GroupMoveRequest(IReadOnlyList<EntityId> EntityIds, FixedVe
 }
 
 public sealed record GroupSlot(ulong GroupId, int Slot, FormationKind Formation, FixedVector2 Anchor,
-    SimScalar Heading, bool Adjusted)
+    SimScalar Heading, bool Adjusted, bool SoftLanding = false)
 {
-    internal bool IsValid => GroupId > 0 && Slot is >= 0 and < FormationLayout.MaximumMembers
+    internal bool IsValid => (!SoftLanding || Slot < SmallGroupAssignment.MaximumMembers) && GroupId > 0 && Slot is >= 0 and < FormationLayout.MaximumMembers
         && Enum.IsDefined(Formation) && SimulationDomain.Contains(Anchor.X) && SimulationDomain.Contains(Anchor.Y)
         && SimulationDomain.Contains(Heading) && Heading >= -SimMath.Pi && Heading < SimMath.Pi;
 }

@@ -136,7 +136,7 @@ public sealed partial class RtsMatch
             var definition = item.Member.Definition;
             var move = CommandEnvelope.MoveTo(command.ExecuteFrame, command.PlayerId, command.Sequence, item.Member.Id,
                 item.Goal.Value, definition.Speed, item.Member.Clearance, definition.Motion, command.Mode, command.Source);
-            var slot = new GroupSlot(groupId, item.Slot, request.Formation, request.Goal, heading, item.Adjusted);
+            var slot = new GroupSlot(groupId, item.Slot, request.Formation, request.Goal, heading, item.Adjusted, request.EntityIds.Count <= SmallGroupAssignment.MaximumMembers);
             var accepted = submission == MatchCommandExecutor.MoveSubmission.PlannedGroup
                 ? _commandExecutor.ExecutePlannedGroupMove(Frame, move, _navigation, slot)
                 : _commandExecutor.ExecuteMove(Frame, move, _navigation, slot);
@@ -154,6 +154,16 @@ public sealed partial class RtsMatch
         foreach (var entity in _entities.Live)
             if (entity.MovementDefinitionId != 0 && !_movementDefinitions.TryGet(entity.MovementDefinitionId, out _))
                 throw new InvalidDataException("Entity movement definition is missing.");
+        foreach (var move in snapshot.Moves!)
+        {
+            if (move.Waypoints[^1] == move.Request.Goal) continue;
+            var id = new EntityId(move.EntityId);
+            var definition = ReadMovementDefinition(id);
+            if (_orders.ReadCurrent(id)?.Group?.SoftLanding != true || definition is null
+                || SquaredDistance.Between(move.Waypoints[^1], move.Request.Goal).Length
+                    > SoftGoalPath.Tolerance(definition.Radius, _navigation!.Grid.CellSize))
+                throw new InvalidDataException("Soft landing endpoint exceeds its preferred-goal envelope.");
+        }
         foreach (var queue in snapshot.Orders!)
         foreach (var intent in queue.Pending.Prepend(queue.Current))
         {

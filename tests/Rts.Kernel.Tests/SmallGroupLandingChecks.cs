@@ -10,10 +10,8 @@ internal static class SmallGroupLandingChecks
         var members = new[] { Member(1, 0, 1000), Member(2, 0, 0), Member(3, 2, 0) };
         var ideals = new FixedVector2[] { new(0, 1000), new(1, 0), new(100, 0) };
         var local = SmallGroupAssignment.Assign(members, ideals, 0, 0);
-        check(local[0] == 0 && local[2] == 1 && local[1] == 2,
-            "front member takes its nearest free preference without global reoptimization");
-        check(!local.SequenceEqual(FormationLayout.Match(members.Select(member => member.Start).ToArray(), ideals, 0)),
-            "small group placement no longer requires the exact matching policy");
+        check(local[0] == 0 && local[1] == 1 && local[2] == 2,
+            "bounded pair exchange removes the avoidable crossing while preserving explicit anchor");
         var shuffled = new[] { members[2], members[0], members[1] };
         var shuffledResult = SmallGroupAssignment.Assign(shuffled, ideals, 0, 1);
         check(members.Select((member, i) => (member.Id, Slot: local[i])).OrderBy(pair => pair.Id)
@@ -39,6 +37,11 @@ internal static class SmallGroupLandingChecks
             var again = GroupPlacementPlanner.Plan(map, starts.Reverse().ToArray(), request, 0, [new(new(325, 325), 8)]);
             check(placed.SequenceEqual(again), $"{formation}: local adjustment is stable under input reversal");
         }
+        var led = new GroupMoveRequest(starts.Select(member => member.Id).ToArray(), new(325, 325),
+            LeaderId: starts[8].Id);
+        var ledGoals = GroupPlacementPlanner.Plan(map, starts, led, 0, []);
+        check(ledGoals.Single(item => item.Member.Id == starts[8].Id).Slot == 0,
+            "explicit leader retains anchor through both assignment passes");
         var match = new RtsMatch(MatchConfig.Default, 97, grid, movementDefinitions: [definition]);
         foreach (var member in starts)
             match.SubmitCommand(CommandEnvelope.Spawn(1, 0, (long)member.Id.Value, member.Start, 1));

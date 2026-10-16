@@ -62,7 +62,11 @@ internal sealed class CrowdStepper
             {
                 retries--;
                 order = order with { RetryAfterFrame = frame + LocalRetryFrames };
-                var detour = LocalDetour.Find(navigation, reservations, entity, proposal.Definition, order);
+                var detour = _orders.ReadCurrent(entity.Id)?.Group?.SoftLanding == true
+                    ? SoftGoalPath.Find(navigation, reservations, entity, proposal.Definition, order) : null;
+                detour ??= LocalDetour.Find(navigation, reservations, entity, proposal.Definition, order);
+                if (_orders.ReadCurrent(entity.Id)?.Group?.SoftLanding == true)
+                    detour ??= LocalSidestep.Find(navigation, reservations, entity, proposal.Definition, order, tickRate);
                 if (detour is not null)
                 {
                     var alternative = MovementStepper.Compute(entity, detour, tickRate, navigation.Terrain);
@@ -112,7 +116,7 @@ internal sealed class CrowdStepper
             var order = _orders.ReadPath(entity.Id);
             if (pathsDirty)
             {
-                if (!MovePathPlanner.TryPlan(navigation, entity.Position, order.Request, out var replanned, true))
+                if (!MovePathPlanner.TryPlan(navigation, entity.Position, order.Request, out var replanned, true, _orders.ReadCurrent(entity.Id)?.Group?.SoftLanding == true))
                 {
                     FinishMove(frame, entity.Id, entity.Position, MatchEventKind.MoveFailed, "path_blocked");
                     continue;
@@ -159,6 +163,7 @@ internal sealed class CrowdStepper
     {
         var group = _orders.ReadCurrent(entity.Id)?.Group;
         if (group is null || group.Slot == 0) return false;
+        if (group.SoftLanding) return false;
         var radius = ReadDefinition(entity.Id)!.Radius;
         var threshold = radius * 4 + navigation.Grid.CellSize * 2;
         if (SquaredDistance.Between(proposal.Position, order.Request.Goal).Length > threshold) return false;

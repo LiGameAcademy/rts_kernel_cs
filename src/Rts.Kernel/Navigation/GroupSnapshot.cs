@@ -20,7 +20,7 @@ internal static class GroupSnapshot
                 || !slots.Add((group.GroupId, group.Slot)))
                 throw new InvalidDataException("Invalid or duplicate group slot identity.");
             if (groups.TryGetValue(group.GroupId, out var other)
-                && (other.Formation != group.Formation || other.Anchor != group.Anchor || other.Heading != group.Heading))
+                && (other.Formation != group.Formation || other.Anchor != group.Anchor || other.Heading != group.Heading || other.SoftLanding != group.SoftLanding))
                 throw new InvalidDataException("Group slots disagree on formation geometry.");
             groups[group.GroupId] = group;
         }

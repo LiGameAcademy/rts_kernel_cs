@@ -27,6 +27,13 @@ void CheckThrows<TException>(Action action, string message) where TException : E
     throw new InvalidOperationException(message);
 }
 
+if (args.Contains("--party-only"))
+{
+    OpenGroundPartyChecks.Run(Check);
+    Console.WriteLine($"Open ground party PASS ({checks} checks)");
+    return;
+}
+
 if (args.Contains("--temporal-only"))
 {
     TemporalCrowdChecks.Run(Check);
@@ -72,6 +79,7 @@ RtsMatch CreateMovingMatch()
     return match;
 }
 
+OpenGroundPartyChecks.Run(Check);
 SmallGroupLandingChecks.Run(Check);
 TemporalCrowdChecks.Run(Check);
 NumericFoundationChecks.Run(Check);
