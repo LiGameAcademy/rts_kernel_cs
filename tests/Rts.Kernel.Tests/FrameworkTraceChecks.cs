@@ -30,9 +30,11 @@ internal static class FrameworkTraceChecks
             {
                 64 => "a0f85d51d6238d8431128f9728baae5dcf557fd7a81809204e53a60f7c09b8fd",
                 65 => "2c3fd832f30c4abd543e57302f7f70f7fe66a7878bf4eb692fc75f3492d1c448",
-                _ => "ba620fdd31573e2577c2118573e259faa728308cedb90132e858bfc44faf0c73",
+                // #102: time-aligned crowd collision changes the 500-unit motion trace.
+                _ => "8ea03f57e5826d2e83b53c58eca4264d5800f798c25037e1e6b7c14e8e3a1334",
             };
-            check(digest == expected, $"group {count} per-frame hashes/events agree with v11 fixed-state baseline");
+            if (digest != expected) Console.WriteLine($"Changed trace {count}: {digest}");
+            check(digest == expected, $"group {count} per-frame hashes/events agree with the recorded collision baseline");
         }
 
         var motionGrid = new PathingGrid(16, 16, 10, default, new byte[256]);
