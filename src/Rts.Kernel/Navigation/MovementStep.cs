@@ -1,7 +1,7 @@
 namespace Rts.Kernel.Navigation;
 
 internal sealed record MovementStep(FixedVector2 Position, SimScalar Facing, int NextWaypoint,
-    IReadOnlyList<FixedVector2> Trace, string? Failure = null);
+    IReadOnlyList<FixedVector2> Trace, string? Failure = null, IReadOnlyList<SimScalar>? Times = null);
 
 /// <summary>One proposal uses one frame of time; callers decide whether to reserve and commit it.</summary>
 internal static class MovementStepper
@@ -50,6 +50,7 @@ internal static class MovementStepper
         SimScalar remaining = 1;
         var next = order.NextWaypoint;
         List<FixedVector2>? trace = diagnostic ? null : new() { position };
+        List<SimScalar>? times = diagnostic ? null : new() { 0 };
         while (next < order.Waypoints.Count)
         {
             var target = order.Waypoints[next];
@@ -106,9 +107,15 @@ internal static class MovementStepper
                 return new(position, facing, next, ReadTrace(trace), "invalid_motion_terrain");
             }
             trace?.Add(position);
+            times?.Add(SimMath.Clamp(1 - remaining, 0, 1));
         }
-        if (trace?.Count == 1) trace.Add(position);
-        return new(position, facing, next, ReadTrace(trace));
+        // A unit that reaches its goal early occupies that endpoint for the rest of the frame.
+        if (times is not null && times[^1] < 1)
+        {
+            trace!.Add(position);
+            times.Add(1);
+        }
+        return new(position, facing, next, ReadTrace(trace), Times: times);
     }
     private static IReadOnlyList<FixedVector2> ReadTrace(List<FixedVector2>? trace)
         => trace is null ? Array.Empty<FixedVector2>() : trace;

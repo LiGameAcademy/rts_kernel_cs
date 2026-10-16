@@ -27,6 +27,13 @@ void CheckThrows<TException>(Action action, string message) where TException : E
     throw new InvalidOperationException(message);
 }
 
+if (args.Contains("--temporal-only"))
+{
+    TemporalCrowdChecks.Run(Check);
+    Console.WriteLine($"Temporal crowd PASS ({checks} checks)");
+    return;
+}
+
 if (args.Contains("--soft-landing"))
 {
     SmallGroupLandingChecks.Run(Check);
@@ -66,6 +73,7 @@ RtsMatch CreateMovingMatch()
 }
 
 SmallGroupLandingChecks.Run(Check);
+TemporalCrowdChecks.Run(Check);
 NumericFoundationChecks.Run(Check);
 FixedGeometryChecks.Run(Check);
 FixedNumericStateChecks.Run(Check);
@@ -145,7 +153,7 @@ var terrain = new TerrainHeights(2, 2, 128, new FixedVector2(-128, -128), new Si
 Check(terrain.TrySample(new FixedVector2(-64, -64), out var altitude) && altitude == 15, "bilinear height sample");
 Check(terrain.TrySample(FixedVector2.Zero, out altitude) && altitude == 30, "last corner samples final quad");
 Check(!terrain.TrySample(new FixedVector2(1, 0), out _), "height outside map explicitly missing");
-CheckThrows<ArgumentException>(() => new TerrainHeights(2, 2, 128, default, new SimScalar[] {0, 0, 0, SimScalar.MaxValue}), "out-of-domain height rejected");
+CheckThrows<ArgumentException>(() => new TerrainHeights(2, 2, 128, default, new SimScalar[] { 0, 0, 0, SimScalar.MaxValue }), "out-of-domain height rejected");
 
 SnapshotDiagnosticChecks.Run(Check);
 EntityReadChecks.Run(Check);

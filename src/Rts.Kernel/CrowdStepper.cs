@@ -31,10 +31,10 @@ internal sealed class CrowdStepper
     {
         var bodies = _entities.Live.Where(entity => entity.MovementDefinitionId != 0).ToArray();
         for (var i = 0; i < bodies.Length; i++)
-        for (var j = i + 1; j < bodies.Length; j++)
-            if (CrowdGeometry.Overlap(bodies[i].Position, bodies[i].Position, ReadDefinition(bodies[i].Id)!.Radius,
-                bodies[j].Position, bodies[j].Position, ReadDefinition(bodies[j].Id)!.Radius))
-                throw new InvalidDataException("Ground unit bodies overlap in snapshot.");
+            for (var j = i + 1; j < bodies.Length; j++)
+                if (CrowdGeometry.Overlap(bodies[i].Position, bodies[i].Position, ReadDefinition(bodies[i].Id)!.Radius,
+                    bodies[j].Position, bodies[j].Position, ReadDefinition(bodies[j].Id)!.Radius))
+                    throw new InvalidDataException("Ground unit bodies overlap in snapshot.");
     }
 
     internal void Advance(long frame, int tickRate, NavigationState navigation, ref bool pathsDirty)
@@ -44,15 +44,70 @@ internal sealed class CrowdStepper
         var maximumRadius = bodies.Max(entity => ReadDefinition(entity.Id)!.Radius);
         var reservations = new CrowdReservations(SimMath.Max(navigation.Grid.CellSize, maximumRadius * 2));
         foreach (var body in bodies)
-            reservations.Put(new(body.Id, ReadDefinition(body.Id)!.Radius, new[] { body.Position, body.Position }));
+            reservations.Put(CrowdBody.Stationary(body.Id, ReadDefinition(body.Id)!.Radius, body.Position));
         RefreshArrivalNeighbors(navigation);
-        var retries = LocalReplansPerFrame;
-        // Older physical waits go first; entity ID breaks ties. Every body is reserved before proposals.
         var moving = bodies.Where(entity => _orders.IsMoving(entity.Id))
             .OrderByDescending(entity => _orders.ReadPath(entity.Id).WaitFrames).ThenBy(entity => entity.Id).ToArray();
-        foreach (var initial in moving)
+        // Every proposal observes frame-start positions; none may assume an earlier unit already moved.
+        var proposals = Prepare(frame, tickRate, navigation, pathsDirty, moving, reservations);
+        var held = CrowdMotionResolver.Resolve(reservations, proposals.Select(item => item.Entity.Id).ToArray());
+        var retries = LocalReplansPerFrame;
+        foreach (var proposal in proposals)
         {
-            var entity = _entities.Get(initial.Id);
+            var entity = proposal.Entity;
+            var order = proposal.Order;
+            var step = proposal.Step;
+            var blocked = held.Contains(entity.Id);
+            if (blocked && frame >= order.RetryAfterFrame && retries > 0)
+            {
+                retries--;
+                order = order with { RetryAfterFrame = frame + LocalRetryFrames };
+                var detour = LocalDetour.Find(navigation, reservations, entity, proposal.Definition, order);
+                if (detour is not null)
+                {
+                    var alternative = MovementStepper.Compute(entity, detour, tickRate, navigation.Terrain);
+                    var body = new CrowdBody(entity.Id, proposal.Definition.Radius, alternative.Trace, alternative.Times);
+                    if (alternative.Failure is null && reservations.FirstMotionConflict(body) is null)
+                    {
+                        order = detour;
+                        step = alternative;
+                        reservations.Put(body);
+                        blocked = false;
+                    }
+                }
+            }
+            if (blocked)
+            {
+                var wait = order.WaitFrames + 1;
+                _entities.Update(entity with { Velocity = FixedVector2.Zero, Facing = step.Facing });
+                if (wait >= CrowdBlockedSeconds * tickRate)
+                    FinishMove(frame, entity.Id, entity.Position, MatchEventKind.MoveFailed, "crowd_blocked_timeout");
+                else
+                    _orders.UpdatePath(entity.Id, order with { WaitFrames = wait });
+                continue;
+            }
+            _entities.Update(entity with
+            {
+                Position = step.Position,
+                Facing = step.Facing,
+                Velocity = new((step.Position.X - entity.Position.X) * tickRate,
+                    (step.Position.Y - entity.Position.Y) * tickRate)
+            });
+            if (step.NextWaypoint == order.Waypoints.Count)
+                FinishMove(frame, entity.Id, step.Position, MatchEventKind.MoveCompleted, string.Empty);
+            else
+                _orders.UpdatePath(entity.Id, order with { NextWaypoint = step.NextWaypoint, WaitFrames = 0 });
+        }
+    }
+
+    private sealed record Proposal(EntityState Entity, MovementDefinition Definition, MoveOrder Order, MovementStep Step);
+
+    private List<Proposal> Prepare(long frame, int tickRate, NavigationState navigation, bool pathsDirty,
+        IReadOnlyList<EntityState> moving, CrowdReservations reservations)
+    {
+        var proposals = new List<Proposal>(moving.Count);
+        foreach (var entity in moving)
+        {
             var definition = ReadDefinition(entity.Id)!;
             var order = _orders.ReadPath(entity.Id);
             if (pathsDirty)
@@ -74,50 +129,12 @@ internal sealed class CrowdStepper
             {
                 _entities.Update(entity with { Velocity = FixedVector2.Zero });
                 _orders.UpdatePath(entity.Id, order with { WaitFrames = 0 });
-                continue; // Assembly sequencing is intentional waiting, not a physical-blockage failure.
+                continue;
             }
-            if (!reservations.Safe(entity.Id, definition.Radius, step.Trace))
-            {
-                if (frame >= order.RetryAfterFrame && retries > 0)
-                {
-                    retries--;
-                    order = order with { RetryAfterFrame = frame + LocalRetryFrames };
-                    var detour = LocalDetour.Find(navigation, reservations, entity, definition, order);
-                    if (detour is not null)
-                    {
-                        var alternative = MovementStepper.Compute(entity, detour, tickRate, navigation.Terrain);
-                        if (alternative.Failure is null && reservations.Safe(entity.Id, definition.Radius, alternative.Trace))
-                        {
-                            order = detour;
-                            step = alternative;
-                        }
-                    }
-                }
-                if (!reservations.Safe(entity.Id, definition.Radius, step.Trace))
-                {
-                    var wait = order.WaitFrames + 1;
-                    _entities.Update(entity with { Velocity = FixedVector2.Zero, Facing = step.Facing });
-                    if (wait >= CrowdBlockedSeconds * tickRate)
-                        FinishMove(frame, entity.Id, entity.Position, MatchEventKind.MoveFailed, "crowd_blocked_timeout");
-                    else
-                        _orders.UpdatePath(entity.Id, order with { WaitFrames = wait });
-                    continue;
-                }
-            }
-            // Commit only a safe proposal, then publish its trace for the remaining units this frame.
-            _entities.Update(entity with
-            {
-                Position = step.Position,
-                Facing = step.Facing,
-                Velocity = new((step.Position.X - entity.Position.X) * tickRate,
-                    (step.Position.Y - entity.Position.Y) * tickRate)
-            });
-            reservations.Put(new(entity.Id, definition.Radius, step.Trace));
-            if (step.NextWaypoint == order.Waypoints.Count)
-                FinishMove(frame, entity.Id, step.Position, MatchEventKind.MoveCompleted, string.Empty);
-            else
-                _orders.UpdatePath(entity.Id, order with { NextWaypoint = step.NextWaypoint, WaitFrames = 0 });
+            proposals.Add(new(entity, definition, order, step));
+            reservations.Put(new(entity.Id, definition.Radius, step.Trace, step.Times));
         }
+        return proposals;
     }
 
     private void RefreshArrivalNeighbors(NavigationState navigation)
