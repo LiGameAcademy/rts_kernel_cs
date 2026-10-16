@@ -40,15 +40,17 @@ internal static class GroupArrivalChecks
             }
         }
         check(completed.Count == 12, "local approach sequencing completes all mixed-speed members");
-        check(match.Entities.All(e => e.Position == assignments.Single(a => a.EntityId == e.Id).Group!.Goal),
-            "twelve-member compact formation reaches every assigned goal");
+        check(match.Entities.All(e => SquaredDistance.Between(e.Position, assignments.Single(a => a.EntityId == e.Id).Group!.Goal!.Value).Length
+                <= SoftGoalPath.Tolerance(match.ReadMovementDefinition(e.Id)!.Radius, grid.CellSize)),
+            "twelve-member compact formation completes inside each preference envelope");
 
         var stopped = Create(6);
         var goals = stopped.DrainEvents().Where(e => e.Kind == MatchEventKind.GroupMoveAssigned).ToArray();
         var anchor = goals.Single(e => e.Group!.Slot == 0).EntityId;
         stopped.SubmitCommand(CommandEnvelope.Stop(stopped.Frame + 1, 0, 20, anchor));
         for (var i = 0; i < 1200; i++) stopped.Step();
-        check(stopped.Entities.Where(e => e.Id != anchor).All(e => e.Position == goals.Single(a => a.EntityId == e.Id).Group!.Goal),
+        check(stopped.Entities.Where(e => e.Id != anchor).All(e => SquaredDistance.Between(e.Position, goals.Single(a => a.EntityId == e.Id).Group!.Goal!.Value).Length
+                <= SoftGoalPath.Tolerance(stopped.ReadMovementDefinition(e.Id)!.Radius, grid.CellSize)),
             "player Stop releases earlier assembly slot without moving stopped member");
         check(stopped.ReadCurrentOrder(anchor)!.Kind == UnitOrderKind.Stop, "released assembly leader retains Stop intent");
     }

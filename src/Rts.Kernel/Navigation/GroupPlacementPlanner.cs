@@ -18,14 +18,14 @@ internal static class GroupPlacementPlanner
         var anchorIndex = members.ToList().FindIndex(member => member.Id == anchorId);
         if (anchorIndex < 0) anchorIndex = members.ToList().FindIndex(member => member.Id == fallbackAnchor);
         var slots = members.Count <= SmallGroupAssignment.MaximumMembers
-            ? SmallGroupAssignment.Assign(members, ideals, heading, anchorIndex)
+            ? SmallGroupAssignment.Assign(members, ideals, heading, anchorIndex, !request.LeaderId.IsNone)
             : FormationLayout.Match(members.Select(member => member.Start).ToArray(), ideals, anchorIndex);
-        return PlanAssigned(navigation, members, ideals, slots, externalBodies);
+        return PlanAssigned(navigation, members, ideals, slots, externalBodies, preserveAnchor: !request.LeaderId.IsNone);
     }
 
     internal static IReadOnlyList<PlacementGoal> PlanAssigned(NavigationState navigation,
         IReadOnlyList<PlacementMember> members, IReadOnlyList<FixedVector2> ideals, IReadOnlyList<int> slots,
-        IReadOnlyList<PlacementBody>? externalBodies = null, IReadOnlyList<IReadOnlyList<GridCell>>? preparedCandidates = null)
+        IReadOnlyList<PlacementBody>? externalBodies = null, IReadOnlyList<IReadOnlyList<GridCell>>? preparedCandidates = null, bool preserveAnchor = true)
     {
         externalBodies ??= [];
         var reachable = new NavigationComponents(navigation);
@@ -61,7 +61,23 @@ internal static class GroupPlacementPlanner
                 if (goal is null) failed.Add(member.Id);
                 result.Add(new PlacementGoal(member, slot, goal, goal is not null && goal != ideals[slot]));
             }
-            if (before == failed.Count) return result.OrderBy(item => item.Member.Id).ToArray();
+            if (before == failed.Count)
+            {
+                if (members.Count <= 24 && failed.Count == 0
+                    && members.All(member => member.Definition == members[0].Definition))
+                {
+                    var positions = result.Select(item => item.Member).ToArray();
+                    var goals = result.Select(item => item.Goal!.Value).ToArray();
+                    var assigned = SmallGroupAssignment.Assign(positions, goals, 0, 0, preserveAnchor);
+                    var reordered = result.Select((item, index) => item with
+                        { Slot = result[assigned[index]].Slot, Goal = goals[assigned[index]],
+                            Adjusted = result[assigned[index]].Adjusted }).ToList();
+                    if (reordered.All(item => navigation.TryWorldToCell(item.Member.Start, out var from)
+                        && navigation.TryWorldToCell(item.Goal!.Value, out var to)
+                        && reachable.Connected(from, to, item.Member.Clearance))) result = reordered;
+                }
+                return result.OrderBy(item => item.Member.Id).ToArray();
+            }
         }
     }
 

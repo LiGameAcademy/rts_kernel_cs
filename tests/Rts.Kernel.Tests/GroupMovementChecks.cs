@@ -54,8 +54,11 @@ internal static class GroupMovementChecks
             }
             for (var frame = 0; frame < 1000; frame++) match.Step();
             check(match.Entities.All(entity => !match.IsMoving(entity.Id)), $"{kind}: all independently arrive");
-            check(match.Entities.All(entity => assigned.Single(e => e.EntityId == entity.Id).Group!.Goal == entity.Position),
-                $"{kind}: arrived positions equal assigned formation goals");
+            check(!match.DrainEvents().Any(item => item.Kind == MatchEventKind.MoveFailed), $"{kind}: no failed completion");
+            check(match.Entities.All(entity => SquaredDistance.Between(
+                    assigned.Single(e => e.EntityId == entity.Id).Group!.Goal!.Value, entity.Position).Length
+                    <= SoftGoalPath.Tolerance(match.ReadMovementDefinition(entity.Id)!.Radius, grid.CellSize)),
+                $"{kind}: arrived positions stay within original soft goal envelope");
         }
         var aMatch = Create(); var bMatch = Create();
         var aRequest = Request(aMatch);

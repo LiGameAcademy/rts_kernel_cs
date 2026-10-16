@@ -17,7 +17,7 @@ public sealed partial class RtsMatch
         {
             var intent = _orders.PeekWaiting(id);
             var entity = _entities.Get(id);
-            if (MovePathPlanner.TryPlan(_navigation, entity.Position, intent.Move!, out var move, intent.Group is not null))
+            if (MovePathPlanner.TryPlan(_navigation, entity.Position, intent.Move!, out var move, intent.Group is not null, intent.Group?.SoftLanding == true))
             {
                 _orders.ActivateWaiting(id, move!);
                 _entities.Update(entity with { Velocity = FixedVector2.Zero });
