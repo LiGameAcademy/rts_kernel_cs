@@ -27,6 +27,13 @@ void CheckThrows<TException>(Action action, string message) where TException : E
     throw new InvalidOperationException(message);
 }
 
+if (args.Contains("--soft-landing"))
+{
+    SmallGroupLandingChecks.Run(Check);
+    Console.WriteLine($"Small group landing PASS ({checks} checks)");
+    return;
+}
+
 if (args.Contains("--perf") || args.Contains("--perf-long"))
 {
     MovementPerformance.Run(args.Contains("--perf-long"));
@@ -58,6 +65,7 @@ RtsMatch CreateMovingMatch()
     return match;
 }
 
+SmallGroupLandingChecks.Run(Check);
 NumericFoundationChecks.Run(Check);
 FixedGeometryChecks.Run(Check);
 FixedNumericStateChecks.Run(Check);
