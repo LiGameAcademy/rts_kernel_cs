@@ -40,14 +40,31 @@ internal static class GroupYieldChecks
         return match;
     }
 
+    private static RtsMatch CreateHostParty(Action<bool, string> check)
+    {
+        var match = OpenGroundPartyChecks.Create();
+        match.SubmitCommand(CommandEnvelope.MoveGroup(2, 0, 25,
+            new(match.Entities.Select(entity => entity.Id).ToArray(), new(3056, 2064))));
+        var completed = 0;
+        for (var frame = 0; frame < 600 && completed < 24; frame++)
+        {
+            match.Step();
+            var events = match.DrainEvents();
+            completed += events.Count(item => item.Kind == MatchEventKind.MoveCompleted);
+            check(!events.Any(item => item.Kind == MatchEventKind.MoveFailed), "host ring party settles without failures");
+        }
+        check(completed == 24, "host ring party completed before internal exit");
+        return match;
+    }
+
     private static void ExitSettledParty(FixedVector2 direction, Action<bool, string> check, bool hostCommand = false)
     {
-        var match = Create(check);
+        var match = hostCommand ? CreateHostParty(check) : Create(check);
         var centre = match.Entities.Aggregate(FixedVector2.Zero, (sum, entity) => sum + entity.Position) / 24;
         var exiting = match.Entities.OrderBy(entity => (entity.Position - centre).Length).ThenBy(entity => entity.Id).First();
         var goal = exiting.Position + direction;
         if (hostCommand)
-            match.SubmitCommand(CommandEnvelope.MoveGroup(match.Frame + 1, 0, 25, new([exiting.Id], goal)));
+            match.SubmitCommand(CommandEnvelope.MoveGroup(match.Frame + 1, 0, 26, new([exiting.Id], goal)));
         else
             match.SubmitCommand(CommandEnvelope.MoveTo(match.Frame + 1, 0, 25, exiting.Id, goal, Footman.Speed, 1, Footman.Motion));
         var completed = 0;

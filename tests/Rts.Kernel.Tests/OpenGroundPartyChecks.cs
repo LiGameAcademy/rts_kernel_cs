@@ -131,7 +131,7 @@ internal static class OpenGroundPartyChecks
             "soft completion activates the next exact queued order");
     }
 
-    private static RtsMatch Create()
+    internal static RtsMatch Create()
     {
         var match = new RtsMatch(MatchConfig.Default, 7, Grid, Heights, [Footman]);
         var points = new List<FixedVector2> { new(2064, 2064) };
