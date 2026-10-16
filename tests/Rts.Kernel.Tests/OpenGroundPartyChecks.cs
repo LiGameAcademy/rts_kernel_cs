@@ -93,9 +93,10 @@ internal static class OpenGroundPartyChecks
         match.Step();
         var saved = match.CaptureSnapshot();
         var moves = saved.Moves!.ToArray();
-        var points = moves[0].Waypoints.ToArray();
-        points[^1] = new(points[^1].X + 512, points[^1].Y);
-        moves[0] = moves[0] with { Waypoints = points };
+        var entity = match.Entities.Single(item => item.Id.Value == moves[0].EntityId);
+        var illegalGoal = new FixedVector2(moves[0].Request.Goal.X + 512, moves[0].Request.Goal.Y);
+        var points = StraightMovePath.TryFind(new NavigationState(Grid), entity.Position, illegalGoal, 1)!;
+        moves[0] = moves[0] with { Waypoints = points, NextWaypoint = 0 };
         var rejected = false;
         try { RtsMatch.Restore(saved with { Moves = moves }, Grid, Heights, [Footman]); }
         catch (InvalidDataException) { rejected = true; }

@@ -70,7 +70,8 @@ internal static class GroupPlacementPlanner
                     var goals = result.Select(item => item.Goal!.Value).ToArray();
                     var assigned = SmallGroupAssignment.Assign(positions, goals, 0, 0, preserveAnchor);
                     var reordered = result.Select((item, index) => item with
-                        { Slot = result[assigned[index]].Slot, Goal = goals[assigned[index]] }).ToList();
+                        { Slot = result[assigned[index]].Slot, Goal = goals[assigned[index]],
+                            Adjusted = result[assigned[index]].Adjusted }).ToList();
                     if (reordered.All(item => navigation.TryWorldToCell(item.Member.Start, out var from)
                         && navigation.TryWorldToCell(item.Goal!.Value, out var to)
                         && reachable.Connected(from, to, item.Member.Clearance))) result = reordered;
