@@ -7,6 +7,7 @@ namespace Rts.Kernel;
 internal sealed class UnitOrderBook
 {
     internal const int MaximumPending = 64;
+    internal GroupCooperation Cooperation { get; } = new();
     private readonly SortedDictionary<EntityId, UnitOrderQueue> _queues = [];
     private readonly SortedDictionary<EntityId, MoveOrder> _moves = [];
 
@@ -66,18 +67,21 @@ internal sealed class UnitOrderBook
 
     internal void ReplaceMove(EntityId id, UnitOrderIntent intent, MoveOrder path)
     {
+        Cooperation.AcceptMove(id, intent, path.Waypoints[0]);
         _queues[id] = new UnitOrderQueue(intent);
         _moves[id] = path;
     }
 
     internal void Stop(EntityId id, OrderSource source)
     {
+        Cooperation.Forget(id);
         _moves.Remove(id);
         _queues[id] = new UnitOrderQueue(new UnitOrderIntent(UnitOrderKind.Stop, source));
     }
 
     internal void Clear(EntityId id)
     {
+        Cooperation.Forget(id);
         _moves.Remove(id);
         _queues.Remove(id);
     }
@@ -89,6 +93,8 @@ internal sealed class UnitOrderBook
         queue.Current = null;
         if (queue.Pending.Count == 0) _queues.Remove(id);
     }
+
+    internal void SuspendPath(EntityId id) => _moves.Remove(id);
 
     internal void UpdatePath(EntityId id, MoveOrder path) => _moves[id] = path;
     internal IReadOnlyList<EntityId> WaitingIds() => _queues.Where(pair => pair.Value.Current is null)
@@ -102,6 +108,7 @@ internal sealed class UnitOrderBook
         var intent = queue.Pending.Dequeue();
         if (path is not null)
         {
+            Cooperation.AcceptMove(id, intent, path.Waypoints[0]);
             queue.Current = intent;
             _moves[id] = path;
         }
@@ -123,7 +130,7 @@ internal sealed class UnitOrderBook
         }
     }
 
-    private void RestorePaths(MatchSnapshot snapshot, IReadOnlyDictionary<EntityId, EntityState> entities, NavigationState? navigation)
+    internal void RestorePaths(MatchSnapshot snapshot, IReadOnlyDictionary<EntityId, EntityState> entities, NavigationState? navigation)
     {
         foreach (var item in snapshot.Moves!)
         {

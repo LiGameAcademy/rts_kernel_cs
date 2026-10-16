@@ -27,6 +27,13 @@ void CheckThrows<TException>(Action action, string message) where TException : E
     throw new InvalidOperationException(message);
 }
 
+if (args.Contains("--yield-only"))
+{
+    GroupYieldChecks.Run(Check);
+    Console.WriteLine($"Group yield PASS ({checks} checks)");
+    return;
+}
+
 if (args.Contains("--party-only"))
 {
     OpenGroundPartyChecks.Run(Check);
@@ -79,6 +86,7 @@ RtsMatch CreateMovingMatch()
     return match;
 }
 
+GroupYieldChecks.Run(Check);
 OpenGroundPartyChecks.Run(Check);
 SmallGroupLandingChecks.Run(Check);
 TemporalCrowdChecks.Run(Check);

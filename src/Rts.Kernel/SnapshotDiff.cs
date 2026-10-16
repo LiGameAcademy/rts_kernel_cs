@@ -49,7 +49,8 @@ public static class SnapshotDiff
             ?? UnitOrdersSnapshot.FindFirst(expected, actual)
             ?? GroupSnapshot.FindFirst(expected, actual)
             ?? PendingCommandSnapshotDiff.FindGroups(expected, actual)
-            ?? GroupPlanningSnapshotRules.FindFirst(expected, actual);
+            ?? GroupPlanningSnapshotRules.FindFirst(expected, actual)
+            ?? CooperationSnapshotRules.FindFirst(expected, actual);
     }
 
     private static SnapshotDifference? Compare<T>(string path, T expected, T actual)

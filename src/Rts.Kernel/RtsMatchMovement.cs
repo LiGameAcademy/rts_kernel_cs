@@ -6,7 +6,7 @@ public sealed partial class RtsMatch
 {
     private bool _pathsDirty;
 
-    public bool IsMoving(EntityId id) => _orders.IsMoving(id);
+    public bool IsMoving(EntityId id) => _orders.IsMoving(id) || _orders.Cooperation.IsYielding(id);
     public IReadOnlyList<MoveOrderSnapshot> ReadMoveOrders() => _orders.ReadPaths();
     public IReadOnlyList<MovementStatusView> ReadMovementStatuses() => _orders.ReadMovementStatuses();
 

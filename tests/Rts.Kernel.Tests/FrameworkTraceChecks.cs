@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Rts.Kernel;
 using Rts.Kernel.Navigation;
 
@@ -64,7 +65,7 @@ internal static class FrameworkTraceChecks
             match.Step();
             var hash = match.ComputeStateHash();
             var events = JsonSerializer.Serialize(match.DrainEvents());
-            digest.AppendData(Encoding.UTF8.GetBytes(hash + "\n" + events + "\n"));
+            digest.AppendData(Encoding.UTF8.GetBytes(LegacyHash(match.CaptureSnapshot()) + "\n" + events + "\n"));
             if (resumed is not null)
             {
                 resumed.Step();
@@ -77,4 +78,27 @@ internal static class FrameworkTraceChecks
         }
         return Convert.ToHexString(digest.GetHashAndReset()).ToLowerInvariant();
     }
+    // These >24-member/ungrouped scenarios must preserve their v12 behavior. Remove
+    // only the v13 wire additions for the old digest; real v13 recovery hashes above
+    // still include every cooperation field and must match without normalization.
+    private static string LegacyHash(MatchSnapshot snapshot)
+    {
+        var root = JsonNode.Parse(SnapshotJson.Serialize(snapshot))!.AsObject();
+        root["formatVersion"] = 12;
+        root.Remove("cooperation");
+        RemoveMemberCount(root);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(root.ToJsonString()))).ToLowerInvariant();
+    }
+
+    private static void RemoveMemberCount(JsonNode? node)
+    {
+        if (node is JsonObject item)
+        {
+            item.Remove("memberCount");
+            foreach (var child in item.ToArray()) RemoveMemberCount(child.Value);
+        }
+        else if (node is JsonArray array)
+            foreach (var child in array) RemoveMemberCount(child);
+    }
+
 }

@@ -16,6 +16,7 @@ internal sealed class CrowdStepper
     private readonly MatchEventBuffer _events;
     private readonly UnitOrderBook _orders;
     private readonly MovementDefinitions _movementDefinitions;
+    private readonly GroupYieldCoordinator _yield;
     private readonly Dictionary<ulong, ArrivalNeighbors> _arrivalNeighbors = [];
 
     internal CrowdStepper(MatchEntities entities, MatchEventBuffer events, UnitOrderBook orders,
@@ -25,6 +26,7 @@ internal sealed class CrowdStepper
         _events = events;
         _orders = orders;
         _movementDefinitions = movementDefinitions;
+        _yield = new(orders, entities, events, movementDefinitions);
     }
 
     internal void ValidateGroundBodies()
@@ -39,6 +41,7 @@ internal sealed class CrowdStepper
 
     internal void Advance(long frame, int tickRate, NavigationState navigation, ref bool pathsDirty)
     {
+        _yield.Prepare(frame, navigation);
         var bodies = _entities.Live.Where(entity => entity.MovementDefinitionId != 0).ToArray();
         if (bodies.Length == 0) return;
         var maximumRadius = bodies.Max(entity => ReadDefinition(entity.Id)!.Radius);
@@ -46,43 +49,56 @@ internal sealed class CrowdStepper
         foreach (var body in bodies)
             reservations.Put(CrowdBody.Stationary(body.Id, ReadDefinition(body.Id)!.Radius, body.Position));
         RefreshArrivalNeighbors(navigation);
-        var moving = bodies.Where(entity => _orders.IsMoving(entity.Id))
-            .OrderByDescending(entity => _orders.ReadPath(entity.Id).WaitFrames).ThenBy(entity => entity.Id).ToArray();
+        var moving = bodies.Where(entity => _orders.IsMoving(entity.Id) || _orders.Cooperation.IsYielding(entity.Id))
+            .OrderByDescending(entity => _orders.Cooperation.IsYielding(entity.Id))
+            .ThenByDescending(entity => ReadPath(entity.Id).WaitFrames).ThenBy(entity => entity.Id).ToArray();
         // Every proposal observes frame-start positions; none may assume an earlier unit already moved.
         var proposals = Prepare(frame, tickRate, navigation, pathsDirty, moving, reservations);
         var held = CrowdMotionResolver.Resolve(reservations, proposals.Select(item => item.Entity.Id).ToArray());
         var retries = LocalReplansPerFrame;
+        var yieldRequests = new List<(EntityId Requester, EntityId Blocker)>();
+        var remainingYieldPlans = 2;
+        var helpingProgress = proposals.Where(proposal => _orders.Cooperation.IsYielding(proposal.Entity.Id)
+            && !held.Contains(proposal.Entity.Id) && proposal.Step.Position != proposal.Entity.Position)
+            .Select(proposal => _orders.Cooperation.ReadYield(proposal.Entity.Id).RequesterId).ToHashSet();
         foreach (var proposal in proposals)
         {
             var entity = proposal.Entity;
             var order = proposal.Order;
             var step = proposal.Step;
             var blocked = held.Contains(entity.Id);
+            var yielding = _orders.Cooperation.IsYielding(entity.Id);
+            EntityId? blocker = null;
+            if (yielding)
+            {
+                CommitYield(frame, tickRate, navigation, proposal, blocked);
+                continue;
+            }
             if (blocked && frame >= order.RetryAfterFrame && retries > 0)
             {
                 retries--;
+                blocker = reservations.FirstMotionConflict(new(entity.Id, proposal.Definition.Radius, step.Trace, step.Times));
                 order = order with { RetryAfterFrame = frame + LocalRetryFrames };
-                var detour = _orders.ReadCurrent(entity.Id)?.Group?.SoftLanding == true
-                    ? SoftGoalPath.Find(navigation, reservations, entity, proposal.Definition, order) : null;
-                detour ??= LocalDetour.Find(navigation, reservations, entity, proposal.Definition, order);
-                if (_orders.ReadCurrent(entity.Id)?.Group?.SoftLanding == true)
-                    detour ??= LocalSidestep.Find(navigation, reservations, entity, proposal.Definition, order, tickRate);
-                if (detour is not null)
+                var waitingForHelp = _orders.Cooperation.HasRequests(entity.Id);
+                if (!waitingForHelp && _orders.Cooperation.Read(entity.Id)?.AssistanceGroupId > 0)
+                    waitingForHelp = TryQueueYield(entity, order, blocker, bodies, navigation, yieldRequests, ref remainingYieldPlans);
+                // Once a valid opening is being prepared, sidestepping would change the
+                // requested corridor and make helpers chase a moving target.
+                if (!waitingForHelp)
                 {
-                    var alternative = MovementStepper.Compute(entity, detour, tickRate, navigation.Terrain);
-                    var body = new CrowdBody(entity.Id, proposal.Definition.Radius, alternative.Trace, alternative.Times);
-                    if (alternative.Failure is null && reservations.FirstMotionConflict(body) is null)
+                    if (TryAlternative(entity, proposal.Definition, order, tickRate, navigation, reservations,
+                            out var alternativeOrder, out var alternativeStep))
                     {
-                        order = detour;
-                        step = alternative;
-                        reservations.Put(body);
+                        order = alternativeOrder!;
+                        step = alternativeStep!;
                         blocked = false;
                     }
                 }
             }
             if (blocked)
             {
-                var wait = order.WaitFrames + 1;
+                TryQueueYield(entity, order, blocker, bodies, navigation, yieldRequests, ref remainingYieldPlans);
+                var wait = helpingProgress.Contains(entity.Id.Value) ? 0 : order.WaitFrames + 1;
                 _entities.Update(entity with { Velocity = FixedVector2.Zero, Facing = step.Facing });
                 if (wait >= CrowdBlockedSeconds * tickRate)
                     FinishMove(frame, entity.Id, entity.Position, MatchEventKind.MoveFailed, "crowd_blocked_timeout");
@@ -98,10 +114,73 @@ internal sealed class CrowdStepper
                     (step.Position.Y - entity.Position.Y) * tickRate)
             });
             if (step.NextWaypoint == order.Waypoints.Count)
-                FinishMove(frame, entity.Id, step.Position, MatchEventKind.MoveCompleted, string.Empty);
+                _yield.Arrive(frame, entity.Id);
             else
                 _orders.UpdatePath(entity.Id, order with { NextWaypoint = step.NextWaypoint, WaitFrames = 0 });
         }
+
+        // Request planning happens after every normal proposal is committed. No frame-start
+        // proposal can overwrite a newly installed temporary path.
+        foreach (var (requester, blocker) in yieldRequests.Take(2))
+            if (_orders.IsMoving(requester))
+                _yield.Request(requester, blocker,
+                    _entities.Live.Where(entity => entity.MovementDefinitionId != 0).ToArray(), navigation);
+        _yield.Prepare(frame, navigation);
+    }
+
+    private bool TryQueueYield(EntityState entity, MoveOrder order, EntityId? blocker,
+        IReadOnlyList<EntityState> bodies, NavigationState navigation,
+        List<(EntityId Requester, EntityId Blocker)> requests, ref int remainingPlans)
+    {
+        if (blocker is not { } id || remainingPlans == 0 || _orders.Cooperation.HasRequests(entity.Id)
+            || requests.Any(request => request.Requester == entity.Id)
+            || !_orders.Cooperation.CanHelp(id, entity.Id, _orders)) return false;
+        remainingPlans--;
+        if (LocalYieldPlanner.Plan(entity, order, id, bodies, _orders, _movementDefinitions, navigation) is null) return false;
+        requests.Add((entity.Id, id));
+        return true;
+    }
+
+    private bool TryAlternative(EntityState entity, MovementDefinition definition, MoveOrder order, int tickRate,
+        NavigationState navigation, CrowdReservations reservations, out MoveOrder? alternativeOrder,
+        out MovementStep? alternativeStep)
+    {
+        alternativeOrder = null;
+        alternativeStep = null;
+        var soft = _orders.ReadCurrent(entity.Id)?.Group?.SoftLanding == true;
+        var detour = soft ? SoftGoalPath.Find(navigation, reservations, entity, definition, order) : null;
+        detour ??= LocalDetour.Find(navigation, reservations, entity, definition, order);
+        if (soft) detour ??= LocalSidestep.Find(navigation, reservations, entity, definition, order, tickRate);
+        if (detour is null) return false;
+        var step = MovementStepper.Compute(entity, detour, tickRate, navigation.Terrain);
+        var body = new CrowdBody(entity.Id, definition.Radius, step.Trace, step.Times);
+        if (step.Failure is not null || reservations.FirstMotionConflict(body) is not null) return false;
+        reservations.Put(body);
+        alternativeOrder = detour;
+        alternativeStep = step;
+        return true;
+    }
+
+    private MoveOrder ReadPath(EntityId id) => _orders.Cooperation.IsYielding(id)
+        ? _orders.Cooperation.ReadPath(id) : _orders.ReadPath(id);
+
+    private void CommitYield(long frame, int tickRate, NavigationState navigation, Proposal proposal, bool blocked)
+    {
+        var entity = proposal.Entity;
+        var order = proposal.Order;
+        var step = proposal.Step;
+        if (blocked)
+        {
+            var wait = order.WaitFrames + 1;
+            _entities.Update(entity with { Velocity = FixedVector2.Zero, Facing = step.Facing });
+            if (wait >= CrowdBlockedSeconds * tickRate) _yield.EndYield(frame, entity.Id, navigation);
+            else _orders.Cooperation.Update(entity.Id, order with { WaitFrames = wait });
+            return;
+        }
+        _entities.Update(entity with { Position = step.Position, Facing = step.Facing,
+            Velocity = (step.Position - entity.Position) * tickRate });
+        if (step.NextWaypoint == order.Waypoints.Count) _yield.EndYield(frame, entity.Id, navigation);
+        else _orders.Cooperation.Update(entity.Id, order with { NextWaypoint = step.NextWaypoint, WaitFrames = 0 });
     }
 
     private sealed record Proposal(EntityState Entity, MovementDefinition Definition, MoveOrder Order, MovementStep Step);
@@ -113,7 +192,13 @@ internal sealed class CrowdStepper
         foreach (var entity in moving)
         {
             var definition = ReadDefinition(entity.Id)!;
-            var order = _orders.ReadPath(entity.Id);
+            var order = ReadPath(entity.Id);
+            var yielding = _orders.Cooperation.IsYielding(entity.Id);
+            if (pathsDirty && yielding)
+            {
+                _yield.EndYield(frame, entity.Id, navigation);
+                continue;
+            }
             if (pathsDirty)
             {
                 if (!MovePathPlanner.TryPlan(navigation, entity.Position, order.Request, out var replanned, true, _orders.ReadCurrent(entity.Id)?.Group?.SoftLanding == true))
@@ -126,10 +211,11 @@ internal sealed class CrowdStepper
             var step = MovementStepper.Compute(entity, order, tickRate, navigation.Terrain);
             if (step.Failure is not null)
             {
-                FinishMove(frame, entity.Id, entity.Position, MatchEventKind.MoveFailed, step.Failure);
+                if (yielding) _yield.EndYield(frame, entity.Id, navigation);
+                else FinishMove(frame, entity.Id, entity.Position, MatchEventKind.MoveFailed, step.Failure);
                 continue;
             }
-            if (YieldAtGroupGoal(navigation, entity, order, step))
+            if (!yielding && YieldAtGroupGoal(navigation, entity, order, step))
             {
                 _entities.Update(entity with { Velocity = FixedVector2.Zero });
                 _orders.UpdatePath(entity.Id, order with { WaitFrames = 0 });
@@ -177,9 +263,8 @@ internal sealed class CrowdStepper
 
     private void FinishMove(long frame, EntityId id, FixedVector2 position, MatchEventKind kind, string detail)
     {
-        _orders.Complete(id);
         _entities.Update(_entities.Get(id) with { Position = position, Velocity = FixedVector2.Zero });
-        _events.Publish(frame, kind, id, detail);
+        _yield.Finish(frame, id, kind == MatchEventKind.MoveCompleted, detail);
     }
 
     private MovementDefinition? ReadDefinition(EntityId id) =>

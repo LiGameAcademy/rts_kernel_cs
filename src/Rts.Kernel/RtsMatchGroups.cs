@@ -136,7 +136,7 @@ public sealed partial class RtsMatch
             var definition = item.Member.Definition;
             var move = CommandEnvelope.MoveTo(command.ExecuteFrame, command.PlayerId, command.Sequence, item.Member.Id,
                 item.Goal.Value, definition.Speed, item.Member.Clearance, definition.Motion, command.Mode, command.Source);
-            var slot = new GroupSlot(groupId, item.Slot, request.Formation, request.Goal, heading, item.Adjusted, request.EntityIds.Count <= SmallGroupAssignment.MaximumMembers);
+            var slot = new GroupSlot(groupId, item.Slot, request.Formation, request.Goal, heading, item.Adjusted, request.EntityIds.Count <= SmallGroupAssignment.MaximumMembers, request.EntityIds.Count);
             var accepted = submission == MatchCommandExecutor.MoveSubmission.PlannedGroup
                 ? _commandExecutor.ExecutePlannedGroupMove(Frame, move, _navigation, slot)
                 : _commandExecutor.ExecuteMove(Frame, move, _navigation, slot);
