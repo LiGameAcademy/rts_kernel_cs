@@ -21,9 +21,15 @@ internal static class UnitOrdersSnapshot
             previous = queue.EntityId;
             if (queue.Current?.Kind == UnitOrderKind.Move)
             {
-                if (!moves.TryGetValue(queue.EntityId, out var move) || move.Request != queue.Current.Move)
-                    throw new InvalidDataException("Current move intent does not match active path.");
-                matchedMoves++;
+                if (moves.TryGetValue(queue.EntityId, out var move))
+                {
+                    if (move.Request != queue.Current.Move)
+                        throw new InvalidDataException("Current move intent does not match active path.");
+                    matchedMoves++;
+                }
+                else if (snapshot.Cooperation?.Members.Any(member => member?.EntityId == queue.EntityId && member.Settled) != true
+                    && snapshot.Cooperation?.Yields.Any(task => task?.EntityId == queue.EntityId && task.ResumeMove) != true)
+                    throw new InvalidDataException("Current move has neither path, settled state nor temporary yield.");
             }
             else
             {

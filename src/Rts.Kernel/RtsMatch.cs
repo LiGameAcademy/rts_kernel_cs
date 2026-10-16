@@ -83,7 +83,7 @@ public sealed partial class RtsMatch
             _navigation?.CaptureSnapshot(),
             ReadMoveOrders(),
             ReadUnitOrders(), _movementDefinitions.ContentHash, _planning.NextId,
-            _planning.Capture());
+            _planning.Capture(), _orders.Cooperation.Capture());
     }
 
     public static RtsMatch Restore(MatchSnapshot snapshot, PathingGrid? pathingGrid = null, TerrainHeights? terrain = null,
@@ -111,6 +111,7 @@ public sealed partial class RtsMatch
         match._orders.Restore(snapshot, match._entities.ById, match._navigation);
         match.ValidateRestoredGroups(snapshot);
         match._planning.Restore(snapshot, match._entities.ById, match._movementDefinitions, match._navigation);
+        CooperationSnapshotRules.Restore(match._orders, snapshot, match._entities.ById, match._navigation, match._movementDefinitions);
         match.ValidateGroundBodies();
         return match;
     }

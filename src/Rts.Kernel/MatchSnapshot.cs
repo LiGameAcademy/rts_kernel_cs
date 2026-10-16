@@ -29,7 +29,8 @@ public sealed record MatchSnapshot(
     IReadOnlyList<MoveOrderSnapshot>? Moves = null,
     IReadOnlyList<UnitOrderQueueSnapshot>? Orders = null,
     string? MovementHash = null, ulong NextGroupId = 1,
-    IReadOnlyList<GroupPlanningSnapshot>? GroupPlans = null);
+    IReadOnlyList<GroupPlanningSnapshot>? GroupPlans = null,
+    CooperationSnapshot? Cooperation = null);
 
 public readonly record struct SnapshotDifference(string Path, string Expected, string Actual);
 
@@ -98,12 +99,13 @@ public static class SnapshotValidator
         }
         GroupSnapshot.Validate(snapshot);
         GroupPlanningSnapshotRules.Validate(snapshot);
+        CooperationSnapshotRules.Validate(snapshot);
     }
 }
 
 public static class SnapshotJson
 {
-    public const int CurrentFormatVersion = 12;
+    public const int CurrentFormatVersion = 13;
 
     private static readonly JsonSerializerOptions Options = new()
     {
