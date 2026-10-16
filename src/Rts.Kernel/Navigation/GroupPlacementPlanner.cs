@@ -13,9 +13,13 @@ internal static class GroupPlacementPlanner
     {
         var spacing = CalculateSpacing(navigation, members);
         var ideals = FormationLayout.Create(request.Formation, members.Count, spacing, request.Goal, heading);
-        var anchorIndex = request.LeaderId.IsNone ? 0 : members.ToList().FindIndex(member => member.Id == request.LeaderId);
-        if (anchorIndex < 0) anchorIndex = 0;
-        var slots = FormationLayout.Match(members.Select(member => member.Start).ToArray(), ideals, anchorIndex);
+        var fallbackAnchor = members.MinBy(member => member.Id)!.Id;
+        var anchorId = request.LeaderId.IsNone ? fallbackAnchor : request.LeaderId;
+        var anchorIndex = members.ToList().FindIndex(member => member.Id == anchorId);
+        if (anchorIndex < 0) anchorIndex = members.ToList().FindIndex(member => member.Id == fallbackAnchor);
+        var slots = members.Count <= SmallGroupAssignment.MaximumMembers
+            ? SmallGroupAssignment.Assign(members, ideals, heading, anchorIndex)
+            : FormationLayout.Match(members.Select(member => member.Start).ToArray(), ideals, anchorIndex);
         return PlanAssigned(navigation, members, ideals, slots, externalBodies);
     }
 
