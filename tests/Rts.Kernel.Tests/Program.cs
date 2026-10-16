@@ -36,6 +36,7 @@ if (args.Contains("--yield-only"))
 
 if (args.Contains("--party-only"))
 {
+    SoftArrivalStabilityChecks.Run(Check);
     OpenGroundPartyChecks.Run(Check);
     Console.WriteLine($"Open ground party PASS ({checks} checks)");
     return;
@@ -194,6 +195,7 @@ GroupSupersessionChecks.Run(Check);
 OrderQueueChecks.Run(Check);
 OrderSnapshotChecks.Run(Check);
 
+SoftArrivalStabilityChecks.Run(Check);
 FrameworkTraceChecks.Run(Check);
 
 Console.WriteLine($"Rts.Kernel.Tests PASS ({checks} checks)");
