@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Diagnostics;
 using System.Text.Json;
 using Rts.Kernel;
@@ -38,6 +40,7 @@ internal static class MultiPartyCloseoutChecks
                 new(ids.Skip(party * 24).Take(24).ToArray(),
                     new(1568 + party % 5 * 1300, 992 + party / 5 * 1300))));
 
+        using var trajectory = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         var samples = new List<double>();
         var allocated = 0L;
         var completed = new HashSet<EntityId>();
@@ -58,6 +61,7 @@ internal static class MultiPartyCloseoutChecks
             samples.Add(watch.Elapsed.TotalMilliseconds);
             if (frame == 0) commandMs = watch.Elapsed.TotalMilliseconds;
             var events = match.DrainEvents();
+            trajectory.AppendData(Encoding.UTF8.GetBytes(match.ComputeStateHash() + "\n" + JsonSerializer.Serialize(events) + "\n"));
             check(!events.Any(item => item.Kind == MatchEventKind.CommandRejected), "all small-party commands accepted");
             assigned += events.Count(item => item.Kind == MatchEventKind.GroupMoveAssigned);
             failed += events.Count(item => item.Kind == MatchEventKind.MoveFailed);
@@ -98,6 +102,6 @@ internal static class MultiPartyCloseoutChecks
         Console.WriteLine($"multi_party count={count} parties={parties} run={run} ticks={samples.Count} command_ms={commandMs:F3}"
             + $" mean_ms={samples.Average():F3} p95_ms={p95:F3} max_ms={samples[^1]:F3} alloc_kb_tick={allocated / 1024.0 / samples.Count:F1}"
             + $" assigned={assigned} completed={completed.Count} failed={failed} remaining={remaining} replay_ticks={restoreChecks}"
-            + $" hash={match.ComputeStateHash()} budget33={(samples[^1] <= 1000.0 / 30 ? "PASS" : "OVER")}");
+            + $" trace={Convert.ToHexString(trajectory.GetHashAndReset())} hash={match.ComputeStateHash()} budget33={(samples[^1] <= 1000.0 / 30 ? "PASS" : "OVER")}");
     }
 }

@@ -28,7 +28,7 @@ internal static class GroupPlacementPlanner
         IReadOnlyList<PlacementBody>? externalBodies = null, IReadOnlyList<IReadOnlyList<GridCell>>? preparedCandidates = null, bool preserveAnchor = true)
     {
         externalBodies ??= [];
-        var reachable = new NavigationComponents(navigation);
+        var reachable = navigation.Components;
         var candidates = preparedCandidates?.ToArray() ?? new IReadOnlyList<GridCell>?[ideals.Count];
         var failed = new HashSet<EntityId>();
         var result = new List<PlacementGoal>();

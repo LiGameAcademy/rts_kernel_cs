@@ -16,6 +16,7 @@ internal sealed class NavigationState
     private readonly PathingGrid _grid;
     internal PathingGrid Grid => _grid;
     internal TerrainHeights? Terrain { get; }
+    internal NavigationComponents Components { get; }
     private readonly SortedDictionary<ulong, GridArea> _obstacles = [];
     private readonly int[] _occupancy;
     private readonly Dictionary<int, byte[]> _clearanceCache = [];
@@ -23,6 +24,7 @@ internal sealed class NavigationState
     internal NavigationState(PathingGrid grid, TerrainHeights? terrain = null)
     {
         _grid = grid;
+        Components = new NavigationComponents(this);
         Terrain = terrain;
         var end = new FixedVector2(grid.Origin.X + grid.Width * grid.CellSize,
             grid.Origin.Y + grid.Height * grid.CellSize);
@@ -94,6 +96,7 @@ internal sealed class NavigationState
         if (_obstacles.TryGetValue(id, out var previous)) Apply(previous, -1);
         _obstacles[id] = area;
         _clearanceCache.Clear();
+        Components.Clear();
         Apply(area, 1);
         return true;
     }
@@ -103,6 +106,7 @@ internal sealed class NavigationState
         if (!_obstacles.Remove(id, out var area)) return false;
         Apply(area, -1);
         _clearanceCache.Clear();
+        Components.Clear();
         return true;
     }
 
