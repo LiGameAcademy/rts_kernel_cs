@@ -27,6 +27,13 @@ void CheckThrows<TException>(Action action, string message) where TException : E
     throw new InvalidOperationException(message);
 }
 
+if (args.Contains("--multi-party"))
+{
+    MultiPartyCloseoutChecks.Run(Check);
+    Console.WriteLine($"Multi-party closeout PASS ({checks} checks)");
+    return;
+}
+
 if (args.Contains("--yield-only"))
 {
     GroupYieldChecks.Run(Check);
