@@ -22,6 +22,8 @@ python experiments/MovementProfile/profile.py --without-replay --output C:/Temp/
 
 逐帧验收记录由tests/Rts.Kernel.Tests/FrameSpikeLog.cs提供，固定容量450，计时窗口外采集进程GC/当前线程JIT计数差并写入缓冲，每轮结束后输出全部frame_sample。CLI与godot_probe共用夹具；计数范围不等于线程调度归因，不剔除首轮和超预算帧。
 
+Windows探针另记录 `thread_cpu_ms`（GetThreadTimes，内核态+用户态）及 `cpu_cycles`（QueryThreadCycleTime，原始周期）。非Windows两字段为null并声明unavailable；Windows调用失败直接报错，不填0伪装成功。计数紧贴Step前后读取，汇总和输出在计时窗外，包含少量观察开销。CPU时间有采样粒度，短帧可能出现0或超过墙钟，不能精确相减为等待时间；周期不能换算成毫秒。30Hz仍只按Step墙钟判断，CPU较少不使超时帧通过。
+
 ## 显式对局准备
 
 宿主在开放输入前、读档交付前调用 `match.PrepareForPlay()`，并独立记录整个调用耗时。调用不推进真实帧、不消费命令/RNG/ID、不发布或清空真实事件，也不修改权威快照。只能在Step之间调用。

@@ -11,6 +11,7 @@
     <Compile Include="../../../tests/Rts.Kernel.Tests/GlobalUsings.cs" Link="GlobalUsings.cs" />
     <Compile Include="../../../tests/Rts.Kernel.Tests/MultiPartyCloseoutChecks.cs" Link="MultiPartyCloseoutChecks.cs" />
     <Compile Include="../../../tests/Rts.Kernel.Tests/FrameSpikeLog.cs" Link="FrameSpikeLog.cs" />
+    <Compile Include="../../../tests/Rts.Kernel.Tests/ThreadWorkObservation.cs" Link="ThreadWorkObservation.cs" />
     <Compile Include="../../../tests/Rts.Kernel.Tests/PreparationObserver.cs" Link="PreparationObserver.cs" />
     <Compile Include="../../../tests/Rts.Kernel.Tests/PreparedBoundaryChecks.cs" Link="PreparedBoundaryChecks.cs" />
   </ItemGroup>

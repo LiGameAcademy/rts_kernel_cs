@@ -64,6 +64,9 @@ internal static class SmallGroupAssignment
         return FixedVector2.FromRaw(checked((long)(x / count)), checked((long)(y / count)));
     }
 
+    // Cold command probes attribute a tier-transition spike to this bounded hot loop.
+    // Optimize only this method; preserve exchange order and fixed-point calculations.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
     private static void Relax(IReadOnlyList<PlacementMember> members, IReadOnlyList<FixedVector2> ideals,
         int[] result, int anchorIndex, bool preserveAnchor)
     {
