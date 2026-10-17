@@ -17,7 +17,9 @@ internal static class OpenGroundPartyChecks
             ("north", new FixedVector2(2064, 3056), FormationKind.Compact),
             ("west", new FixedVector2(1072, 2064), FormationKind.Compact),
             ("diagonal", new FixedVector2(2800, 2800), FormationKind.Compact),
-            ("rectangle", new FixedVector2(3056, 2064), FormationKind.Rectangle)
+            ("rectangle", new FixedVector2(3056, 2064), FormationKind.Rectangle),
+            ("wedge", new FixedVector2(3056, 2064), FormationKind.Wedge),
+            ("circle", new FixedVector2(3056, 2064), FormationKind.Circle)
         })
         {
             var match = Create();
