@@ -8,18 +8,25 @@ internal sealed class FrameSpikeLog(int capacity)
     private readonly Sample[] _samples = new Sample[capacity];
     private int _count;
 
-    internal readonly record struct Counters(int Gen0, int Gen1, int Gen2, long PauseTicks, long JitTicks);
+    internal readonly record struct Counters(int Gen0, int Gen1, int Gen2, long PauseTicks, long JitTicks,
+        ThreadWorkObservation? ThreadWork);
     private readonly record struct Sample(int Tick, double ElapsedMs, long Bytes, Counters Delta);
 
     // Invoke the same reader before/after Step, so first-call compilation precedes the measured window.
-    internal static Counters ReadCounters() => new(GC.CollectionCount(0), GC.CollectionCount(1),
-        GC.CollectionCount(2), GC.GetTotalPauseDuration().Ticks, JitInfo.GetCompilationTime(currentThread: true).Ticks);
+    internal static Counters ReadCounters()
+    {
+        // Read the native helper before JIT time so its first compilation is not attributed to Step.
+        var threadWork = ThreadWorkObservation.Read();
+        return new(GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2),
+            GC.GetTotalPauseDuration().Ticks, JitInfo.GetCompilationTime(currentThread: true).Ticks, threadWork);
+    }
 
     internal void Record(int tick, double elapsedMs, long bytes, Counters before, Counters after)
     {
         if (_count == _samples.Length) throw new InvalidOperationException("Spike observation buffer exhausted.");
         _samples[_count++] = new(tick, elapsedMs, bytes, new(after.Gen0 - before.Gen0, after.Gen1 - before.Gen1,
-            after.Gen2 - before.Gen2, after.PauseTicks - before.PauseTicks, after.JitTicks - before.JitTicks));
+            after.Gen2 - before.Gen2, after.PauseTicks - before.PauseTicks, after.JitTicks - before.JitTicks,
+            ThreadWorkObservation.Between(before.ThreadWork, after.ThreadWork)));
     }
 
     internal void Report(int count, int run, string scenario = "multi-party")
@@ -28,7 +35,9 @@ internal sealed class FrameSpikeLog(int capacity)
             count, run, scenario, runtime = RuntimeInformation.FrameworkDescription,
             architecture = RuntimeInformation.ProcessArchitecture.ToString(),
             processFirstSample = scenario == "multi-party" && count == 300 && run == 0,
-            notes = "Step elapsed only; process GC pause/current-thread JIT bracket Step; no frames discarded"
+            thread_counters = OperatingSystem.IsWindows() ? "GetThreadTimes + QueryThreadCycleTime" : "unavailable",
+            notes = "Step wall clock is the 30Hz gate; counters bracket Step with small observation overhead; "
+                + "thread CPU is quantized, raw cycles are not elapsed time; no frames discarded"
         }));
         for (var i = 0; i < _count; i++)
         {
@@ -39,6 +48,8 @@ internal sealed class FrameSpikeLog(int capacity)
                 gc0 = sample.Delta.Gen0, gc1 = sample.Delta.Gen1, gc2 = sample.Delta.Gen2,
                 gc_pause_ms = sample.Delta.PauseTicks / (double)TimeSpan.TicksPerMillisecond,
                 jit_ms = sample.Delta.JitTicks / (double)TimeSpan.TicksPerMillisecond,
+                thread_cpu_ms = sample.Delta.ThreadWork?.CpuTicks / (double)TimeSpan.TicksPerMillisecond,
+                cpu_cycles = sample.Delta.ThreadWork?.Cycles,
                 over_budget = sample.ElapsedMs > 1000.0 / 30
             }));
         }
