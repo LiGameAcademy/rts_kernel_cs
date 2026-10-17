@@ -30,3 +30,36 @@ scheduled_running_ms是被调度在CPU上的区间，可能含本配置未细分
 采集会扰动性能；ETL用于归因，未录制对照继续以33.3333ms逐帧墙钟判定。未复现最多每运行时三份冷采集，不制造额外负载、不绑核/提优先级/关GC/调电源、不挑最好的一轮。不处理500同帧出生，不扩大预算或交通范围。
 
 复核完整日志：`python experiments/SchedulingProbe/verify.py C:/Temp/rts-scheduling`。原有固定夹具的哈希/事件摘要、901帧、原生身份、QPC计时门及准备状态均核验；不是只比终态。
+
+## 采集扰动对照的前置校准
+
+在同一CLI Release构建中，用独立小进程验证已知方法的装载范围与CPU样本地址；这不是对真实对局新增预热。
+
+```powershell
+wpr -exportprofile CPU.Verbose C:/Temp/rts-overhead/original.wprp
+python experiments/SchedulingProbe/profiles.py C:/Temp/rts-overhead/original.wprp C:/Temp/rts-overhead/profiles
+```
+
+B/C共用事件providers、关键字、缓冲及频率，并加入相同DPC/ISR；B仅移除全部内核/用户栈。不能以CPU.Light/Verbose直接相减推断纯栈开销。生成器拒绝覆盖原文件；WPR是否接受配置仍需profiledetails核验。
+
+在正常管理员PowerShell中执行一次文件模式校准（输出目录必须不存在）：
+
+```powershell
+./experiments/SchedulingProbe/Calibrate.ps1 -ToolPath ./experiments/SchedulingProbe/bin/Release/net10.0/SchedulingProbe.dll -ProfilePath C:/Temp/rts-overhead/profiles/C.wprp -OutputDirectory C:/Temp/rts-overhead/file-calibration
+```
+
+脚本从输入C配置派生独立File配置，保留providers、关键词、级别和栈开关；不会修改原B/C配置。文件模式用于保留早期方法装载事件，不将循环缓冲的EventsLost=0视为首段完整的证明。这只是元数据校准配置，不自动确定后续六轮的统一记录模式。
+
+fixture采用有界握手：ready报告实际PID/原生TID、coreclr路径/版本及相关配置；控制端读取目标provider原生注册与启用信息后发送run。工作完成再取一次快照，目标等待ETL保存成功，之后才接受release退出。错误命令、EOF或超时失败，不能借此给真实对局预热。
+
+`--providers PID session-token output.json`只读调用EnumerateTraceGuidsEx和ControlTraceW(QUERY)，记录Runtime/Rundown实例、Flags、LoggerId、Level、MatchAny/MatchAll、会话模式和缓冲。只认可本次唯一会话的目标运行时注册，PRE_ENABLE及其他会话不算通过；本配置须启用Verbose及JIT/Loader。没有START/UPDATE/STOP provider调用；只清理脚本自己成功创建的WPR会话和fixture子进程。Windows x64之外明确拒绝，不猜原生结构布局。
+
+必须同时有目标CLR方法装载事件、KnownWork有效代码范围、装载时间之后的范围内CPU样本和零丢事件才通过；不能用保存时才产生的Rundown地址反推先前运行版本。读取原始ETL，另计原始provider事件，不能以其他进程事件冒充目标。元数据缺失写passed=false、返回1；配置/IO等异常仍传播。
+
+不重新录制时，可显式离线检查已有证据：
+
+```powershell
+dotnet experiments/SchedulingProbe/bin/Release/net10.0/SchedulingProbe.dll --calibrate C:/Temp/rts-overhead/file-calibration/calibration.etl C:/Temp/rts-overhead/file-calibration/fixture.log C:/Temp/rts-overhead/recheck.json
+```
+
+校准不是30Hz性能验收，不产生真实对局哈希/事件对照。**校准通过后仍须另行确定六轮A-B-C-C-B-A的统一配置，不能自动启动。** 30Hz墙钟、首轮保留及500同帧出生暂缓不变，工具不修改权威内核规则。
