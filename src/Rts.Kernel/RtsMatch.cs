@@ -53,6 +53,19 @@ public sealed partial class RtsMatch
 
     public CommandAcceptance SubmitCommand(CommandEnvelope command) => _commands.Submit(command, Frame);
 
+    /// <summary>
+    /// Explicit loading-time preparation. Does not advance time, consume commands/RNG/IDs or publish events.
+    /// Call between steps, including after restore or navigation edits. Runtime initialization is process-wide;
+    /// derived navigation labels remain match-owned. Warms up to eight configured clearances (existing cache limit).
+    /// </summary>
+    public void PrepareForPlay()
+    {
+        RuntimePreparation.EnsureReady();
+        if (_navigation is null) return;
+        foreach (var clearance in _movementDefinitions.Items.Select(Clearance).Distinct().Order().Take(8))
+            _navigation.Components.Prepare(clearance);
+    }
+
     public void Step()
     {
         Frame++;

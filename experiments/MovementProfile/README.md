@@ -21,3 +21,11 @@ python experiments/MovementProfile/profile.py --without-replay --output C:/Temp/
 本工具不实现缓存、碰撞裁剪、寻路预算或交通策略优化。
 
 逐帧验收记录由tests/Rts.Kernel.Tests/FrameSpikeLog.cs提供，固定容量450，计时窗口外采集进程GC/当前线程JIT计数差并写入缓冲，每轮结束后输出全部frame_sample。CLI与godot_probe共用夹具；计数范围不等于线程调度归因，不剔除首轮和超预算帧。
+
+## 显式对局准备
+
+宿主在开放输入前、读档交付前调用 `match.PrepareForPlay()`，并独立记录整个调用耗时。调用不推进真实帧、不消费命令/RNG/ID、不发布或清空真实事件，也不修改权威快照。只能在Step之间调用。
+
+首次调用会同步执行一次进程级隔离用例（固定300单位、每组最多24个、两个方向、移动/队列/Stop/JSON恢复），后续调用只准备本局导航派生数据。标签按既有8种净空缓存容量预建，不增加缓存上限；额外净空仍走原来的按需查询。障碍编辑成功后缓存仍失效，可在允许的准备阶段再次调用；不在Step内部自动预热。准备耗时和首个真实Step必须分别报告，不能用准备成功代替30Hz验收。
+
+CLI：`dotnet run --project tests/Rts.Kernel.Tests -c Release -- --prepared-multi-party`。该入口保留出生首帧、移动命令及全部活动帧，并验证读档和障碍增删替换后的首次命令。Godot对应入口见godot_probe/README.md，传入 `-- --prepared-multi-party`。

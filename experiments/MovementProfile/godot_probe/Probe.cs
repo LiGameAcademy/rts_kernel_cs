@@ -13,7 +13,13 @@ public partial class Probe : Node
             {
                 checks++;
                 if (!condition) throw new InvalidOperationException(message);
-            });
+            }, prepared: OS.GetCmdlineUserArgs().Contains("--prepared-multi-party"));
+            if (OS.GetCmdlineUserArgs().Contains("--prepared-multi-party"))
+                PreparedBoundaryChecks.Run((condition, message) =>
+                {
+                    checks++;
+                    if (!condition) throw new InvalidOperationException(message);
+                });
             Console.WriteLine($"Godot multi-party PASS ({checks} checks)");
             GetTree().Quit();
         }

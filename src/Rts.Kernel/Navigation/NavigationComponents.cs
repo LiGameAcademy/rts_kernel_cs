@@ -4,6 +4,12 @@ namespace Rts.Kernel.Navigation;
 internal sealed class NavigationComponents(NavigationState navigation)
 {
     private readonly Dictionary<int, int[]> _byClearance = [];
+    internal void Prepare(int clearance)
+    {
+        // A self-query constructs labels even when this particular cell is blocked.
+        Connected(new GridCell(0, 0), new GridCell(0, 0), clearance);
+    }
+
     internal void Clear() => _byClearance.Clear();
 
     internal bool Connected(GridCell from, GridCell to, int clearance)

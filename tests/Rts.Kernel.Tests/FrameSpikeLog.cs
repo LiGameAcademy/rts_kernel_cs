@@ -22,19 +22,19 @@ internal sealed class FrameSpikeLog(int capacity)
             after.Gen2 - before.Gen2, after.PauseTicks - before.PauseTicks, after.JitTicks - before.JitTicks));
     }
 
-    internal void Report(int count, int run)
+    internal void Report(int count, int run, string scenario = "multi-party")
     {
         Console.WriteLine("frame_observer=" + JsonSerializer.Serialize(new {
-            count, run, runtime = RuntimeInformation.FrameworkDescription,
+            count, run, scenario, runtime = RuntimeInformation.FrameworkDescription,
             architecture = RuntimeInformation.ProcessArchitecture.ToString(),
-            processFirstSample = count == 300 && run == 0,
+            processFirstSample = scenario == "multi-party" && count == 300 && run == 0,
             notes = "Step elapsed only; process GC pause/current-thread JIT bracket Step; no frames discarded"
         }));
         for (var i = 0; i < _count; i++)
         {
             var sample = _samples[i];
             Console.WriteLine("frame_sample=" + JsonSerializer.Serialize(new {
-                count, run, tick = sample.Tick, phase = sample.Tick == 0 ? "command" : "move",
+                count, run, scenario, tick = sample.Tick, phase = sample.Tick == -2 ? "obstacle-edit" : sample.Tick < 0 ? "spawn" : sample.Tick == 0 ? "command" : "move",
                 elapsed_ms = sample.ElapsedMs, alloc_bytes = sample.Bytes,
                 gc0 = sample.Delta.Gen0, gc1 = sample.Delta.Gen1, gc2 = sample.Delta.Gen2,
                 gc_pause_ms = sample.Delta.PauseTicks / (double)TimeSpan.TicksPerMillisecond,

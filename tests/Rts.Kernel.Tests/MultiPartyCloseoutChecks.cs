@@ -8,20 +8,19 @@ using Rts.Kernel.Navigation;
 /// <summary>Release acceptance probe: independent small parties share one populated match.</summary>
 internal static class MultiPartyCloseoutChecks
 {
-    private static readonly MovementDefinition Footman = new(1, 270, 31,
+    internal static readonly MovementDefinition Footman = new(1, 270, 31,
         new MotionParameters(TurnRate: SimScalar.Parse("0.6")));
-    private static readonly PathingGrid Grid = new(256, 256, 32, default, new byte[256 * 256]);
-    private static readonly TerrainHeights Heights = new(257, 257, 32, default, new SimScalar[257 * 257]);
+    internal static readonly PathingGrid Grid = new(256, 256, 32, default, new byte[256 * 256]);
+    internal static readonly TerrainHeights Heights = new(257, 257, 32, default, new SimScalar[257 * 257]);
 
-    internal static void Run(Action<bool, string> check)
+    internal static void Run(Action<bool, string> check, bool prepared = false)
     {
         foreach (var count in new[] { 300, 500 })
-        for (var run = 0; run < 3; run++) Measure(count, run, check);
+        for (var run = 0; run < 3; run++) Measure(count, run, check, prepared);
     }
 
-    private static void Measure(int count, int run, Action<bool, string> check)
+    internal static void QueueSpawns(RtsMatch match, int count)
     {
-        var match = new RtsMatch(MatchConfig.Default, 7, Grid, Heights, [Footman]);
         for (var index = 0; index < count; index++)
         {
             var party = index / 24;
@@ -30,15 +29,36 @@ internal static class MultiPartyCloseoutChecks
                 new(800 + party % 5 * 1300 + member % 5 * 96,
                     800 + party / 5 * 1300 + member / 5 * 96), 1));
         }
-        match.Step();
-        check(match.Entities.Count == count, "multi-party fixture spawns all bodies");
-        match.DrainEvents();
+    }
+
+    internal static void QueueMoves(RtsMatch match, int count)
+    {
         var ids = match.Entities.Select(entity => entity.Id).ToArray();
         var parties = (count + 23) / 24;
         for (var party = 0; party < parties; party++)
-            match.SubmitCommand(CommandEnvelope.MoveGroup(2, 0, count + party,
+            match.SubmitCommand(CommandEnvelope.MoveGroup(match.Frame + 1, 0, count + party,
                 new(ids.Skip(party * 24).Take(24).ToArray(),
                     new(1568 + party % 5 * 1300, 992 + party / 5 * 1300))));
+
+    }
+
+    private static void Measure(int count, int run, Action<bool, string> check, bool prepared)
+    {
+        var match = new RtsMatch(MatchConfig.Default, 7, Grid, Heights, [Footman]);
+        if (prepared) PreparationObserver.Run(match, check, $"fresh-{count}-{run}");
+        QueueSpawns(match, count);
+        var spawnLog = new FrameSpikeLog(1);
+        var spawnCounters = FrameSpikeLog.ReadCounters();
+        var spawnBytes = GC.GetAllocatedBytesForCurrentThread();
+        var spawnWatch = Stopwatch.StartNew();
+        match.Step();
+        spawnWatch.Stop();
+        var spawnAfter = FrameSpikeLog.ReadCounters();
+        spawnLog.Record(-1, spawnWatch.Elapsed.TotalMilliseconds,
+            GC.GetAllocatedBytesForCurrentThread() - spawnBytes, spawnCounters, spawnAfter);
+        check(match.Entities.Count == count, "multi-party fixture spawns all bodies");
+        match.DrainEvents();
+        QueueMoves(match, count);
 
         using var trajectory = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         var spikeLog = new FrameSpikeLog(450);
@@ -101,13 +121,16 @@ internal static class MultiPartyCloseoutChecks
         var idle = match.Entities.ToArray();
         for (var frame = 0; frame < 90; frame++) match.Step();
         check(idle.SequenceEqual(match.Entities), "all parties remain settled");
+        spawnLog.Report(count, run);
         spikeLog.Report(count, run);
         samples.Sort();
         var p95 = samples[(int)Math.Ceiling(samples.Count * 0.95) - 1];
+        var parties = (count + 23) / 24;
+        var maximumMs = Math.Max(samples[^1], spawnWatch.Elapsed.TotalMilliseconds);
         var remaining = match.ReadUnitOrders().Count(queue => queue.Current?.Kind == UnitOrderKind.Move);
         Console.WriteLine($"multi_party count={count} parties={parties} run={run} ticks={samples.Count} command_ms={commandMs:F3}"
-            + $" mean_ms={samples.Average():F3} p95_ms={p95:F3} max_ms={samples[^1]:F3} alloc_kb_tick={allocated / 1024.0 / samples.Count:F1}"
+            + $" mean_ms={samples.Average():F3} p95_ms={p95:F3} max_ms={maximumMs:F3} first_step_ms={spawnWatch.Elapsed.TotalMilliseconds:F3} prepared={prepared} alloc_kb_tick={allocated / 1024.0 / samples.Count:F1}"
             + $" assigned={assigned} completed={completed.Count} failed={failed} remaining={remaining} replay_ticks={restoreChecks}"
-            + $" trace={Convert.ToHexString(trajectory.GetHashAndReset())} hash={match.ComputeStateHash()} budget33={(samples[^1] <= 1000.0 / 30 ? "PASS" : "OVER")}");
+            + $" trace={Convert.ToHexString(trajectory.GetHashAndReset())} hash={match.ComputeStateHash()} budget33={(maximumMs <= 1000.0 / 30 ? "PASS" : "OVER")}");
     }
 }

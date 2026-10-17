@@ -14,6 +14,7 @@ internal sealed class MovementDefinitions
 {
     private readonly SortedDictionary<ulong, MovementDefinition> _items = [];
     internal string? ContentHash { get; }
+    internal IEnumerable<MovementDefinition> Items => _items.Values;
     internal MovementDefinitions(IReadOnlyList<MovementDefinition>? definitions)
     {
         foreach (var definition in definitions ?? [])
