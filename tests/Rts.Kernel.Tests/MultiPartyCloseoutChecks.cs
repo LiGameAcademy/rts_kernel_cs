@@ -50,11 +50,12 @@ internal static class MultiPartyCloseoutChecks
         var spawnLog = new FrameSpikeLog(1);
         var spawnCounters = FrameSpikeLog.ReadCounters();
         var spawnBytes = GC.GetAllocatedBytesForCurrentThread();
-        var spawnWatch = Stopwatch.StartNew();
+        var spawnStart = Stopwatch.GetTimestamp();
         match.Step();
-        spawnWatch.Stop();
+        var spawnEnd = Stopwatch.GetTimestamp();
         var spawnAfter = FrameSpikeLog.ReadCounters();
-        spawnLog.Record(-1, spawnWatch.Elapsed.TotalMilliseconds,
+        var spawnMs = Stopwatch.GetElapsedTime(spawnStart, spawnEnd).TotalMilliseconds;
+        spawnLog.Record(-1, spawnStart, spawnEnd,
             GC.GetAllocatedBytesForCurrentThread() - spawnBytes, spawnCounters, spawnAfter);
         check(match.Entities.Count == count, "multi-party fixture spawns all bodies");
         match.DrainEvents();
@@ -76,15 +77,16 @@ internal static class MultiPartyCloseoutChecks
             // Include command execution/planning in the first measured tick.
             var countersBefore = FrameSpikeLog.ReadCounters();
             var before = GC.GetAllocatedBytesForCurrentThread();
-            var watch = Stopwatch.StartNew();
+            var start = Stopwatch.GetTimestamp();
             match.Step();
-            watch.Stop();
+            var end = Stopwatch.GetTimestamp();
             var countersAfter = FrameSpikeLog.ReadCounters();
             var frameBytes = GC.GetAllocatedBytesForCurrentThread() - before;
-            spikeLog.Record(frame, watch.Elapsed.TotalMilliseconds, frameBytes, countersBefore, countersAfter);
+            var elapsedMs = Stopwatch.GetElapsedTime(start, end).TotalMilliseconds;
+            spikeLog.Record(frame, start, end, frameBytes, countersBefore, countersAfter);
             allocated += frameBytes;
-            samples.Add(watch.Elapsed.TotalMilliseconds);
-            if (frame == 0) commandMs = watch.Elapsed.TotalMilliseconds;
+            samples.Add(elapsedMs);
+            if (frame == 0) commandMs = elapsedMs;
             var events = match.DrainEvents();
             trajectory.AppendData(Encoding.UTF8.GetBytes(match.ComputeStateHash() + "\n" + JsonSerializer.Serialize(events) + "\n"));
             check(!events.Any(item => item.Kind == MatchEventKind.CommandRejected), "all small-party commands accepted");
@@ -126,10 +128,10 @@ internal static class MultiPartyCloseoutChecks
         samples.Sort();
         var p95 = samples[(int)Math.Ceiling(samples.Count * 0.95) - 1];
         var parties = (count + 23) / 24;
-        var maximumMs = Math.Max(samples[^1], spawnWatch.Elapsed.TotalMilliseconds);
+        var maximumMs = Math.Max(samples[^1], spawnMs);
         var remaining = match.ReadUnitOrders().Count(queue => queue.Current?.Kind == UnitOrderKind.Move);
         Console.WriteLine($"multi_party count={count} parties={parties} run={run} ticks={samples.Count} command_ms={commandMs:F3}"
-            + $" mean_ms={samples.Average():F3} p95_ms={p95:F3} max_ms={maximumMs:F3} first_step_ms={spawnWatch.Elapsed.TotalMilliseconds:F3} prepared={prepared} alloc_kb_tick={allocated / 1024.0 / samples.Count:F1}"
+            + $" mean_ms={samples.Average():F3} p95_ms={p95:F3} max_ms={maximumMs:F3} first_step_ms={spawnMs:F3} prepared={prepared} alloc_kb_tick={allocated / 1024.0 / samples.Count:F1}"
             + $" assigned={assigned} completed={completed.Count} failed={failed} remaining={remaining} replay_ticks={restoreChecks}"
             + $" trace={Convert.ToHexString(trajectory.GetHashAndReset())} hash={match.ComputeStateHash()} budget33={(maximumMs <= 1000.0 / 30 ? "PASS" : "OVER")}");
     }

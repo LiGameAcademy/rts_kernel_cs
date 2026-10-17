@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <Target Name="RequireTraceEvent" BeforeTargets="ResolveReferences"
+          Condition="!Exists('$(TraceEventDirectory)/Microsoft.Diagnostics.Tracing.TraceEvent.dll')">
+    <Error Text="Pass -p:TraceEventDirectory=... pointing to an existing compatible TraceEvent tool installation." />
+  </Target>
+  <ItemGroup>
+    <Reference Include="Microsoft.Diagnostics.Tracing.TraceEvent" HintPath="$(TraceEventDirectory)/Microsoft.Diagnostics.Tracing.TraceEvent.dll" />
+    <Reference Include="Microsoft.Diagnostics.FastSerialization" HintPath="$(TraceEventDirectory)/Microsoft.Diagnostics.FastSerialization.dll" />
+  </ItemGroup>
+</Project>
