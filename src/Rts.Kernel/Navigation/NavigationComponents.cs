@@ -1,9 +1,11 @@
 namespace Rts.Kernel.Navigation;
 
-/// <summary>Per-command derived reachability, including clearance and corner rules; never match authority.</summary>
+/// <summary>Per-navigation derived reachability, including clearance and corner rules; never match authority.</summary>
 internal sealed class NavigationComponents(NavigationState navigation)
 {
     private readonly Dictionary<int, int[]> _byClearance = [];
+    internal void Clear() => _byClearance.Clear();
+
     internal bool Connected(GridCell from, GridCell to, int clearance)
     {
         var grid = navigation.Grid;
@@ -11,6 +13,8 @@ internal sealed class NavigationComponents(NavigationState navigation)
             || to.X < 0 || to.Y < 0 || to.X >= grid.Width || to.Y >= grid.Height) return false;
         if (!_byClearance.TryGetValue(clearance, out var labels))
         {
+            // Bound retained derived maps, matching the navigation clearance cache.
+            if (_byClearance.Count == 8) _byClearance.Clear();
             labels = Build(clearance);
             _byClearance.Add(clearance, labels);
         }

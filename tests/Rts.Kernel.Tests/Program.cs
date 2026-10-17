@@ -188,6 +188,7 @@ MatchCommandQueueChecks.Run(Check);
 MatchEventBufferChecks.Run(Check);
 PathfindingChecks.Run(Check);
 NavigationChecks.Run(Check);
+NavigationCacheChecks.Run(Check);
 MovementChecks.Run(Check);
 MotionRuleChecks.Run(Check);
 MotionStateChecks.Run(Check);
