@@ -42,14 +42,24 @@ python experiments/SchedulingProbe/profiles.py C:/Temp/rts-overhead/original.wpr
 
 B/C共用事件providers、关键字、缓冲及频率，并加入相同DPC/ISR；B仅移除全部内核/用户栈。不能以CPU.Light/Verbose直接相减推断纯栈开销。生成器拒绝覆盖原文件；WPR是否接受配置仍需profiledetails核验。
 
-管理员正常启动唯一命名WPR会话，使用C.wprp!RtsOverhead，运行下面的独立fixture后保存ETL；会话安全约束同Capture.ps1：
+在正常管理员PowerShell中执行一次文件模式校准（输出目录必须不存在）：
 
 ```powershell
-dotnet experiments/SchedulingProbe/bin/Release/net10.0/SchedulingProbe.dll --metadata-fixture > C:/Temp/rts-overhead/fixture.log
-# 停止本次会话并保存calibration.etl后离线核对：
-dotnet experiments/SchedulingProbe/bin/Release/net10.0/SchedulingProbe.dll --calibrate C:/Temp/rts-overhead/calibration.etl C:/Temp/rts-overhead/fixture.log C:/Temp/rts-overhead/calibration.json
+./experiments/SchedulingProbe/Calibrate.ps1 -ToolPath ./experiments/SchedulingProbe/bin/Release/net10.0/SchedulingProbe.dll -ProfilePath C:/Temp/rts-overhead/profiles/C.wprp -OutputDirectory C:/Temp/rts-overhead/file-calibration
 ```
 
-必须同时有目标CLR方法装载事件、KnownWork有效代码范围、范围内CPU样本和零丢事件才通过。读取的是原始ETL，另计原始provider事件，不能以全机其他进程的CLR事件冒充目标元数据。数据不全时写passed=false、返回1；配置/IO等异常仍传播，不伪造成功。
+脚本从输入C配置派生独立File配置，保留providers、关键词、级别和栈开关；不会修改原B/C配置。文件模式用于保留早期方法装载事件，不将循环缓冲的EventsLost=0视为首段完整的证明。这只是元数据校准配置，不自动确定后续六轮的统一记录模式。
 
-**只有校准passed=true，才运行六个A-B-C-C-B-A冷CLI对照。** 2026-10-17本机校准实际失败：有99个CPU样本，目标CLR方法元数据为0；六轮尚未执行，不能声称比较了采集扰动、核对了六轮哈希/事件或性能过门。下一阶段保持30Hz墙钟及首轮，500同帧出生继续暂缓；本工具未修改任何权威内核规则。
+fixture采用有界握手：ready报告实际PID/原生TID、coreclr路径/版本及相关配置；控制端读取目标provider原生注册与启用信息后发送run。工作完成再取一次快照，目标等待ETL保存成功，之后才接受release退出。错误命令、EOF或超时失败，不能借此给真实对局预热。
+
+`--providers PID session-token output.json`只读调用EnumerateTraceGuidsEx和ControlTraceW(QUERY)，记录Runtime/Rundown实例、Flags、LoggerId、Level、MatchAny/MatchAll、会话模式和缓冲。只认可本次唯一会话的目标运行时注册，PRE_ENABLE及其他会话不算通过；本配置须启用Verbose及JIT/Loader。没有START/UPDATE/STOP provider调用；只清理脚本自己成功创建的WPR会话和fixture子进程。Windows x64之外明确拒绝，不猜原生结构布局。
+
+必须同时有目标CLR方法装载事件、KnownWork有效代码范围、装载时间之后的范围内CPU样本和零丢事件才通过；不能用保存时才产生的Rundown地址反推先前运行版本。读取原始ETL，另计原始provider事件，不能以其他进程事件冒充目标。元数据缺失写passed=false、返回1；配置/IO等异常仍传播。
+
+不重新录制时，可显式离线检查已有证据：
+
+```powershell
+dotnet experiments/SchedulingProbe/bin/Release/net10.0/SchedulingProbe.dll --calibrate C:/Temp/rts-overhead/file-calibration/calibration.etl C:/Temp/rts-overhead/file-calibration/fixture.log C:/Temp/rts-overhead/recheck.json
+```
+
+校准不是30Hz性能验收，不产生真实对局哈希/事件对照。**校准通过后仍须另行确定六轮A-B-C-C-B-A的统一配置，不能自动启动。** 30Hz墙钟、首轮保留及500同帧出生暂缓不变，工具不修改权威内核规则。

@@ -7,8 +7,9 @@ using Microsoft.Diagnostics.Tracing;
 /// <summary>Separate diagnostic process. Never pre-runs or changes the real match fixture.</summary>
 internal static class MetadataCalibration
 {
-    internal static void RunFixture()
+    internal static void RunFixture(bool handshake = false)
     {
+        if (handshake) MetadataHandshake.Ready();
         var start = Stopwatch.GetTimestamp();
         var checksum = KnownWork(64_000_000);
         var end = Stopwatch.GetTimestamp();
@@ -17,6 +18,7 @@ internal static class MetadataCalibration
             qpc_frequency = Stopwatch.Frequency, checksum,
             runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription
         }));
+        if (handshake) MetadataHandshake.ReleaseAfterSave();
     }
 
     [DllImport("kernel32.dll", ExactSpelling = true)]
