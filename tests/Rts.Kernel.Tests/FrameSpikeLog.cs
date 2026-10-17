@@ -1,0 +1,46 @@
+using System.Runtime;
+using System.Runtime.InteropServices;
+using System.Text.Json;
+
+/// <summary>Probe-only observations. Buffered outside Step; never consulted by simulation.</summary>
+internal sealed class FrameSpikeLog(int capacity)
+{
+    private readonly Sample[] _samples = new Sample[capacity];
+    private int _count;
+
+    internal readonly record struct Counters(int Gen0, int Gen1, int Gen2, long PauseTicks, long JitTicks);
+    private readonly record struct Sample(int Tick, double ElapsedMs, long Bytes, Counters Delta);
+
+    // Invoke the same reader before/after Step, so first-call compilation precedes the measured window.
+    internal static Counters ReadCounters() => new(GC.CollectionCount(0), GC.CollectionCount(1),
+        GC.CollectionCount(2), GC.GetTotalPauseDuration().Ticks, JitInfo.GetCompilationTime(currentThread: true).Ticks);
+
+    internal void Record(int tick, double elapsedMs, long bytes, Counters before, Counters after)
+    {
+        if (_count == _samples.Length) throw new InvalidOperationException("Spike observation buffer exhausted.");
+        _samples[_count++] = new(tick, elapsedMs, bytes, new(after.Gen0 - before.Gen0, after.Gen1 - before.Gen1,
+            after.Gen2 - before.Gen2, after.PauseTicks - before.PauseTicks, after.JitTicks - before.JitTicks));
+    }
+
+    internal void Report(int count, int run)
+    {
+        Console.WriteLine("frame_observer=" + JsonSerializer.Serialize(new {
+            count, run, runtime = RuntimeInformation.FrameworkDescription,
+            architecture = RuntimeInformation.ProcessArchitecture.ToString(),
+            processFirstSample = count == 300 && run == 0,
+            notes = "Step elapsed only; process GC pause/current-thread JIT bracket Step; no frames discarded"
+        }));
+        for (var i = 0; i < _count; i++)
+        {
+            var sample = _samples[i];
+            Console.WriteLine("frame_sample=" + JsonSerializer.Serialize(new {
+                count, run, tick = sample.Tick, phase = sample.Tick == 0 ? "command" : "move",
+                elapsed_ms = sample.ElapsedMs, alloc_bytes = sample.Bytes,
+                gc0 = sample.Delta.Gen0, gc1 = sample.Delta.Gen1, gc2 = sample.Delta.Gen2,
+                gc_pause_ms = sample.Delta.PauseTicks / (double)TimeSpan.TicksPerMillisecond,
+                jit_ms = sample.Delta.JitTicks / (double)TimeSpan.TicksPerMillisecond,
+                over_budget = sample.ElapsedMs > 1000.0 / 30
+            }));
+        }
+    }
+}

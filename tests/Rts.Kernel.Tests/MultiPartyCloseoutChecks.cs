@@ -41,7 +41,8 @@ internal static class MultiPartyCloseoutChecks
                     new(1568 + party % 5 * 1300, 992 + party / 5 * 1300))));
 
         using var trajectory = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        var samples = new List<double>();
+        var spikeLog = new FrameSpikeLog(450);
+        var samples = new List<double>(450);
         var allocated = 0L;
         var completed = new HashSet<EntityId>();
         var failed = 0;
@@ -53,11 +54,15 @@ internal static class MultiPartyCloseoutChecks
         for (var frame = 0; frame < 450 && completed.Count + failed < count; frame++)
         {
             // Include command execution/planning in the first measured tick.
+            var countersBefore = FrameSpikeLog.ReadCounters();
             var before = GC.GetAllocatedBytesForCurrentThread();
             var watch = Stopwatch.StartNew();
             match.Step();
             watch.Stop();
-            allocated += GC.GetAllocatedBytesForCurrentThread() - before;
+            var countersAfter = FrameSpikeLog.ReadCounters();
+            var frameBytes = GC.GetAllocatedBytesForCurrentThread() - before;
+            spikeLog.Record(frame, watch.Elapsed.TotalMilliseconds, frameBytes, countersBefore, countersAfter);
+            allocated += frameBytes;
             samples.Add(watch.Elapsed.TotalMilliseconds);
             if (frame == 0) commandMs = watch.Elapsed.TotalMilliseconds;
             var events = match.DrainEvents();
@@ -96,6 +101,7 @@ internal static class MultiPartyCloseoutChecks
         var idle = match.Entities.ToArray();
         for (var frame = 0; frame < 90; frame++) match.Step();
         check(idle.SequenceEqual(match.Entities), "all parties remain settled");
+        spikeLog.Report(count, run);
         samples.Sort();
         var p95 = samples[(int)Math.Ceiling(samples.Count * 0.95) - 1];
         var remaining = match.ReadUnitOrders().Count(queue => queue.Current?.Kind == UnitOrderKind.Move);

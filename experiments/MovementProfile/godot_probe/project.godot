@@ -1,0 +1,11 @@
+config_version=5
+
+[application]
+config/name="RTS movement runtime probe"
+run/main_scene="res://probe.tscn"
+
+[dotnet]
+project/assembly_name="Rts.Kernel.Tests"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
