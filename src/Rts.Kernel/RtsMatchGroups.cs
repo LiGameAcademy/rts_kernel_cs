@@ -101,6 +101,8 @@ public sealed partial class RtsMatch
         return members;
     }
 
+    // Compile this measured hot scan with optimizations to reduce command-time JIT spikes.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
     private IReadOnlyList<PlacementBody> GroupBodies(IReadOnlyList<PlacementMember> members)
     {
         var activeIds = members.Select(member => member.Id).ToHashSet();

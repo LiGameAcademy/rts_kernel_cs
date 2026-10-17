@@ -19,3 +19,5 @@ python experiments/MovementProfile/profile.py --without-replay --output C:/Temp/
 - 源码方法或探针标记变化时明确失败，不静默跳过；诊断结果须与原始日志及源码版本一起审阅。
 
 本工具不实现缓存、碰撞裁剪、寻路预算或交通策略优化。
+
+逐帧验收记录由tests/Rts.Kernel.Tests/FrameSpikeLog.cs提供，固定容量450，计时窗口外采集进程GC/当前线程JIT计数差并写入缓冲，每轮结束后输出全部frame_sample。CLI与godot_probe共用夹具；计数范围不等于线程调度归因，不剔除首轮和超预算帧。
