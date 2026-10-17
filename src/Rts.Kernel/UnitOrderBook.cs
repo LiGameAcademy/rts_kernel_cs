@@ -39,6 +39,17 @@ internal sealed class UnitOrderBook
             ? queue.Pending.Prepend(queue.Current).Where(intent => intent?.Move is not null).Select(intent => intent!.Move!.Goal)
             : Enumerable.Empty<FixedVector2>();
 
+    // Append in current-then-pending order without exposing or consuming the live queue.
+    internal void AppendRetainedBodies(EntityId id, SimScalar radius, List<PlacementBody> destination)
+    {
+        if (!_queues.TryGetValue(id, out var queue)) return;
+        if (queue.Current?.Move is { } current)
+            destination.Add(new PlacementBody(current.Goal, radius));
+        foreach (var intent in queue.Pending)
+            if (intent.Move is { } pending)
+                destination.Add(new PlacementBody(pending.Goal, radius));
+    }
+
     internal IEnumerable<(EntityId Id, UnitOrderIntent Intent)> Intents()
     {
         foreach (var pair in _queues)
