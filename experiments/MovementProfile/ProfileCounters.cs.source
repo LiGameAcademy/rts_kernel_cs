@@ -1,0 +1,104 @@
+using System.Diagnostics;
+using System.Text.Json;
+
+namespace Rts.Kernel;
+
+// Diagnostic copy only. All values are observations, never simulation inputs.
+internal static class ProfileCounters
+{
+    private static readonly string[] Names = [
+        "Step", "Commands", "Planning", "Queued", "Crowd",
+        "Group.Members", "Group.Bodies", "Group.Layout", "Group.Assign", "Group.Place", "Group.Commit",
+        "Path.Plan", "Crowd.Prepare", "Crowd.Resolve", "Crowd.Alternative",
+        "Crowd.Settle", "Crowd.YieldPlan", "Motion.Compute", "Local.Detour", "Local.SoftGoal", "Navigation.Build", "Collision.Query", "Collision.Timed", "Collision.Segment"
+    ];
+    private static readonly Dictionary<string, int> Ids =
+        Names.Select((name, id) => (name, id)).ToDictionary(pair => pair.name, pair => pair.id);
+    private static readonly long[] TickTime = new long[Names.Length];
+    private static readonly long[] TickBytes = new long[Names.Length];
+    private static readonly long[] TickCalls = new long[Names.Length];
+    private static readonly Stats[][] Totals = [new Stats[Names.Length], new Stats[Names.Length]];
+    private static readonly int[] Frames = new int[2];
+    private static readonly long[] GcPause = new long[2];
+    private static readonly int[,] GcCounts = new int[2, 3];
+    private static readonly int[] GcStart = new int[3];
+    private static long _pauseStart;
+    private static int _phase;
+    private static bool _enabled;
+
+    internal static void Reset()
+    {
+        foreach (var stats in Totals) Array.Clear(stats);
+        Array.Clear(Frames);
+        Array.Clear(GcPause);
+        Array.Clear(GcCounts);
+    }
+
+    internal static void BeginTick(bool command)
+    {
+        _phase = command ? 0 : 1;
+        Array.Clear(TickTime);
+        Array.Clear(TickBytes);
+        Array.Clear(TickCalls);
+        for (var generation = 0; generation < 3; generation++) GcStart[generation] = GC.CollectionCount(generation);
+        _pauseStart = GC.GetTotalPauseDuration().Ticks;
+        _enabled = true;
+    }
+
+    internal static void EndTick()
+    {
+        _enabled = false;
+        GcPause[_phase] += GC.GetTotalPauseDuration().Ticks - _pauseStart;
+        for (var generation = 0; generation < 3; generation++)
+            GcCounts[_phase, generation] += GC.CollectionCount(generation) - GcStart[generation];
+        Frames[_phase]++;
+        for (var id = 0; id < Names.Length; id++)
+        {
+            ref var stat = ref Totals[_phase][id];
+            stat.Ticks += TickTime[id];
+            stat.Bytes += TickBytes[id];
+            stat.Calls += TickCalls[id];
+            stat.MaxTick = Math.Max(stat.MaxTick, TickTime[id]);
+        }
+    }
+
+    internal static Scope Enter(string name) => !_enabled ? default
+        : new(Ids[name] + 1, Stopwatch.GetTimestamp(), GC.GetAllocatedBytesForCurrentThread());
+
+    internal readonly struct Scope(int key, long started, long bytes) : IDisposable
+    {
+        public void Dispose()
+        {
+            if (key == 0) return;
+            var id = key - 1;
+            TickTime[id] += Stopwatch.GetTimestamp() - started;
+            TickBytes[id] += GC.GetAllocatedBytesForCurrentThread() - bytes;
+            TickCalls[id]++;
+        }
+    }
+
+    private struct Stats
+    {
+        internal long Ticks, Bytes, Calls, MaxTick;
+    }
+
+    internal static void Report(int count, int run)
+    {
+        for (var phase = 0; phase < 2; phase++)
+        for (var id = 0; id < Names.Length; id++)
+        {
+            var stat = Totals[phase][id];
+            if (stat.Calls == 0) continue;
+            Console.WriteLine("profile=" + JsonSerializer.Serialize(new {
+                count, run, phase = phase == 0 ? "command" : "move", stage = Names[id],
+                calls = stat.Calls, frames = Frames[phase],
+                gc0 = GcCounts[phase, 0], gc1 = GcCounts[phase, 1], gc2 = GcCounts[phase, 2],
+                gc_pause_ms = GcPause[phase] / (double)TimeSpan.TicksPerMillisecond,
+                total_ms = stat.Ticks * 1000.0 / Stopwatch.Frequency,
+                mean_tick_ms = stat.Ticks * 1000.0 / Stopwatch.Frequency / Frames[phase],
+                max_tick_ms = stat.MaxTick * 1000.0 / Stopwatch.Frequency,
+                kib_tick = stat.Bytes / 1024.0 / Frames[phase]
+            }));
+        }
+    }
+}
