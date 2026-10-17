@@ -72,6 +72,9 @@ internal static class SmallGroupAssignment
     {
         // A bounded pair exchange removes avoidable crossings left by greedy selection.
         var exchangeOrder = Enumerable.Range(0, members.Count).OrderBy(i => members[i].Id).ToArray();
+        Span<Int128> currentCosts = stackalloc Int128[MaximumMembers];
+        Span<bool> knownCosts = stackalloc bool[MaximumMembers];
+        knownCosts.Clear();
         for (var pass = 0; pass < members.Count; pass++)
         {
             var changed = false;
@@ -81,12 +84,25 @@ internal static class SmallGroupAssignment
                 var a = exchangeOrder[ai];
                 var b = exchangeOrder[bi];
                 if (preserveAnchor && (a == anchorIndex || b == anchorIndex)) continue;
-                var before = SquaredDistance.Between(members[a].Start, ideals[result[a]]).Raw
-                    + SquaredDistance.Between(members[b].Start, ideals[result[b]]).Raw;
-                var after = SquaredDistance.Between(members[a].Start, ideals[result[b]]).Raw
-                    + SquaredDistance.Between(members[b].Start, ideals[result[a]]).Raw;
+                // Evaluate only costs visited by the original loop, including overflow checks.
+                if (!knownCosts[a])
+                {
+                    currentCosts[a] = SquaredDistance.Between(members[a].Start, ideals[result[a]]).Raw;
+                    knownCosts[a] = true;
+                }
+                if (!knownCosts[b])
+                {
+                    currentCosts[b] = SquaredDistance.Between(members[b].Start, ideals[result[b]]).Raw;
+                    knownCosts[b] = true;
+                }
+                var before = currentCosts[a] + currentCosts[b];
+                var afterA = SquaredDistance.Between(members[a].Start, ideals[result[b]]).Raw;
+                var afterB = SquaredDistance.Between(members[b].Start, ideals[result[a]]).Raw;
+                var after = afterA + afterB;
                 if (after >= before) continue;
                 (result[a], result[b]) = (result[b], result[a]);
+                currentCosts[a] = afterA;
+                currentCosts[b] = afterB;
                 changed = true;
             }
             if (!changed) break;
