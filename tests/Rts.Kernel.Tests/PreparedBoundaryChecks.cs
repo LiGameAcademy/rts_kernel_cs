@@ -58,12 +58,12 @@ internal static class PreparedBoundaryChecks
     {
         var counters = FrameSpikeLog.ReadCounters();
         var bytes = GC.GetAllocatedBytesForCurrentThread();
-        var watch = Stopwatch.StartNew();
+        var start = Stopwatch.GetTimestamp();
         match.Step();
-        watch.Stop();
+        var end = Stopwatch.GetTimestamp();
         var after = FrameSpikeLog.ReadCounters();
-        records.Record(tick, watch.Elapsed.TotalMilliseconds, GC.GetAllocatedBytesForCurrentThread() - bytes, counters, after);
-        return watch.Elapsed.TotalMilliseconds;
+        records.Record(tick, start, end, GC.GetAllocatedBytesForCurrentThread() - bytes, counters, after);
+        return Stopwatch.GetElapsedTime(start, end).TotalMilliseconds;
     }
 
     private static RtsMatch Restore(MatchSnapshot snapshot) => RtsMatch.Restore(
