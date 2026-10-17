@@ -95,19 +95,10 @@ internal static class GroupPlacementPlanner
         if (rawX < -AdjustmentCells
             || rawY < -AdjustmentCells || rawX >= (long)grid.Width + AdjustmentCells
             || rawY >= (long)grid.Height + AdjustmentCells) return [];
-        var x = rawX;
-        var y = rawY;
-        var capacity = (int)((Math.Min(grid.Width - 1L, (long)x + AdjustmentCells) - Math.Max(0, x - AdjustmentCells) + 1)
-            * (Math.Min(grid.Height - 1L, (long)y + AdjustmentCells) - Math.Max(0, y - AdjustmentCells) + 1));
-        var candidates = new List<(GridCell Element, (Int128 Distance, int Y, int X) Priority)>(capacity);
-        for (var cy = Math.Max(0, y - AdjustmentCells); cy <= Math.Min(grid.Height - 1L, (long)y + AdjustmentCells); cy++)
-        for (var cx = Math.Max(0, x - AdjustmentCells); cx <= Math.Min(grid.Width - 1L, (long)x + AdjustmentCells); cx++)
-        {
-            var cell = new GridCell(checked((int)cx), checked((int)cy));
-            var point = navigation.CellCenter(cell);
-            var distance = SquaredDistance.Between(point, ideal).Raw;
-            candidates.Add((cell, (distance, checked((int)cy), checked((int)cx))));
-        }
-        return new PlacementCandidates(candidates);
+        return new PlacementCandidates(navigation, ideal,
+            checked((int)Math.Max(0, rawX - AdjustmentCells)),
+            checked((int)Math.Min(grid.Width - 1L, rawX + AdjustmentCells)),
+            checked((int)Math.Max(0, rawY - AdjustmentCells)),
+            checked((int)Math.Min(grid.Height - 1L, rawY + AdjustmentCells)));
     }
 }
