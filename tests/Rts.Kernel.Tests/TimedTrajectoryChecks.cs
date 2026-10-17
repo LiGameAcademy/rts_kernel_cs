@@ -5,6 +5,7 @@ internal static class TimedTrajectoryChecks
 {
     internal static void Run(Action<bool, string> check)
     {
+        CollisionBoundsChecks.Run(check);
         CrowdBody Body(ulong id, FixedVector2[] points, SimScalar[] times, SimScalar? radius = null) =>
             new(new(id), radius ?? 1, points, times);
         var a = Body(1, [new(-10, 0), new(10, 0)], [0, 1]);
