@@ -10,8 +10,9 @@ source, destination = map(Path, sys.argv[1:])
 destination.mkdir(parents=True, exist_ok=True)
 root = ET.parse(source).getroot()
 profile = root.find("Profiles/Profile")
-profile.set("Id", "RtsOverhead.Verbose.Memory")
+profile.set("Id", "RtsOverhead.Verbose.File")
 profile.set("Name", "RtsOverhead")
+profile.set("LoggingMode", "File")
 profile.set("Description", "Matched RTS command overhead diagnostic")
 keywords = root.find("Profiles/SystemProvider/Keywords")
 for keyword in ["DPC", "Interrupt"]:
@@ -52,7 +53,7 @@ for tree in actual.values():
 if shape(actual["B"]) != shape(actual["C"]) or counts["B"] != 0 or counts["C"] == 0:
     raise ValueError("Serialized profiles do not differ solely by stack switches")
 manifest_path.write_text(json.dumps(dict(
-    otherwise_identical=True, stack_switches=counts,
+    otherwise_identical=True, logging_mode="File", stack_switches=counts,
     comparison="XML semantic tree, indentation whitespace excluded",
     source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
     profiles={k: hashlib.sha256(path.read_bytes()).hexdigest() for k, path in paths.items()}

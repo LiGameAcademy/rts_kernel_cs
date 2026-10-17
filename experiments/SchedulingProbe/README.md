@@ -40,7 +40,7 @@ wpr -exportprofile CPU.Verbose C:/Temp/rts-overhead/original.wprp
 python experiments/SchedulingProbe/profiles.py C:/Temp/rts-overhead/original.wprp C:/Temp/rts-overhead/profiles
 ```
 
-B/C共用事件providers、关键字、缓冲及频率，并加入相同DPC/ISR；B仅移除全部内核/用户栈。不能以CPU.Light/Verbose直接相减推断纯栈开销。生成器拒绝覆盖原文件；WPR是否接受配置仍需profiledetails核验。
+B/C统一使用File模式，共用事件providers、关键字、缓冲及频率，并加入相同DPC/ISR；B仅移除全部内核/用户栈。不能以CPU.Light/Verbose直接相减推断纯栈开销。生成器拒绝覆盖原文件；WPR是否接受配置仍需profiledetails核验。
 
 在正常管理员PowerShell中执行一次文件模式校准（输出目录必须不存在）：
 
@@ -52,7 +52,7 @@ B/C共用事件providers、关键字、缓冲及频率，并加入相同DPC/ISR�
 
 fixture采用有界握手：ready报告实际PID/原生TID、coreclr路径/版本及相关配置；控制端读取目标provider原生注册与启用信息后发送run。工作完成再取一次快照，目标等待ETL保存成功，之后才接受release退出。错误命令、EOF或超时失败，不能借此给真实对局预热。
 
-`--providers PID session-token output.json`只读调用EnumerateTraceGuidsEx和ControlTraceW(QUERY)，记录Runtime/Rundown实例、Flags、LoggerId、Level、MatchAny/MatchAll、会话模式和缓冲。只认可本次唯一会话的目标运行时注册，PRE_ENABLE及其他会话不算通过；本配置须启用Verbose及JIT/Loader。没有START/UPDATE/STOP provider调用；只清理脚本自己成功创建的WPR会话和fixture子进程。Windows x64之外明确拒绝，不猜原生结构布局。
+`--providers PID session-token output.json`只读调用EnumerateTraceGuidsEx和ControlTraceW(QUERY)，记录Runtime/Rundown实例、Flags、LoggerId、Level、MatchAny/MatchAll、会话模式和缓冲。只认可本次唯一会话的目标运行时注册，PRE_ENABLE及其他会话不算通过；本配置须启用Verbose及JIT/Loader。没有START/UPDATE/STOP provider调用；只清理脚本自己成功创建的WPR会话和fixture子进程。非Windows或32位进程明确拒绝，本机验证范围为x64。
 
 必须同时有目标CLR方法装载事件、KnownWork有效代码范围、装载时间之后的范围内CPU样本和零丢事件才通过；不能用保存时才产生的Rundown地址反推先前运行版本。读取原始ETL，另计原始provider事件，不能以其他进程事件冒充目标。元数据缺失写passed=false、返回1；配置/IO等异常仍传播。
 
@@ -63,3 +63,30 @@ dotnet experiments/SchedulingProbe/bin/Release/net10.0/SchedulingProbe.dll --cal
 ```
 
 校准不是30Hz性能验收，不产生真实对局哈希/事件对照。**校准通过后仍须另行确定六轮A-B-C-C-B-A的统一配置，不能自动启动。** 30Hz墙钟、首轮保留及500同帧出生暂缓不变，工具不修改权威内核规则。
+
+## 已批准的六轮CLI文件模式对照
+
+仅在用户明确批准矩阵、且前置已知方法校准通过后，在同一个管理员PowerShell中执行：
+
+```powershell
+./experiments/SchedulingProbe/Matrix.ps1 -OutputDirectory C:/Temp/rts-matrix/runs -ProfilesDirectory C:/Temp/rts-matrix/profiles -CalibrationResult C:/Temp/rts-overhead/file-calibration/calibration.json
+```
+
+先从本机CPU.Verbose导出原配置，用profiles.py生成B/C，并核验两个profiledetails。Matrix.ps1固定A-B-C-C-B-A，最多六个新CLI进程；A不启用本轮WPR，B/C相同File配置仅栈开关不同。每轮保留901帧原日志、准备成本、出生/命令/读档/障碍首帧及所有超时；固定所有CLI DLL和JSON指纹、同管理员上下文与采样间隔。录制期间不编译、不加预热、不自动重试。它不关闭Windows本来存在的其他ETW会话或后台任务。
+
+六轮结束后才离线处理；每条命令的输出文件必须使用新名字，不能覆盖原始记录：
+
+```powershell
+python experiments/SchedulingProbe/verify.py C:/Temp/rts-matrix/runs
+# 对四份B/C各执行一次（替换prefix），导出原始元数据、调度及中断覆盖：
+dotnet experiments/SchedulingProbe/bin/Release/net10.0/SchedulingProbe.dll --matrix-evidence C:/Temp/rts-matrix/runs/prefix.etl C:/Temp/rts-matrix/runs/prefix.log C:/Temp/rts-matrix/runs/prefix-evidence.json
+# 对两份C沿用本工具三参数入口，输出prefix-stacks.json，读取索引后的现有方法栈。
+python experiments/SchedulingProbe/verify_matrix.py C:/Temp/rts-matrix/runs
+python experiments/SchedulingProbe/summarize_matrix.py C:/Temp/rts-matrix/runs
+```
+
+原始分析可另存目录，向两个Python工具追加该目录参数即可；重新解析不意味着重跑真实对局。方法映射只使用采样前已装载且未卸载的版本，不以保存时Rundown反推过去；地址复用不能延长旧代码寿命。DPC/ISR按目标当时CPU、已知running区间裁剪后取并集，嵌套不重复相加。
+
+业务验证和诊断完整性分别报告：901帧/6组逐帧状态事件摘要按既有基线核对，六轮合计5406帧/36组摘要。Unknown调度段保留原值并使diagnostics_complete=false，不自动转成running/waiting；首帧和所有超时不因此删除。A的ETL字段不可用，不能填零。编译层级/代码长度不同或结果漂移时不宣称已隔离固定采栈开销；同层级/长度也不能证明机器码逐字节相同。n=2每条件只作有界观察。
+
+所有条件仍按原始Step墙钟33.3333ms判门，不减去采集均值、Ready或中断后宣布过门。500同帧出生只保留原记录，暂不优化；本批不追加Godot采集或交通/预算重构。
