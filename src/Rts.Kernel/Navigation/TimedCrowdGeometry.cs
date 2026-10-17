@@ -38,6 +38,11 @@ internal static class TimedCrowdGeometry
         var a1 = a.Trace[i];
         var b0 = b.Trace[j - 1];
         var b1 = b.Trace[j];
+        // Full segment bounds contain every point in the shared time interval.
+        // Reject only a strictly separated axis; touching still reaches the exact predicate.
+        var combinedRadius = (Int128)a.Radius.Raw + b.Radius.Raw;
+        if (Separated(a0.X.Raw, a1.X.Raw, b0.X.Raw, b1.X.Raw, combinedRadius)
+            || Separated(a0.Y.Raw, a1.Y.Raw, b0.Y.Raw, b1.Y.Raw, combinedRadius)) return false;
         var at = a.Times![i - 1].Raw;
         var ae = a.Times[i].Raw;
         var bt = b.Times![j - 1].Raw;
@@ -69,6 +74,10 @@ internal static class TimedCrowdGeometry
         if (projection >= length) return (x + vx) * (x + vx) + (y + vy) * (y + vy) < r * r;
         return margin * length < projection * projection;
     }
+
+    private static bool Separated(long a0, long a1, long b0, long b1, Int128 radius) =>
+        (Int128)Math.Min(a0, a1) - Math.Max(b0, b1) > radius
+        || (Int128)Math.Min(b0, b1) - Math.Max(a0, a1) > radius;
 
     private static bool SpatialOverlap(CrowdBody a, CrowdBody b)
     {
