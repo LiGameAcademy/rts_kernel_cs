@@ -3,6 +3,12 @@ using Microsoft.Diagnostics.Tracing;
 using Microsoft.Diagnostics.Tracing.Etlx;
 using Microsoft.Diagnostics.Tracing.Parsers.Kernel;
 
+if (args.SequenceEqual(new[] { "--metadata-fixture" })) { MetadataCalibration.RunFixture(); return; }
+if (args.Length == 4 && args[0] == "--calibrate")
+{
+    Environment.ExitCode = MetadataCalibration.Check(args[1], args[2], args[3]) ? 0 : 1;
+    return;
+}
 if (args.SequenceEqual(new[] { "--self-test" })) { SchedulingChecks.Run(); return; }
 if (args.Length != 3) throw new ArgumentException("Usage: SchedulingProbe trace.etl|trace.etlx probe.log output.json");
 var frames = File.ReadLines(args[1]).Where(line => line.StartsWith("frame_sample="))

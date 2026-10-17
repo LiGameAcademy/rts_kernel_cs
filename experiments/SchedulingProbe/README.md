@@ -30,3 +30,26 @@ scheduled_running_ms是被调度在CPU上的区间，可能含本配置未细分
 采集会扰动性能；ETL用于归因，未录制对照继续以33.3333ms逐帧墙钟判定。未复现最多每运行时三份冷采集，不制造额外负载、不绑核/提优先级/关GC/调电源、不挑最好的一轮。不处理500同帧出生，不扩大预算或交通范围。
 
 复核完整日志：`python experiments/SchedulingProbe/verify.py C:/Temp/rts-scheduling`。原有固定夹具的哈希/事件摘要、901帧、原生身份、QPC计时门及准备状态均核验；不是只比终态。
+
+## 采集扰动对照的前置校准
+
+在同一CLI Release构建中，用独立小进程验证已知方法的装载范围与CPU样本地址；这不是对真实对局新增预热。
+
+```powershell
+wpr -exportprofile CPU.Verbose C:/Temp/rts-overhead/original.wprp
+python experiments/SchedulingProbe/profiles.py C:/Temp/rts-overhead/original.wprp C:/Temp/rts-overhead/profiles
+```
+
+B/C共用事件providers、关键字、缓冲及频率，并加入相同DPC/ISR；B仅移除全部内核/用户栈。不能以CPU.Light/Verbose直接相减推断纯栈开销。生成器拒绝覆盖原文件；WPR是否接受配置仍需profiledetails核验。
+
+管理员正常启动唯一命名WPR会话，使用C.wprp!RtsOverhead，运行下面的独立fixture后保存ETL；会话安全约束同Capture.ps1：
+
+```powershell
+dotnet experiments/SchedulingProbe/bin/Release/net10.0/SchedulingProbe.dll --metadata-fixture > C:/Temp/rts-overhead/fixture.log
+# 停止本次会话并保存calibration.etl后离线核对：
+dotnet experiments/SchedulingProbe/bin/Release/net10.0/SchedulingProbe.dll --calibrate C:/Temp/rts-overhead/calibration.etl C:/Temp/rts-overhead/fixture.log C:/Temp/rts-overhead/calibration.json
+```
+
+必须同时有目标CLR方法装载事件、KnownWork有效代码范围、范围内CPU样本和零丢事件才通过。读取的是原始ETL，另计原始provider事件，不能以全机其他进程的CLR事件冒充目标元数据。数据不全时写passed=false、返回1；配置/IO等异常仍传播，不伪造成功。
+
+**只有校准passed=true，才运行六个A-B-C-C-B-A冷CLI对照。** 2026-10-17本机校准实际失败：有99个CPU样本，目标CLR方法元数据为0；六轮尚未执行，不能声称比较了采集扰动、核对了六轮哈希/事件或性能过门。下一阶段保持30Hz墙钟及首轮，500同帧出生继续暂缓；本工具未修改任何权威内核规则。
