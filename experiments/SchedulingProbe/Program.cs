@@ -15,7 +15,8 @@ if (args.Length == 4 && args[0] == "--calibrate")
     Environment.ExitCode = MetadataCalibration.Check(args[1], args[2], args[3]) ? 0 : 1;
     return;
 }
-if (args.SequenceEqual(new[] { "--self-test" })) { SchedulingChecks.Run(); ProviderSnapshotChecks.Run(); return; }
+if (args.SequenceEqual(new[] { "--self-test" })) { SchedulingChecks.Run(); ProviderSnapshotChecks.Run(); InterruptOverlap.Check(); CodeVersion.Check(); return; }
+if (args.Length == 4 && args[0] == "--matrix-evidence") { MatrixEvidence.Export(args[1], args[2], args[3]); return; }
 if (args.Length != 3) throw new ArgumentException("Usage: SchedulingProbe trace.etl|trace.etlx probe.log output.json");
 var frames = File.ReadLines(args[1]).Where(line => line.StartsWith("frame_sample="))
     .Select(line => JsonDocument.Parse(line[13..]).RootElement.Clone())

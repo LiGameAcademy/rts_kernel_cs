@@ -15,7 +15,7 @@ internal sealed class FrameWindow(JsonElement frame)
         _ => "unknown"
     };
 
-    internal object Summarize(IReadOnlyList<ThreadTransition> transitions, int eventsLost, bool truncated = false)
+    internal ThreadSegment[] ReadSegments(IReadOnlyList<ThreadTransition> transitions)
     {
         var segments = new List<ThreadSegment>();
         ThreadTransition? current = null;
@@ -29,6 +29,12 @@ internal sealed class FrameWindow(JsonElement frame)
             cursor = transition.Qpc;
         }
         segments.Add(new(cursor, End, current?.State ?? "unknown", current));
+        return segments.ToArray();
+    }
+
+    internal object Summarize(IReadOnlyList<ThreadTransition> transitions, int eventsLost, bool truncated = false)
+    {
+        var segments = ReadSegments(transitions);
         long? offCpuStart = null;
         long longestOffCpu = 0;
         foreach (var segment in segments)
