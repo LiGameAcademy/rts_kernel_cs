@@ -6,6 +6,7 @@ internal static class SmallGroupLandingChecks
     internal static void Run(Action<bool, string> check)
     {
         SmallGroupAssignmentCostChecks.Run(check);
+        PlacementOrderReadChecks.Run(check);
         var definition = new MovementDefinition(1, 30, 2);
         PlacementMember Member(ulong id, int x, int y) => new(new(id), new(x, y), definition, 0, []);
         var members = new[] { Member(1, 0, 1000), Member(2, 0, 0), Member(3, 2, 0) };

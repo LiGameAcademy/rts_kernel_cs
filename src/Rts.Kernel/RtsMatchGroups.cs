@@ -107,12 +107,14 @@ public sealed partial class RtsMatch
     {
         var activeIds = members.Select(member => member.Id).ToHashSet();
         var occupied = new List<PlacementBody>();
-        foreach (var entity in _entities.Live.Where(entity => !activeIds.Contains(entity.Id)))
+        foreach (var entity in _entities.Live)
         {
-            var radius = ReadMovementDefinition(entity.Id)?.Radius ?? 0;
+            if (activeIds.Contains(entity.Id)) continue;
+            var radius = _movementDefinitions.TryGet(entity.MovementDefinitionId, out var definition)
+                && definition is not null
+                ? definition.Radius : 0;
             if (!IsMoving(entity.Id)) occupied.Add(new PlacementBody(entity.Position, radius));
-            foreach (var goal in _orders.RetainedGoals(entity.Id))
-                occupied.Add(new PlacementBody(goal, radius));
+            _orders.AppendRetainedBodies(entity.Id, radius, occupied);
         }
         return occupied;
     }
