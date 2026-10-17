@@ -27,6 +27,14 @@ void CheckThrows<TException>(Action action, string message) where TException : E
     throw new InvalidOperationException(message);
 }
 
+if (args.Contains("--prepared-multi-party"))
+{
+    MultiPartyCloseoutChecks.Run(Check, prepared: true);
+    PreparedBoundaryChecks.Run(Check);
+    Console.WriteLine($"Prepared multi-party PASS ({checks} checks)");
+    return;
+}
+
 if (args.Contains("--multi-party"))
 {
     MultiPartyCloseoutChecks.Run(Check);
@@ -189,6 +197,7 @@ MatchEventBufferChecks.Run(Check);
 PathfindingChecks.Run(Check);
 NavigationChecks.Run(Check);
 NavigationCacheChecks.Run(Check);
+PreparationStateChecks.Run(Check);
 PlacementCandidateChecks.Run(Check);
 MovementChecks.Run(Check);
 MotionRuleChecks.Run(Check);
