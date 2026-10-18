@@ -24,12 +24,31 @@ internal static class LocalYieldPlanner
         var offset = first.Position - requester.Position;
         var side = offset.X * normal.X + offset.Y * normal.Y;
         var preferredSign = side < 0 ? -1 : 1;
+        var translations = new List<FixedVector2>(2);
         foreach (var sign in new[] { preferredSign, -preferredSign })
         {
             var clearance = requesterDefinition!.Radius + firstDefinition!.Radius + navigation.Grid.CellSize / 4;
             var distance = SimMath.Max(navigation.Grid.CellSize / 2, clearance - side * sign);
             var translation = normal * (distance * sign);
+            translations.Add(translation);
             var result = BuildClosure(requester, blocker, translation, bodies, orders, definitions, navigation);
+            if (result is not null) return result;
+        }
+        if (order.Review?.Recovering != true) return null;
+        var group = cooperation.Read(requester.Id)!.GroupId;
+        if (group == 0 || bodies.Any(body => body.Id != requester.Id
+            && cooperation.Read(body.Id)?.GroupId == group && !cooperation.IsSettled(body.Id))) return null;
+        // Settled peers can already be at the outer edge of their goal envelope.
+        // A purely lateral opening would push them outside it. Keep that same lateral
+        // clearance, but allow a short forward slide for the last arriving member.
+        // Earlier arrivals retain their existing plans; concurrent recovery requests
+        // must not recruit peers into crossing forward translations.
+        for (var cells = 1; cells <= 2; cells++)
+        foreach (var translation in translations)
+        {
+            var result = BuildClosure(requester, blocker,
+                translation + direction * (navigation.Grid.CellSize * cells),
+                bodies, orders, definitions, navigation);
             if (result is not null) return result;
         }
         return null;

@@ -7,6 +7,7 @@ internal static class RouteReviewChecks
     internal static void Run(Action<bool, string> check)
     {
         RouteReviewBoundaryChecks.Run(check);
+        ArrivalTimeoutChecks.Run(check);
         RunCase(31, [new(1443, 1425), new(2399, 2335), new(2470, 1415), new(2119, 2823), new(1380, 2995)], check);
         RunCase(10, [new(2337, 2186), new(2711, 1201), new(2935, 2829), new(2653, 2878), new(2066, 2735)], check);
         RunCase(80, [new(2586, 2986), new(2242, 2699), new(1250, 2186), new(1919, 2526), new(2573, 1871)], check);
