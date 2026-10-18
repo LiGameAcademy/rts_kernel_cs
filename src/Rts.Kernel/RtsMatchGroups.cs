@@ -26,6 +26,12 @@ public sealed partial class RtsMatch
             return;
         }
         var members = PrepareGroupMembers(command, groupId);
+        if (request.EntityIds.Count <= SmallGroupAssignment.MaximumMembers && members.Count != request.EntityIds.Count)
+        {
+            foreach (var member in members)
+                AddGroupEvent(MatchEventKind.CommandRejected, member.Id, "group_member_unavailable", new(groupId, -1, null, false));
+            return;
+        }
         if (members.Count == 0) return;
         var anchorMember = members.FirstOrDefault(member => member.Id == request.LeaderId) ?? members[0];
         var mean = MeanStart(members);
@@ -129,6 +135,11 @@ public sealed partial class RtsMatch
         IReadOnlyList<PlacementGoal> goals, MatchCommandExecutor.MoveSubmission submission)
     {
         var request = command.Group!;
+        if (request.EntityIds.Count <= SmallGroupAssignment.MaximumMembers)
+        {
+            SubmitSmallGroupGoals(command, groupId, heading, goals, submission);
+            return;
+        }
         foreach (var item in goals)
         {
             var outcome = new GroupMoveOutcome(groupId, item.Slot, item.Goal, item.Adjusted);

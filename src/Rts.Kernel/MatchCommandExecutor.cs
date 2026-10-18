@@ -63,58 +63,68 @@ internal sealed class MatchCommandExecutor
     internal bool ExecutePlannedGroupMove(long frame, CommandEnvelope command, NavigationState? navigation, GroupSlot group) =>
         ExecuteMoveCore(frame, command, navigation, group, MoveSubmission.PlannedGroup);
 
+    internal sealed record MovePreparation(EntityId EntityId, UnitOrderIntent Intent,
+        MoveOrder? Path, bool Append, bool CancelPlans);
+
     private bool ExecuteMoveCore(long frame, CommandEnvelope command, NavigationState? navigation, GroupSlot? group,
         MoveSubmission submission)
     {
+        var error = PrepareMove(command, navigation, group, submission, out var prepared);
+        if (error is not null)
+        {
+            Publish(frame, MatchEventKind.CommandRejected, command.EntityId, error);
+            return false;
+        }
+        CommitMove(frame, prepared!);
+        return true;
+    }
+
+    // No orders, events or group-plan ownership change until the prepared move is committed.
+    internal string? PrepareMove(CommandEnvelope command, NavigationState? navigation, GroupSlot? group,
+        MoveSubmission submission, out MovePreparation? prepared)
+    {
+        prepared = null;
         if (!_entities.TryGet(command.EntityId, out var entity) || entity.OwnerId != command.PlayerId)
-        {
-            Publish(frame, MatchEventKind.CommandRejected, command.EntityId, "entity_missing_or_not_owned");
-            return false;
-        }
+            return "entity_missing_or_not_owned";
         if (command.Source == OrderSource.UnitAi && BlocksUnitAi(command.EntityId))
-        {
-            Publish(frame, MatchEventKind.CommandRejected, command.EntityId, "player_order_active");
-            return false;
-        }
+            return "player_order_active";
         var request = command.Move!;
         if (entity.MovementDefinitionId != 0 && (!_movementDefinitions.TryGet(entity.MovementDefinitionId, out var definition)
             || request.Speed != definition!.Speed || request.Motion != definition.Motion
             || request.ClearanceCells != MovementDefinitions.ClearanceCells(definition, navigation!.Grid.CellSize)))
-        {
-            Publish(frame, MatchEventKind.CommandRejected, entity.Id, "move_does_not_match_definition");
-            return false;
-        }
+            return "move_does_not_match_definition";
         if (entity.MovementDefinitionId != 0
             && !navigation!.CanStandAt(request.Goal, ReadDefinition(entity.Id)!.Radius))
-        {
-            Publish(frame, MatchEventKind.CommandRejected, entity.Id, "move_body_goal_unavailable");
-            return false;
-        }
+            return "move_body_goal_unavailable";
         if (request.Motion is { ScaleSlopeSpeed: true } && navigation?.Terrain is null)
-        {
-            Publish(frame, MatchEventKind.CommandRejected, command.EntityId, "motion_requires_height_field");
-            return false;
-        }
+            return "motion_requires_height_field";
         var intent = new UnitOrderIntent(UnitOrderKind.Move, command.Source, request, group);
-        if (command.Mode == OrderMode.Append && _orders.CanAppend(entity.Id))
+        var append = command.Mode == OrderMode.Append && _orders.CanAppend(entity.Id);
+        MoveOrder? path = null;
+        if (append)
         {
             if (navigation is null || !navigation.TryWorldToCell(request.Goal, out var goal)
-                || !navigation.CanOccupy(goal, request.ClearanceCells))
-                Publish(frame, MatchEventKind.CommandRejected, entity.Id, "move_goal_unavailable");
-            else if (_orders.TryAppend(entity.Id, intent)) return true;
-            else Publish(frame, MatchEventKind.CommandRejected, entity.Id, "order_queue_full");
-            return false; // No path is frozen for a future order; current movement stays intact.
+                || !navigation.CanOccupy(goal, request.ClearanceCells)) return "move_goal_unavailable";
+            if (_orders.PendingCount(entity.Id) >= UnitOrderBook.MaximumPending) return "order_queue_full";
         }
-        if (!MovePathPlanner.TryPlan(navigation, entity.Position, request, out var order, group is not null, group?.SoftLanding == true))
+        else if (!MovePathPlanner.TryPlan(navigation, entity.Position, request, out path,
+                     group is not null, group?.SoftLanding == true)) return "move_path_unavailable";
+        prepared = new(entity.Id, intent, path, append,
+            !append && command.Mode == OrderMode.Replace && submission == MoveSubmission.Command);
+        return null;
+    }
+
+    internal void CommitMove(long frame, MovePreparation prepared)
+    {
+        if (prepared.Append)
         {
-            Publish(frame, MatchEventKind.CommandRejected, command.EntityId, "move_path_unavailable");
-            return false; // Invalid replacement preserves both current and pending orders.
+            if (!_orders.TryAppend(prepared.EntityId, prepared.Intent))
+                throw new InvalidOperationException("Prepared move queue capacity changed before commit.");
+            return;
         }
-        if (command.Mode == OrderMode.Replace && submission == MoveSubmission.Command)
-            CancelGroupPlans(frame, entity.Id, command.Source);
-        _orders.ReplaceMove(entity.Id, intent, order!);
-        _entities.Update(entity with { Velocity = FixedVector2.Zero });
-        return true;
+        if (prepared.CancelPlans) CancelGroupPlans(frame, prepared.EntityId, prepared.Intent.Source);
+        _orders.ReplaceMove(prepared.EntityId, prepared.Intent, prepared.Path!);
+        _entities.Update(_entities.Get(prepared.EntityId) with { Velocity = FixedVector2.Zero });
     }
 
     private void ExecuteStop(long frame, CommandEnvelope command)

@@ -53,8 +53,10 @@ internal static class GroupEdgeChecks
         var partial = Create();
         partial.SubmitCommand(CommandEnvelope.MoveGroup(2, 0, 1, request with { EntityIds = new[] { ids[0], new EntityId(999), ids[1] } })); partial.Step();
         var outcomes = partial.DrainEvents();
-        check(outcomes.Count(e => e.Kind == MatchEventKind.GroupMoveAssigned) == 2
-            && outcomes.Any(e => e.EntityId.Value == 999 && e.Detail == "entity_missing_or_not_owned"), "missing member does not abort other members");
+        check(outcomes.Count(e => e.Kind == MatchEventKind.GroupMoveAssigned) == 0
+            && outcomes.Count(e => e.Kind == MatchEventKind.CommandRejected) == 3
+            && outcomes.Any(e => e.EntityId.Value == 999 && e.Detail == "entity_missing_or_not_owned"),
+            "missing member rejects the complete small group without partial takeover");
         var constrainedFlags = Enumerable.Repeat((byte)2, 625).ToArray();
         constrainedFlags[12 * 25 + 12] = 0;
         constrainedFlags[2 * 25 + 2] = 0;

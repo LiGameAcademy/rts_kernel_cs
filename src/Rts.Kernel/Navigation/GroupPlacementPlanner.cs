@@ -53,6 +53,7 @@ internal static class GroupPlacementPlanner
                     {
                         if (!reachable.Connected(start, cell, member.Clearance)) continue;
                         var center = navigation.CellCenter(cell);
+                        if (!navigation.CanStandAt(center, member.Definition.Radius)) continue;
                         if (bodyIndex.Overlaps(center, member.Definition.Radius)) continue;
                         goal = center;
                         bodyIndex.Add(new PlacementBody(center, member.Definition.Radius));

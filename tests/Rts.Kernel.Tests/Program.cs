@@ -42,6 +42,13 @@ if (args.Contains("--multi-party"))
     return;
 }
 
+if (args.Contains("--atomic-only"))
+{
+    AtomicSmallGroupChecks.Run(Check);
+    Console.WriteLine($"Atomic group PASS ({checks} checks)");
+    return;
+}
+
 if (args.Contains("--yield-only"))
 {
     GroupYieldChecks.Run(Check);
