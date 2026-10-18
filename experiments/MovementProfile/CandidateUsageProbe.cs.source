@@ -1,0 +1,58 @@
+using Rts.Kernel;
+using Rts.Kernel.Navigation;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+
+internal static class CandidateUsageProbe
+{
+    internal static void Run(Action<bool, string> check)
+    {
+        Scenario(0, 1, [new(3056, 2064)], check);
+        Scenario(1, 31, [new(1443, 1425), new(2399, 2335), new(2470, 1415), new(2119, 2823), new(1380, 2995)], check);
+        // Existing fixed fixtures: unreachable member causes a second placement pass;
+        // tree-edge placement requires genuine non-first candidates.
+        Atomic(check);
+    }
+
+    private static void Atomic(Action<bool, string> check)
+    {
+        // CANDIDATE_ATOMIC_BEGIN
+        AtomicSmallGroupChecks.Run(check);
+        // CANDIDATE_ATOMIC_END
+        Console.WriteLine("candidate_probe case=atomic-24 checks=PASS");
+    }
+
+    private static void Scenario(int run, int interval, FixedVector2[] goals, Action<bool, string> check)
+    {
+        // CANDIDATE_SCENARIO_RESET
+        var match = OpenGroundPartyChecks.Create();
+        var ids = match.Entities.Select(entity => entity.Id).ToArray();
+        using var digest = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var completed = 0;
+        var failures = 0;
+        var last = interval * (goals.Length - 1);
+        var elapsed = 0;
+        for (; elapsed < last + 600 && (elapsed <= last || completed < 24); elapsed++)
+        {
+            var commandFrame = elapsed % interval == 0 && elapsed / interval < goals.Length;
+            if (commandFrame)
+            {
+                check(match.SubmitCommand(CommandEnvelope.MoveGroup(match.Frame + 1, 0, 25 + elapsed / interval,
+                    new(ids, goals[elapsed / interval]))).Accepted, "24-unit candidate probe command accepted");
+                completed = 0;
+                failures = 0;
+            }
+            // CANDIDATE_SCENARIO_BEGIN
+            match.Step();
+            // CANDIDATE_SCENARIO_END
+            var events = match.DrainEvents();
+            completed += events.Count(item => item.Kind == MatchEventKind.MoveCompleted);
+            failures += events.Count(item => item.Kind is MatchEventKind.MoveFailed or MatchEventKind.CommandRejected);
+            digest.AppendData(Encoding.UTF8.GetBytes(match.ComputeStateHash() + "\n" + JsonSerializer.Serialize(events) + "\n"));
+        }
+        check(completed == 24 && failures == 0, "24-unit candidate probe preserves all arrivals");
+        Console.WriteLine($"candidate_probe case={run} completed={completed} failures={failures} frames_after_last={elapsed-last} trace={Convert.ToHexString(digest.GetHashAndReset())} hash={match.ComputeStateHash()}");
+        // CANDIDATE_SCENARIO_REPORT
+    }
+}

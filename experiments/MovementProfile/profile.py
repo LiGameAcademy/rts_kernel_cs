@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import candidate_usage
 
 ROOT = Path(__file__).resolve().parents[2]
 SCOPES = [
@@ -102,7 +103,10 @@ def main():
     parser.add_argument("--without-replay", action="store_true")
     parser.add_argument("--prepared", action="store_true", help="Use the existing explicit preparation acceptance entry")
     parser.add_argument("--commands-only", action="store_true", help="Observe command stages without per-collision probes")
+    parser.add_argument("--candidate-usage", action="store_true", help="Observe visited prefixes and accepted candidate ranks; adds 24-unit fixtures")
     args = parser.parse_args()
+    if args.candidate_usage and not args.prepared:
+        parser.error("--candidate-usage requires --prepared")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     destination = Path(tempfile.mkdtemp(prefix="rts-movement-profile-")).resolve()
@@ -110,6 +114,7 @@ def main():
         "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT).decode().strip(),
         "source_directory": str(destination), "without_replay": args.without_replay,
         "prepared": args.prepared, "commands_only": args.commands_only,
+        "candidate_usage": args.candidate_usage,
         "platform": platform.platform(), "python": platform.python_version(),
         "helper_sha256": hashlib.sha256((ROOT / "experiments/MovementProfile/ProfileCounters.cs.source").read_bytes()).hexdigest(),
     }
@@ -117,6 +122,9 @@ def main():
               or scope[2] in {"Step", "Commands", "Path.Plan"}]
     metadata["scopes"] = scopes
     metadata["tool_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    if args.candidate_usage:
+        metadata["candidate_tools"] = {name: hashlib.sha256((ROOT / "experiments/MovementProfile" / name).read_bytes()).hexdigest()
+            for name in ["candidate_usage.py", "CandidateUsage.cs.source", "CandidateUsageProbe.cs.source"]}
     (output / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     copy_sources(destination)
     manifest = {str(path.relative_to(destination)): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -128,6 +136,8 @@ def main():
         if text.count("if (frame is 0 or 30)") != 1:
             raise ValueError("Replay marker changed")
         probe.write_text(text.replace("if (frame is 0 or 30)", "if (frame < 0)"), encoding="utf-8")
+    if args.candidate_usage:
+        candidate_usage.add_fixture(destination)
     # Build and observe an unmodified copy first, then add diagnostics only here.
     project = "tests/Rts.Kernel.Tests"
     probe = str(destination / project / "bin/Release/net10.0/Rts.Kernel.Tests.dll")
@@ -136,12 +146,23 @@ def main():
         command(["dotnet", "build", project, "-c", "Release", "-m:1", "-p:NuGetAudit=false"], destination, log)
         baseline = command(["dotnet", probe, *probe_args], destination, log)
     instrument(destination, scopes)
+    if args.candidate_usage:
+        candidate_usage.instrument(destination)
     with (output / "profile.log").open("w", encoding="utf-8") as log:
         command(["dotnet", "build", project, "-c", "Release", "--no-restore", "-m:1"], destination, log)
         measured = command(["dotnet", probe, *probe_args], destination, log)
     digests = lambda text: re.findall(r"multi_party count=(\d+) .*?run=(\d+).*?trace=([A-F0-9]+) hash=([a-f0-9]+)", text)
     if digests(baseline) != digests(measured) or len(digests(baseline)) != 6:
         raise RuntimeError("Diagnostic copy changed observed outcomes")
+    if args.candidate_usage:
+        auxiliary = lambda text: [line for line in text.splitlines() if line.startswith(("candidate_probe ", "candidate_atomic="))]
+        if auxiliary(baseline) != auxiliary(measured) or len(auxiliary(baseline)) != 4:
+            raise RuntimeError("Candidate observations changed 24-unit fixtures")
+        usage = [json.loads(line.removeprefix("candidate_usage=")) for line in measured.splitlines()
+                 if line.startswith("candidate_usage=")]
+        if len(usage) != 9:
+            raise RuntimeError("Candidate usage is missing a measured run")
+        (output / "candidate-usage.json").write_text(json.dumps(usage, indent=2) + "\n", encoding="utf-8")
     records = [json.loads(line.removeprefix("profile="))
                for line in measured.splitlines() if line.startswith("profile=")]
     (output / "profile.json").write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
