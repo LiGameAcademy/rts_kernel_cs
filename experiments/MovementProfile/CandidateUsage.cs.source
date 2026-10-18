@@ -1,0 +1,112 @@
+using System.Text.Json;
+
+namespace Rts.Kernel;
+
+// Diagnostic copy only. Observations never affect candidate selection or ordering.
+internal static class CandidateUsage
+{
+    private static readonly List<ListSample> Lists = [];
+    private static readonly List<AttemptSample> Attempts = [];
+    internal static bool Enabled { get; set; }
+
+    internal sealed class ListSample
+    {
+        public int Id { get; init; }
+        public int Capacity { get; init; }
+        public int Rows { get; init; }
+        public int Columns { get; init; }
+        public int Generated { get; set; }
+        public int Reads { get; set; }
+        public int CachedReads { get; set; }
+        public int Enumerations { get; set; }
+    }
+
+    internal sealed class AttemptSample
+    {
+        public int ListId { get; init; }
+        public ulong Member { get; init; }
+        public int Slot { get; init; }
+        public int Capacity { get; init; }
+        public int Visited { get; set; }
+        public bool Accepted { get; set; }
+    }
+
+    internal static void Reset()
+    {
+        Enabled = false;
+        Lists.Clear();
+        Attempts.Clear();
+    }
+
+    internal static int Register(int capacity, int rows, int columns)
+    {
+        if (!Enabled) return 0;
+        var id = Lists.Count + 1;
+        Lists.Add(new() { Id = id, Capacity = capacity, Rows = rows, Columns = columns });
+        return id;
+    }
+
+    internal static void Read(int id, int index, int before, int after)
+    {
+        if (!Enabled || id == 0) return;
+        var sample = Lists[id - 1];
+        sample.Reads++;
+        if (index < before) sample.CachedReads++;
+        sample.Generated = Math.Max(sample.Generated, after);
+    }
+
+    internal static void Enumerate(int id)
+    {
+        if (Enabled && id != 0) Lists[id - 1].Enumerations++;
+    }
+
+    internal static Attempt Begin(int id, ulong member, int slot, int capacity)
+    {
+        if (!Enabled) return default;
+        var sample = new AttemptSample { ListId = id, Member = member, Slot = slot, Capacity = capacity };
+        Attempts.Add(sample);
+        return new(sample);
+    }
+
+    internal readonly struct Attempt(AttemptSample? sample)
+    {
+        internal void Visit() { if (sample is not null) sample.Visited++; }
+        internal void Accept() { if (sample is not null) sample.Accepted = true; }
+    }
+
+    internal static void Report(int count, int run)
+    {
+        if (Lists.Any(item => item.Generated > item.Capacity || item.CachedReads > item.Reads)
+            || Attempts.Any(item => item.Visited > item.Capacity || item.Accepted && item.Visited == 0))
+            throw new InvalidOperationException("Invalid candidate observation.");
+        Console.WriteLine("candidate_usage=" + JsonSerializer.Serialize(new
+        {
+            count, run, lists = Lists, attempts = Attempts,
+            note = "Attempt rank is validation visits; generated prefix is per constructed list. Retry reads may reuse that prefix."
+        }));
+    }
+
+    internal static void SelfCheck(Action<bool, string> check)
+    {
+        Reset();
+        Enabled = true;
+        var id = Register(9, 3, 3);
+        Enumerate(id);
+        var first = Begin(id, 1, 0, 9);
+        Read(id, 0, 0, 1); first.Visit(); first.Accept();
+        Enumerate(id);
+        var second = Begin(id, 1, 0, 9);
+        Read(id, 0, 1, 1); second.Visit();
+        Read(id, 1, 1, 2); second.Visit();
+        Read(id, 2, 2, 3); second.Visit(); second.Accept();
+        check(Lists.Single().Generated == 3 && Lists.Single().Reads == 4
+            && Lists.Single().CachedReads == 1 && Lists.Single().Enumerations == 2,
+            "candidate counters separate unique prefix, repeated reads and enumerations");
+        check(Attempts.Count == 2 && Attempts[0].Visited == 1 && Attempts[1].Visited == 3,
+            "candidate first hit is accepted rank, not first getter access");
+        Reset();
+        check(Lists.Count == 0 && Attempts.Count == 0 && !Enabled, "candidate counters reset between samples");
+        var ignored = Register(1, 1, 1);
+        check(ignored == 0 && Lists.Count == 0, "unmeasured preparation cannot contaminate candidate statistics");
+    }
+}

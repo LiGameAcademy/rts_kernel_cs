@@ -6,6 +6,7 @@
 python experiments/MovementProfile/profile.py --output C:/Temp/rts-profile
 python experiments/MovementProfile/profile.py --without-replay --output C:/Temp/rts-profile-no-replay
 python experiments/MovementProfile/profile.py --prepared --commands-only --output C:/Temp/rts-profile-prepared-command
+python experiments/MovementProfile/profile.py --prepared --commands-only --candidate-usage --output C:/Temp/rts-profile-candidate-usage
 ```
 
 需要Python3.12+、现有.NET10 SDK和完整工作区依赖。脚本复制Git跟踪的工作区文件到新建临时目录，先运行原算法，再仅在副本插入阶段计时/当前线程分配观测。正式src/与宿主不加诊断字段或分支。临时源码保留供核对，路径在输出/metadata.json中。
@@ -13,6 +14,12 @@ python experiments/MovementProfile/profile.py --prepared --commands-only --outpu
 产物：baseline.log、profile.log、profile.json、metadata.json。未插桩基线用于判断预算；插桩数据用于归因，包含观测开销，不能当作发布性能。首轮包含JIT等首次执行成本，非严格冷机实验。
 
 `--prepared`沿用现有显式准备验收入口，保留全部准备耗时、出生及真实首命令，并运行读档/障碍首命令边界。`--commands-only`只插入Step、Commands、群体成员/占位/初始分配/代价交换/候选构造/落点/提交及Path.Plan，不插入高频逐次碰撞/运动计时；它不会删除移动阶段或改变命令输入。两个选项均不修改正式src。
+
+`--candidate-usage`要求`--prepared`，仅在副本记录每份候选列表的完整容量、实际生成前缀、索引读取/缓存读取/枚举次数，以及每次落点尝试的检查数和成功标记。“首项命中”指成功接受第一个候选，不是读过索引0；重试可重复访问同一已生成前缀。输出candidate-usage.json逐份保留数据，不合并成一个含糊的平均数。
+
+采集后用`python experiments/MovementProfile/summarize_candidates.py <输出目录>`生成candidate-summary.json；它不启动新对局，区分成功尝试的首项命中率和列表始终只生成一项的比例。Accepted只表示候选通过局部落点校验，整组命令仍可能被原子拒绝。原子夹具按固定源码顺序拆分不可达与树边缘数据，顺序或计数变化时直接报错；三轮相同输入不视为独立布局。
+
+该选项在两个进程的标准300/500测量结束后，额外执行相同的24单位空地、连续替换及原子拒绝/树边缘夹具。比较两组完整滚动状态/事件摘要和原子夹具摘要，统计前缀时额外校准计数器。附加夹具是访问行为验证，不作为独立冷进程性能门；真实门仍保留标准901帧及全部首轮。准备、JSON恢复对照和测量外读取不计入候选统计；插桩数据只用于归因，不当作发布性能。
 
 每次仅一次未插桩控制进程、一次插桩观察进程，直接运行冻结DLL，不用dotnet run的额外启动器。输出目录必须新建；source-manifest.json记录插桩前全部源文件指纹，metadata保留工具指纹与实际插桩清单。阶段计时仍是inclusive，Group.Place包含合法落点后的第二次匹配，Group.Assign两次调用合计，父子阶段不能相加；插桩会影响JIT形态和执行成本，不能据其差额替历史38.2368ms帧补造归因。
 
