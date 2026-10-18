@@ -105,7 +105,7 @@ public static class SnapshotValidator
 
 public static class SnapshotJson
 {
-    public const int CurrentFormatVersion = 13;
+    public const int CurrentFormatVersion = 14;
 
     private static readonly JsonSerializerOptions Options = new()
     {

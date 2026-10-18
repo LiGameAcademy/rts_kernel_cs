@@ -7,8 +7,10 @@ public sealed record MoveRequest(FixedVector2 Goal, SimScalar Speed, int Clearan
 }
 
 public sealed record MoveOrderSnapshot(ulong EntityId, MoveRequest Request,
-    IReadOnlyList<FixedVector2> Waypoints, int NextWaypoint, int WaitFrames = 0, long RetryAfterFrame = 0);
+    IReadOnlyList<FixedVector2> Waypoints, int NextWaypoint, int WaitFrames = 0, long RetryAfterFrame = 0,
+    RouteReviewState? Review = null);
 /// <summary>Detached per-unit movement diagnostics without copying path waypoints.</summary>
 public readonly record struct MovementStatusView(ulong EntityId, int WaitFrames, long RetryAfterFrame);
 
-internal sealed record MoveOrder(MoveRequest Request, IReadOnlyList<FixedVector2> Waypoints, int NextWaypoint = 0, int WaitFrames = 0, long RetryAfterFrame = 0);
+internal sealed record MoveOrder(MoveRequest Request, IReadOnlyList<FixedVector2> Waypoints, int NextWaypoint = 0,
+    int WaitFrames = 0, long RetryAfterFrame = 0, RouteReviewState? Review = null);

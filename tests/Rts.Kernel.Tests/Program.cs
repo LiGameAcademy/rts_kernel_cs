@@ -42,6 +42,21 @@ if (args.Contains("--multi-party"))
     return;
 }
 
+if (args.Contains("--route-review"))
+{
+    try
+    {
+        RouteReviewChecks.Run(Check);
+        Console.WriteLine($"Route review PASS ({checks} checks)");
+    }
+    catch (Exception error)
+    {
+        Console.Error.WriteLine(error);
+        Environment.ExitCode = 1;
+    }
+    return;
+}
+
 if (args.Contains("--atomic-only"))
 {
     AtomicSmallGroupChecks.Run(Check);
@@ -51,8 +66,16 @@ if (args.Contains("--atomic-only"))
 
 if (args.Contains("--yield-only"))
 {
-    GroupYieldChecks.Run(Check);
-    Console.WriteLine($"Group yield PASS ({checks} checks)");
+    try
+    {
+        GroupYieldChecks.Run(Check);
+        Console.WriteLine($"Group yield PASS ({checks} checks)");
+    }
+    catch (Exception error)
+    {
+        Console.Error.WriteLine(error);
+        Environment.ExitCode = 1;
+    }
     return;
 }
 

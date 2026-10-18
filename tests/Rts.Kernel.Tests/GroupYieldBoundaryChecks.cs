@@ -6,6 +6,7 @@ internal static class GroupYieldBoundaryChecks
     internal static void Run(Action<bool, string> check)
     {
         StopAndReplacement(check);
+        StoppedPeers(check);
         BlockedExit(check);
         QueuedExit(check);
         SnapshotValidation(check);
@@ -69,7 +70,7 @@ internal static class GroupYieldBoundaryChecks
         check(settled.SequenceEqual(cancelled.Entities), "cancelled helpers remain at safe positions without returning");
     }
 
-    private static void BlockedExit(Action<bool, string> check)
+    private static void StoppedPeers(Action<bool, string> check)
     {
         var (match, exiting) = StartExit(check, hostCommand: false);
         var positions = match.Entities.Where(entity => entity.Id != exiting).ToDictionary(entity => entity.Id, entity => entity.Position);
@@ -78,10 +79,38 @@ internal static class GroupYieldBoundaryChecks
         match.DrainEvents();
         for (var i = 0; i < 180; i++) match.Step();
         check(positions.All(pair => match.Entities.Single(entity => entity.Id == pair.Key).Position == pair.Value),
-            "closed Stop ring cannot be pushed apart");
+            "Stop peers cannot be pushed apart even when the changed layout leaves an exit");
         var outcomes = match.DrainEvents();
-        check(outcomes.Any(item => item.Kind == MatchEventKind.MoveFailed && item.EntityId == exiting),
-            "unavailable cooperation does not wait forever");
+        check(outcomes.Any(item => item.EntityId == exiting
+            && item.Kind is MatchEventKind.MoveFailed or MatchEventKind.MoveCompleted)
+            && !match.ReadMoveOrders().Any(order => order.EntityId == exiting.Value),
+            "stopped peers leave the requester a finite completed or failed outcome");
+    }
+
+    private static void BlockedExit(Action<bool, string> check)
+    {
+        // A deterministic closed ring, independent of soft-party placement changes.
+        // Adjacent body centres are >62 apart, but their requester-exclusion circles overlap.
+        var match = new RtsMatch(MatchConfig.Default, 7, GroupYieldChecks.Grid,
+            GroupYieldChecks.Heights, [GroupYieldChecks.Footman]);
+        var centre = new FixedVector2(2064, 2064);
+        FixedVector2[] offsets = [new(82, 0), new(58, 58), new(0, 82), new(-58, 58),
+            new(-82, 0), new(-58, -58), new(0, -82), new(58, -58)];
+        match.SubmitCommand(CommandEnvelope.Spawn(1, 0, 0, centre, 1));
+        for (var i = 0; i < offsets.Length; i++)
+            match.SubmitCommand(CommandEnvelope.Spawn(1, 0, i + 1, centre + offsets[i], 1));
+        match.Step(); match.DrainEvents();
+        check(match.Entities.Count == 9, "closed Stop ring spawns nine non-overlapping bodies");
+        var positions = match.Entities.Skip(1).ToDictionary(entity => entity.Id, entity => entity.Position);
+        long sequence = 9;
+        foreach (var id in positions.Keys) match.SubmitCommand(CommandEnvelope.Stop(2, 0, sequence++, id));
+        match.SubmitCommand(CommandEnvelope.MoveTo(2, 0, sequence, new(1), centre + new FixedVector2(-800, 0),
+            270, 1, GroupYieldChecks.Footman.Motion));
+        for (var frame = 0; frame < 180; frame++) match.Step();
+        check(positions.All(pair => match.Entities.Single(entity => entity.Id == pair.Key).Position == pair.Value),
+            "closed Stop ring bodies remain immovable");
+        check(match.DrainEvents().Any(item => item.Kind == MatchEventKind.MoveFailed && item.EntityId.Value == 1),
+            "a truly closed Stop ring produces finite failure without pushing through");
     }
 
     private static void QueuedExit(Action<bool, string> check)

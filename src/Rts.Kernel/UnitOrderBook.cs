@@ -63,7 +63,7 @@ internal sealed class UnitOrderBook
 
     internal IReadOnlyList<MoveOrderSnapshot> ReadPaths() => Array.AsReadOnly(_moves.Select(pair =>
         new MoveOrderSnapshot(pair.Key.Value, pair.Value.Request, Array.AsReadOnly(pair.Value.Waypoints.ToArray()),
-            pair.Value.NextWaypoint, pair.Value.WaitFrames, pair.Value.RetryAfterFrame)).ToArray());
+            pair.Value.NextWaypoint, pair.Value.WaitFrames, pair.Value.RetryAfterFrame, pair.Value.Review)).ToArray());
 
     internal IReadOnlyList<MovementStatusView> ReadMovementStatuses() => Array.AsReadOnly(_moves.Select(pair =>
         new MovementStatusView(pair.Key.Value, pair.Value.WaitFrames, pair.Value.RetryAfterFrame)).ToArray());
@@ -170,7 +170,7 @@ internal sealed class UnitOrderBook
                     throw new InvalidDataException("Entity position lies outside its saved move segment.");
             }
             _moves.Add(entity.Id, new MoveOrder(item.Request,
-                Array.AsReadOnly(item.Waypoints.ToArray()), item.NextWaypoint, item.WaitFrames, item.RetryAfterFrame));
+                Array.AsReadOnly(item.Waypoints.ToArray()), item.NextWaypoint, item.WaitFrames, item.RetryAfterFrame, item.Review));
         }
     }
 }
