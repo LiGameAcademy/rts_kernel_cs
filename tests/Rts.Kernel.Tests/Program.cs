@@ -133,6 +133,7 @@ RtsMatch CreateMovingMatch()
 }
 
 GroupYieldChecks.Run(Check);
+RouteReviewChecks.Run(Check);
 OpenGroundPartyChecks.Run(Check);
 SmallGroupLandingChecks.Run(Check);
 TemporalCrowdChecks.Run(Check);
