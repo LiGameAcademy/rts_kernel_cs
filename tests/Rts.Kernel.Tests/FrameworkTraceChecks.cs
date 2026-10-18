@@ -79,26 +79,31 @@ internal static class FrameworkTraceChecks
         return Convert.ToHexString(digest.GetHashAndReset()).ToLowerInvariant();
     }
     // These >24-member/ungrouped scenarios must preserve their v12 behavior. Remove
-    // only the v13 wire additions for the old digest; real v13 recovery hashes above
+    // only inactive v13/v14 wire additions for the old digest; real v14 recovery hashes above
     // still include every cooperation field and must match without normalization.
     private static string LegacyHash(MatchSnapshot snapshot)
     {
         var root = JsonNode.Parse(SnapshotJson.Serialize(snapshot))!.AsObject();
         root["formatVersion"] = 12;
         root.Remove("cooperation");
-        RemoveMemberCount(root);
+        RemoveWireAdditions(root);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(root.ToJsonString()))).ToLowerInvariant();
     }
 
-    private static void RemoveMemberCount(JsonNode? node)
+    private static void RemoveWireAdditions(JsonNode? node)
     {
         if (node is JsonObject item)
         {
             item.Remove("memberCount");
-            foreach (var child in item.ToArray()) RemoveMemberCount(child.Value);
+            if (item.ContainsKey("review"))
+            {
+                if (item["review"] is not null) throw new InvalidOperationException("Legacy scenarios cannot activate soft-route review.");
+                item.Remove("review");
+            }
+            foreach (var child in item.ToArray()) RemoveWireAdditions(child.Value);
         }
         else if (node is JsonArray array)
-            foreach (var child in array) RemoveMemberCount(child);
+            foreach (var child in array) RemoveWireAdditions(child);
     }
 
 }

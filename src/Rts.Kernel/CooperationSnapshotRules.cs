@@ -56,7 +56,7 @@ internal static class CooperationSnapshotRules
                 || helper.GroupId == 0 || (helper.GroupId != requester.GroupId && helper.GroupId != requester.AssistanceGroupId)
                 || entities[task.EntityId].OwnerId != entities[task.RequesterId].OwnerId
                 || moves.Contains(task.EntityId) || !moves.Contains(task.RequesterId)
-                || task.Path is null || task.Path.EntityId != task.EntityId
+                || task.Path is null || task.Path.EntityId != task.EntityId || task.Path.Review is not null
                 || (task.ResumeMove && (helper.Settled || orders.GetValueOrDefault(task.EntityId)?.Current?.Kind != UnitOrderKind.Move))
                 || (!task.ResumeMove && !helper.Settled && orders.GetValueOrDefault(task.EntityId)?.Current is not null))
                 throw new InvalidDataException("Invalid temporary yield ownership.");

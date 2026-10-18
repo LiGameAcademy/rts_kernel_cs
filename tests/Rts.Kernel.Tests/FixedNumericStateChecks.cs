@@ -31,8 +31,8 @@ internal static class FixedNumericStateChecks
         var saved = match.CaptureSnapshot();
         var json = SnapshotJson.Serialize(saved);
         using var document = JsonDocument.Parse(json);
-        check(saved.FormatVersion == 13 && document.RootElement.GetProperty("entities")[0].GetProperty("positionX").GetInt64()
-            == SimulationDomain.CoordinateLimit.Raw, "v13 authoritative coordinates serialize raw integers");
+        check(saved.FormatVersion == 14 && document.RootElement.GetProperty("entities")[0].GetProperty("positionX").GetInt64()
+            == SimulationDomain.CoordinateLimit.Raw, "v14 authoritative coordinates serialize raw integers");
         check(!json.Contains("length", StringComparison.OrdinalIgnoreCase), "derived vector length is not snapshot authority");
         check(RtsMatch.Restore(SnapshotJson.Deserialize(json)).ComputeStateHash() == match.ComputeStateHash(),
             "world boundary snapshot restores without loss");

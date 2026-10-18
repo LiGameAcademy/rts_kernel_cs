@@ -48,6 +48,7 @@ internal sealed class CrowdStepper
         var reservations = new CrowdReservations(SimMath.Max(navigation.Grid.CellSize, maximumRadius * 2));
         foreach (var body in bodies)
             reservations.Put(CrowdBody.Stationary(body.Id, ReadDefinition(body.Id)!.Radius, body.Position));
+        if (!pathsDirty) ReviewRoutes(frame, tickRate, navigation, bodies, reservations);
         RefreshArrivalNeighbors(navigation);
         var moving = bodies.Where(entity => _orders.IsMoving(entity.Id) || _orders.Cooperation.IsYielding(entity.Id))
             .OrderByDescending(entity => _orders.Cooperation.IsYielding(entity.Id))
@@ -80,13 +81,13 @@ internal sealed class CrowdStepper
                 blocker = reservations.FirstMotionConflict(new(entity.Id, proposal.Definition.Radius, step.Trace, step.Times));
                 order = order with { RetryAfterFrame = frame + LocalRetryFrames };
                 var waitingForHelp = _orders.Cooperation.HasRequests(entity.Id);
-                if (!waitingForHelp && _orders.Cooperation.Read(entity.Id)?.AssistanceGroupId > 0)
+                if (!waitingForHelp && (_orders.Cooperation.Read(entity.Id)?.AssistanceGroupId > 0 || order.Review?.Recovering == true))
                     waitingForHelp = TryQueueYield(entity, order, blocker, bodies, navigation, yieldRequests, ref remainingYieldPlans);
                 // Once a valid opening is being prepared, sidestepping would change the
                 // requested corridor and make helpers chase a moving target.
                 if (!waitingForHelp)
                 {
-                    if (TryAlternative(entity, proposal.Definition, order, tickRate, navigation, reservations,
+                    if (TryAlternative(frame, entity, proposal.Definition, order, tickRate, navigation, reservations,
                             out var alternativeOrder, out var alternativeStep))
                     {
                         order = alternativeOrder!;
@@ -116,7 +117,8 @@ internal sealed class CrowdStepper
             if (step.NextWaypoint == order.Waypoints.Count)
                 _yield.Arrive(frame, entity.Id);
             else
-                _orders.UpdatePath(entity.Id, order with { NextWaypoint = step.NextWaypoint, WaitFrames = 0 });
+                _orders.UpdatePath(entity.Id, order with { NextWaypoint = step.NextWaypoint, WaitFrames = 0,
+                    Review = RouteReview.RecordMotion(order.Review, (step.Position - entity.Position).Length) });
         }
 
         // Request planning happens after every normal proposal is committed. No frame-start
@@ -126,6 +128,19 @@ internal sealed class CrowdStepper
                 _yield.Request(requester, blocker,
                     _entities.Live.Where(entity => entity.MovementDefinitionId != 0).ToArray(), navigation);
         _yield.Prepare(frame, navigation);
+    }
+
+    private void ReviewRoutes(long frame, int tickRate, NavigationState navigation,
+        IReadOnlyList<EntityState> bodies, CrowdReservations reservations)
+    {
+        var due = bodies.Where(entity => _orders.TryReadPath(entity.Id, out var path)
+                && path.Review is { } review && frame >= review.NextFrame
+                && !_orders.Cooperation.IsYielding(entity.Id) && !_orders.Cooperation.HasRequests(entity.Id))
+            .OrderBy(entity => _orders.ReadPath(entity.Id).Review!.NextFrame).ThenBy(entity => entity.Id)
+            .Take(RouteReview.ReviewsPerFrame).ToArray();
+        foreach (var entity in due)
+            _orders.UpdatePath(entity.Id, RouteReview.Advance(frame, tickRate, entity, ReadDefinition(entity.Id)!,
+                _orders.ReadPath(entity.Id), navigation, reservations));
     }
 
     private bool TryQueueYield(EntityState entity, MoveOrder order, EntityId? blocker,
@@ -141,7 +156,7 @@ internal sealed class CrowdStepper
         return true;
     }
 
-    private bool TryAlternative(EntityState entity, MovementDefinition definition, MoveOrder order, int tickRate,
+    private bool TryAlternative(long frame, EntityState entity, MovementDefinition definition, MoveOrder order, int tickRate,
         NavigationState navigation, CrowdReservations reservations, out MoveOrder? alternativeOrder,
         out MovementStep? alternativeStep)
     {
@@ -155,12 +170,13 @@ internal sealed class CrowdStepper
             <= navigation.Grid.CellSize * LocalDetour.RadiusCells;
         if (!nearSoftGoal) detour ??= LocalDetour.Find(navigation, reservations, entity, definition, order);
         if (soft) detour ??= LocalSidestep.Find(navigation, reservations, entity, definition, order, tickRate);
-        if (detour is null) return false;
+        if (detour is null || (order.Review?.Oscillating == true
+            && !reservations.Safe(entity.Id, definition.Radius, detour.Waypoints))) return false;
         var step = MovementStepper.Compute(entity, detour, tickRate, navigation.Terrain);
         var body = new CrowdBody(entity.Id, definition.Radius, step.Trace, step.Times);
         if (step.Failure is not null || reservations.FirstMotionConflict(body) is not null) return false;
         reservations.Put(body);
-        alternativeOrder = detour;
+        alternativeOrder = soft ? RouteReview.Begin(frame, entity, order, detour) : detour;
         alternativeStep = step;
         return true;
     }

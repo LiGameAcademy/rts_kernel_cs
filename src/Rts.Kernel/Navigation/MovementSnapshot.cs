@@ -20,6 +20,16 @@ internal static class MovementSnapshot
                 || (move.Waypoints[^1] != move.Request.Goal && snapshot.Orders?.Any(queue =>
                     queue?.EntityId == move.EntityId && queue.Current?.Group?.SoftLanding == true) != true))
                 throw new InvalidDataException("Invalid move order state or noncanonical entity order.");
+            if (move.Review is { } review && (review.NextFrame < 0
+                || review.NextFrame > snapshot.Frame + RouteReview.IntervalFrames
+                || review.ProgressFrame < 0 || review.ProgressFrame > snapshot.Frame
+                || review.BestDistance < 0 || review.BestDistance > SimulationDomain.CoordinateLimit * 3
+                || review.WindowFrame < 0 || review.WindowFrame > snapshot.Frame
+                || !SimulationDomain.Contains(review.WindowStart) || review.Travelled < 0
+                || review.Travelled > SimulationDomain.CoordinateLimit * 3
+                || snapshot.Orders?.Any(queue =>
+                    queue.EntityId == move.EntityId && queue.Current?.Group?.SoftLanding == true) != true))
+                throw new InvalidDataException("Invalid route-review state or order ownership.");
             previous = move.EntityId;
         }
     }
@@ -38,6 +48,7 @@ internal static class MovementSnapshot
             if (left.Request != right.Request) return Difference(prefix + ".request", left.Request, right.Request);
             if (left.WaitFrames != right.WaitFrames) return Difference(prefix + ".waitFrames", left.WaitFrames, right.WaitFrames);
             if (left.RetryAfterFrame != right.RetryAfterFrame) return Difference(prefix + ".retryAfterFrame", left.RetryAfterFrame, right.RetryAfterFrame);
+            if (left.Review != right.Review) return Difference(prefix + ".review", left.Review, right.Review);
             if (left.NextWaypoint != right.NextWaypoint) return Difference(prefix + ".nextWaypoint", left.NextWaypoint, right.NextWaypoint);
             if (left.Waypoints.Count != right.Waypoints.Count)
                 return Difference(prefix + ".waypoints.count", left.Waypoints.Count, right.Waypoints.Count);

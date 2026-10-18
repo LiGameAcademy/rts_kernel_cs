@@ -128,3 +128,20 @@ frame and cannot turn reports `movement_below_resolution`; queues follow the usu
 failure policy. Intentional zero-scale turning/holding remains valid.
 
 `RtsMatch.CanSpawn(position, movementDefinitionId)` reuses committed ground-placement rules without reserving space, IDs, randomness or events. Queued/future commands are not applied by this query; Spawn validates again at execution. Definition zero keeps the diagnostic point-entity behavior.
+
+## Local route review
+
+Soft groups of at most24 members periodically review local detours: reviews are
+staggered by entity ID, due every15 logic ticks, with at most2 reviews per tick.
+An open, shorter corridor can replace a detour. A route that remains fully safe is
+allowed to finish even when it temporarily moves away from the preferred slot.
+
+Progress and position-window observations belong to the active order. A blocked
+route without meaningful progress is reconsidered; substantial travel within a
+small position window prevents repeatedly accepting an unsafe reconnect. Temporary
+yield tasks are excluded, and Stop/replacement clear the old review state.
+
+Snapshot format v14 stores this progress and rejects v13 and older snapshots.
+JSON restore and state hashes include it. The existing soft endpoint envelope,
+body collision, queue, and physical-blocking rules remain in force. This mechanism
+does not provide global crowd traffic planning or guarantee escape through Stop bodies.

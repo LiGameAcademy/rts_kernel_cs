@@ -17,7 +17,11 @@ public sealed partial class RtsMatch
         {
             var intent = _orders.PeekWaiting(id);
             var entity = _entities.Get(id);
-            if (MovePathPlanner.TryPlan(_navigation, entity.Position, intent.Move!, out var move, intent.Group is not null, intent.Group?.SoftLanding == true))
+            // A queued order starts at the actual soft landing, not its grid centre.
+            // Retain the old party's exit permission without steering backwards into it first.
+            var leavingSoftParty = _orders.Cooperation.Read(id)?.GroupId > 0;
+            if (MovePathPlanner.TryPlan(_navigation, entity.Position, intent.Move!, out var move,
+                    intent.Group is not null, intent.Group?.SoftLanding == true || leavingSoftParty))
             {
                 _orders.ActivateWaiting(id, move!);
                 _entities.Update(entity with { Velocity = FixedVector2.Zero });
