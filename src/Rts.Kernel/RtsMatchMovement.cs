@@ -10,6 +10,25 @@ public sealed partial class RtsMatch
     public IReadOnlyList<MoveOrderSnapshot> ReadMoveOrders() => _orders.ReadPaths();
     public IReadOnlyList<MovementStatusView> ReadMovementStatuses() => _orders.ReadMovementStatuses();
 
+    public IReadOnlyList<MovementRouteView> ReadMovementRoutes(IReadOnlyList<EntityId> ids)
+    {
+        var routes = new List<MovementRouteView>();
+        foreach (var id in ids.Distinct().Order())
+        {
+            if (!_entities.TryGet(id, out var entity)) continue;
+            var yielding = _orders.Cooperation.IsYielding(id);
+            var intent = _orders.ReadCurrent(id);
+            var path = yielding ? _orders.Cooperation.ReadPath(id)
+                : _orders.TryReadPath(id, out var active) ? active : null;
+            if (path is null && intent?.Move is null) continue;
+            var points = new List<FixedVector2> { entity.Position };
+            if (path is not null) points.AddRange(path.Waypoints.Skip(path.NextWaypoint));
+            routes.Add(new(id, intent?.Move?.Goal, Array.AsReadOnly(points.ToArray()), yielding,
+                _orders.Cooperation.IsSettled(id), path?.WaitFrames ?? 0));
+        }
+        return routes.AsReadOnly();
+    }
+
     private void AdvanceMovement(int tickRate)
     {
         foreach (var entity in _entities.ReadAll())
