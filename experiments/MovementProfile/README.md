@@ -5,16 +5,21 @@
 ```powershell
 python experiments/MovementProfile/profile.py --output C:/Temp/rts-profile
 python experiments/MovementProfile/profile.py --without-replay --output C:/Temp/rts-profile-no-replay
+python experiments/MovementProfile/profile.py --prepared --commands-only --output C:/Temp/rts-profile-prepared-command
 ```
 
 需要Python3.12+、现有.NET10 SDK和完整工作区依赖。脚本复制Git跟踪的工作区文件到新建临时目录，先运行原算法，再仅在副本插入阶段计时/当前线程分配观测。正式src/与宿主不加诊断字段或分支。临时源码保留供核对，路径在输出/metadata.json中。
 
 产物：baseline.log、profile.log、profile.json、metadata.json。未插桩基线用于判断预算；插桩数据用于归因，包含观测开销，不能当作发布性能。首轮包含JIT等首次执行成本，非严格冷机实验。
 
+`--prepared`沿用现有显式准备验收入口，保留全部准备耗时、出生及真实首命令，并运行读档/障碍首命令边界。`--commands-only`只插入Step、Commands、群体成员/占位/初始分配/代价交换/候选构造/落点/提交及Path.Plan，不插入高频逐次碰撞/运动计时；它不会删除移动阶段或改变命令输入。两个选项均不修改正式src。
+
+每次仅一次未插桩控制进程、一次插桩观察进程，直接运行冻结DLL，不用dotnet run的额外启动器。输出目录必须新建；source-manifest.json记录插桩前全部源文件指纹，metadata保留工具指纹与实际插桩清单。阶段计时仍是inclusive，Group.Place包含合法落点后的第二次匹配，Group.Assign两次调用合计，父子阶段不能相加；插桩会影响JIT形态和执行成本，不能据其差额替历史38.2368ms帧补造归因。
+
 - 阶段数据是包含子调用的inclusive值，父子时间和分配不可相加。
 - gc0/1/2和gc_pause_ms是整个command/move阶段的统计，为便于读取重复在各行，不是每个方法独占的GC，也不能按行累加。
 - 默认沿用已有快照对照；--without-replay只在副本关闭第1/31帧的读档验证，用于检查恢复验证产生的GC干扰。它不删除正式测试中的恢复覆盖。
-- 两轮300/500各三次最终哈希必须6/6一致，夹具仍检查完成数、身体分离和终态静止；默认模式另有24帧live/JSON续跑对照。不宣称覆盖所有中间帧哈希。
+- 两轮300/500各三次逐帧状态/事件滚动摘要及最终哈希必须6/6一致，夹具仍检查完成数、身体分离和终态静止；默认模式另有24帧live/JSON续跑对照。读档/障碍边界在各进程内对照控制对局，不冒充另有跨进程黄金摘要。
 - 稳定阶段时钟与分配只观察，不参与命令、逻辑预算、状态提交或哈希。
 - 源码方法或探针标记变化时明确失败，不静默跳过；诊断结果须与原始日志及源码版本一起审阅。
 

@@ -8,7 +8,8 @@ internal static class ProfileCounters
 {
     private static readonly string[] Names = [
         "Step", "Commands", "Planning", "Queued", "Crowd",
-        "Group.Members", "Group.Bodies", "Group.Layout", "Group.Assign", "Group.Place", "Group.Commit",
+        "Group.Members", "Group.Bodies", "Group.Layout", "Group.Assign", "Group.Place", "Group.Commit", "Group.AtomicCommit",
+        "Group.Relax", "Group.Candidates",
         "Path.Plan", "Crowd.Prepare", "Crowd.Resolve", "Crowd.Alternative",
         "Crowd.Settle", "Crowd.YieldPlan", "Motion.Compute", "Local.Detour", "Local.SoftGoal", "Navigation.Build", "Collision.Query", "Collision.Timed", "Collision.Segment"
     ];
