@@ -26,6 +26,16 @@ internal static class PlacementCandidateChecks
                 var expected = FullCandidates(navigation, ideal);
                 var actual = GroupPlacementPlanner.Candidates(navigation, ideal);
                 check(actual.Count == expected.Length, "candidate count retains complete clipped window");
+                if (expected.Length > 0)
+                {
+                    var indexed = GroupPlacementPlanner.Candidates(navigation, ideal);
+                    check(indexed[expected.Length / 2] == expected[expected.Length / 2],
+                        "first access may initialize directly at a middle index");
+                    check(indexed[0] == expected[0] && indexed.SequenceEqual(expected),
+                        "middle-first access retains the cached head and complete fallback");
+                    check(actual[0] == expected[0] && actual[0] == expected[0],
+                        "repeated head reads retain the same candidate before frontier initialization");
+                }
                 using var first = actual.GetEnumerator();
                 if (expected.Length > 0)
                 {

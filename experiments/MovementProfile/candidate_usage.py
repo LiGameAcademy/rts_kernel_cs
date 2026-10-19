@@ -48,9 +48,10 @@ def instrument(destination):
     text = path.read_text(encoding="utf-8-sig")
     for before, after in [
         ("    public int Count { get; }", "    internal int UsageId { get; }\n    public int Count { get; }"),
-        ("        for (var y = top; y <= bottom; y++) Enqueue(y, 0);",
-         "        for (var y = top; y <= bottom; y++) Enqueue(y, 0);\n        UsageId = CandidateUsage.Register(Count, bottom - top + 1, _columns.Length);"),
-        ("            while (_ordered.Count <= index)", "            var cachedPrefix = _ordered.Count;\n            while (_ordered.Count <= index)"),
+        ("        Count = checked((right - left + 1) * (bottom - top + 1));",
+         "        Count = checked((right - left + 1) * (bottom - top + 1));\n        UsageId = CandidateUsage.Register(Count, bottom - top + 1, right - left + 1);"),
+        ("            if (index < 0 || index >= Count) throw new ArgumentOutOfRangeException(nameof(index));",
+         "            if (index < 0 || index >= Count) throw new ArgumentOutOfRangeException(nameof(index));\n            var cachedPrefix = _ordered.Count;"),
         ("            return _ordered[index];", "            CandidateUsage.Read(UsageId, index, cachedPrefix, _ordered.Count);\n            return _ordered[index];"),
         ("        for (var i = 0; i < Count; i++) yield return this[i];",
          "        CandidateUsage.Enumerate(UsageId);\n        for (var i = 0; i < Count; i++) yield return this[i];")
