@@ -78,21 +78,32 @@ internal sealed class CrowdStepper
             if (blocked && frame >= order.RetryAfterFrame && retries > 0)
             {
                 retries--;
-                blocker = reservations.FirstMotionConflict(new(entity.Id, proposal.Definition.Radius, step.Trace, step.Times));
-                order = order with { RetryAfterFrame = frame + LocalRetryFrames };
-                var waitingForHelp = _orders.Cooperation.HasRequests(entity.Id);
-                if (!waitingForHelp && (_orders.Cooperation.Read(entity.Id)?.AssistanceGroupId > 0 || order.Review?.Recovering == true))
-                    waitingForHelp = TryQueueYield(entity, order, blocker, bodies, navigation, yieldRequests, ref remainingYieldPlans);
-                // Once a valid opening is being prepared, sidestepping would change the
-                // requested corridor and make helpers chase a moving target.
-                if (!waitingForHelp)
+                var originalBody = new CrowdBody(entity.Id, proposal.Definition.Radius, step.Trace, step.Times);
+                blocker = reservations.FirstMotionConflict(originalBody);
+                if (blocker is null)
                 {
-                    if (TryAlternative(frame, entity, proposal.Definition, order, tickRate, navigation, reservations,
-                            out var alternativeOrder, out var alternativeStep))
+                    // Earlier alternatives may have cleared this hold. Restore the timed
+                    // reservation as well as motion so later proposals observe the same step.
+                    reservations.Put(originalBody);
+                    blocked = false;
+                }
+                else
+                {
+                    order = order with { RetryAfterFrame = frame + LocalRetryFrames };
+                    var waitingForHelp = _orders.Cooperation.HasRequests(entity.Id);
+                    if (!waitingForHelp && (_orders.Cooperation.Read(entity.Id)?.AssistanceGroupId > 0 || order.Review?.Recovering == true))
+                        waitingForHelp = TryQueueYield(entity, order, blocker, bodies, navigation, yieldRequests, ref remainingYieldPlans);
+                    // Once a valid opening is being prepared, sidestepping would change the
+                    // requested corridor and make helpers chase a moving target.
+                    if (!waitingForHelp)
                     {
-                        order = alternativeOrder!;
-                        step = alternativeStep!;
-                        blocked = false;
+                        if (TryAlternative(frame, entity, proposal.Definition, order, tickRate, navigation, reservations,
+                                out var alternativeOrder, out var alternativeStep))
+                        {
+                            order = alternativeOrder!;
+                            step = alternativeStep!;
+                            blocked = false;
+                        }
                     }
                 }
             }
