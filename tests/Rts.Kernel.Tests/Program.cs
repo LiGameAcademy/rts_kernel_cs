@@ -42,6 +42,13 @@ if (args.Contains("--multi-party"))
     return;
 }
 
+if (args.Contains("--stale-hold"))
+{
+    StaleHoldChecks.Run(Check);
+    Console.WriteLine($"Stale hold PASS ({checks} checks)");
+    return;
+}
+
 if (args.Contains("--route-review"))
 {
     try
@@ -133,6 +140,7 @@ RtsMatch CreateMovingMatch()
 }
 
 GroupYieldChecks.Run(Check);
+StaleHoldChecks.Run(Check);
 RouteReviewChecks.Run(Check);
 OpenGroundPartyChecks.Run(Check);
 SmallGroupLandingChecks.Run(Check);
