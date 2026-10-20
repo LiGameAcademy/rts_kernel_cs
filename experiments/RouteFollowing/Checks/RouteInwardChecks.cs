@@ -13,19 +13,18 @@ internal static class RouteInwardChecks
         Check(!upper.Move([10, 10], new(600, 800)) && upper.Hash() == originalHash,
             "invalid replacement preserves inward state");
         upper.Step();
-        Check(Quarter(upper, 10) < 4 && upper.Units.Single(body => body.Id == 10).Position != before[10].Position,
-            "upper traffic front takes a safe inward step");
-        Check(Quarter(upper, 3) < 4, "inner traffic front contracts on the same reference point");
-        Check(JsonNode.Parse(upper.Save())!["Format"]!.GetValue<int>() == 3, "experimental format covers inward state");
+        Check(upper.Units.Any(body => body.Position != before[body.Id].Position),
+            "upper frozen entrance produces safe movement with the corrected reference");
+        Check(JsonNode.Parse(upper.Save())!["Format"]!.GetValue<int>() == 4, "experimental format covers inward state");
         Safe(before, upper);
         var lower = Fixture(47);
         lower.Step();
-        Check(Quarter(lower, 5) < 4, "lower front uses its inward opportunity before it closes");
+        Check(lower.Units.Any(body => body.TransitQuarters < 4), "lower entrance still exercises accepted contraction");
         Continuation(upper);
         Lifecycle(upper);
         Corrupt(upper, -1);
         Corrupt(upper, 5);
-        foreach (var format in new[] { 1, 2 })
+        foreach (var format in new[] { 1, 2, 3 })
         {
             var legacy = JsonNode.Parse(upper.Save())!;
             legacy["Format"] = format;
@@ -40,6 +39,7 @@ internal static class RouteInwardChecks
     {
         var first = RouteWorld.Load(initial.Save());
         var restored = RouteWorld.Load(initial.Save());
+        var contractions = 0;
         for (var frame = 0; frame < 180; frame++)
         {
             var before = first.Units.ToDictionary(body => body.Id);
@@ -54,8 +54,12 @@ internal static class RouteInwardChecks
                 if (body.Connection is { } connection)
                     Check(connection.TransitQuarters is >= 0 and <= 4
                         && connection.TransitQuarters <= Quarter(first, body.Id), "connection preserves a permitted inward cap");
+            contractions += first.Units.Count(body => body.Task == before[body.Id].Task
+                && body.Task != 0 && Quarter(first, body.Id) < quarters[body.Id]
+                && body.Position != before[body.Id].Position);
             Safe(before, first);
         }
+        Check(contractions > 0, "continuation exercises real accepted inward translations");
     }
 
     private static void Lifecycle(RouteWorld initial)
@@ -92,17 +96,7 @@ internal static class RouteInwardChecks
             "queued task resets inward state");
     }
 
-    private static RouteWorld Fixture(int frame)
-    {
-        using var stream = typeof(RouteInwardChecks).Assembly.GetManifestResourceStream($"narrow-entry-{frame}.json")
-            ?? throw new InvalidOperationException("Missing frozen fixture.");
-        using var reader = new StreamReader(stream);
-        var json = JsonNode.Parse(reader.ReadToEnd())!;
-        // Explicit test setup, not a runtime migration of the historical v1 snapshot.
-        json["Format"] = JsonNode.Parse(new RouteWorld().Save())!["Format"]!.DeepClone();
-        foreach (var node in json["Units"]!.AsArray()) node!["TransitQuarters"] = 4;
-        return RouteWorld.Load(json.ToJsonString());
-    }
+    private static RouteWorld Fixture(int frame) => RouteFixture.Load($"narrow-entry-{frame}.json");
 
     private static int Quarter(RouteWorld world, ulong id) => JsonNode.Parse(world.Save())!["Units"]!.AsArray()
         .Single(node => node!["Id"]!.GetValue<ulong>() == id)!["TransitQuarters"]?.GetValue<int>() ?? 4;

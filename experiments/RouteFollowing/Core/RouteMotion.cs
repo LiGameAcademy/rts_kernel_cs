@@ -67,18 +67,12 @@ internal static class RouteMotion
                 WaitTicks = body.WaitTicks + (moved ? 0 : 1),
                 Connection = blocked || step.NextWaypoint >= (body.Connection?.Points.Count ?? 0) ? null
                     : body.Connection! with { Next = step.NextWaypoint } };
-            var remaining = RoutePlanning.Remaining(updated, world.Routes[body.Task]);
-            if (body.BestRemaining == SimScalar.MaxValue || SourceVersionChanged(body, world.Routes[body.Task]))
-                updated = updated with { BestRemaining = remaining };
-            else if (remaining + RouteSettings.ProgressThreshold <= body.BestRemaining)
-                updated = updated with { BestRemaining = remaining, WaitTicks = 0, RetryAtWait = 90, Recoveries = 0 };
+            updated = RouteProgress.Measure(body, updated, world.Routes[body.Task]);
             if (!blocked && proposal.Final && step.Position == body.Endpoint)
                 updated = updated with { Phase = WalkPhase.Settled, Velocity = default, Blocker = null };
             world.Bodies[body.Id] = updated;
         }
     }
-
-    private static bool SourceVersionChanged(Walker body, RouteTask task) => body.RouteVersion != task.Version;
 
     private static IReadOnlyList<FixedVector2>? Connection(RouteWorld world, FixedVector2 from, FixedVector2 to)
     {
@@ -116,7 +110,7 @@ internal static class RouteMotion
             if (attempts > RouteSettings.RecoveryLimit)
             {
                 world.Bodies[waiting.Id] = waiting with { Task = 0, Phase = WalkPhase.Failed,
-                    Velocity = default, Blocker = null, Connection = null, TransitQuarters = 4 };
+                    Velocity = default, Blocker = null, Connection = null, TransitQuarters = 4, Progress = 0, ProgressCursor = 0, ProgressVersion = 0 };
                 world.Publish(waiting.Id, "failed", "no_connection_progress");
             }
             else
@@ -130,17 +124,19 @@ internal static class RouteMotion
             }
             return;
         }
-        var found = RoutePlanning.TryRoute(world, waiting.Position, task.Anchor, blockers, out var points);
         var recoveries = waiting.Recoveries + 1;
         if (recoveries > RouteSettings.RecoveryLimit)
         {
             world.Bodies[waiting.Id] = waiting with { Task = 0, Phase = WalkPhase.Failed,
-                Velocity = default, Blocker = null, TransitQuarters = 4 };
+                Velocity = default, Blocker = null, Connection = null, TransitQuarters = 4,
+                Progress = 0, ProgressCursor = 0, ProgressVersion = 0 };
             world.Publish(waiting.Id, "failed", "no_reference_progress");
+            return;
         }
-        else world.Bodies[waiting.Id] = waiting with { Recoveries = recoveries,
-            RetryAtWait = waiting.WaitTicks + 90, BestRemaining = SimScalar.MaxValue };
-        if (found) world.Routes[task.Id] = task with { Points = points, Version = task.Version + 1, MapRevision = world.Revision };
+        var found = RoutePlanning.TryRoute(world, waiting.Position, task.Anchor, blockers, out var points, out var corners);
+        world.Bodies[waiting.Id] = waiting with { Recoveries = recoveries, RetryAtWait = waiting.WaitTicks + 90 };
+        if (found) world.Routes[task.Id] = task with { Points = points, Corners = corners,
+            Version = task.Version + 1, MapRevision = world.Revision };
         world.Publish(waiting.Id, "retry", found ? "reference_replaced" : "no_route_this_round");
     }
 }

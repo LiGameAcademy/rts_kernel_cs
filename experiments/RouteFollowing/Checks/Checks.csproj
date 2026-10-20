@@ -2,5 +2,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Fixtures/narrow-entry-47.json" LogicalName="narrow-entry-47.json" />
     <EmbeddedResource Include="Fixtures/narrow-entry-120.json" LogicalName="narrow-entry-120.json" />
+    <EmbeddedResource Include="Fixtures/reference-entry-399.json" LogicalName="reference-entry-399.json" />
+    <EmbeddedResource Include="Fixtures/reference-progress-789.json" LogicalName="reference-progress-789.json" />
   </ItemGroup>
 </Project>

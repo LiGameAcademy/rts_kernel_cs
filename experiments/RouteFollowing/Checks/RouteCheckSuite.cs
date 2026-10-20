@@ -3,6 +3,8 @@ using Rts.Kernel;
 using Rts.Kernel.Numerics;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text;
+using System.Security.Cryptography;
 
 /// <summary>CLI and Godot run the identical independent experimental acceptance suite.</summary>
 public static class RouteCheckSuite
@@ -18,6 +20,8 @@ public static class RouteCheckSuite
         output($"route_prepare_ms={preparation.Elapsed.TotalMilliseconds:R} authority_unchanged=true");
         var passed = true;
         foreach (var scenario in new[] { 1, 2, 3, 4, 5 }) passed &= Scenario(scenario, output);
+        RouteReferenceChecks.Run();
+        output("route_reference_boundaries=PASS");
         RouteInwardChecks.Run();
         output("route_inward_boundaries=PASS");
         RouteBoundaryChecks.Run();
@@ -30,6 +34,7 @@ public static class RouteCheckSuite
     {
         var world = RouteScenarios.Create(scenario);
         var frames = new List<object>();
+        using var transcript = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         var failed = 0;
         var completed = 0;
         var ticks = 0;
@@ -52,6 +57,7 @@ public static class RouteCheckSuite
                 Check(resumed.Hash() == world.Hash(), "JSON continuation hash");
                 Check(JsonSerializer.Serialize(resumed.Events) == JsonSerializer.Serialize(world.Events), "JSON events");
             }
+            transcript.AppendData(Encoding.UTF8.GetBytes(world.Hash() + "\n" + JsonSerializer.Serialize(world.Events) + "\n"));
             var after = world.Units;
             for (var i = 0; i < after.Count; i++)
             {
@@ -78,7 +84,8 @@ public static class RouteCheckSuite
         output("route_result=" + JsonSerializer.Serialize(new { scenario, frames = frames.Count, stable_frames = stableFrames,
             failed, completed, active = world.Units.Count(body => body.Task != 0),
             settled = world.Units.Count(body => body.Phase == WalkPhase.Settled), peak_ms = peak,
-            over_budget = overBudget, passed = pass, hash = world.Hash() }));
+            over_budget = overBudget, passed = pass, hash = world.Hash(),
+            trace_sha256 = Convert.ToHexString(transcript.GetHashAndReset()) }));
         return pass;
     }
 

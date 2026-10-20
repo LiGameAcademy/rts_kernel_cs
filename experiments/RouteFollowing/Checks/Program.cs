@@ -3,7 +3,9 @@ using System.Text.Json;
 
 try
 {
-    if (args.Contains("--diagnose"))
+    if (args.Contains("--reference-checks")) RouteReferenceChecks.Run();
+    else if (args.Contains("--inward-checks")) RouteInwardChecks.Run();
+    else if (args.Contains("--diagnose"))
     {
         var world = RouteScenarios.Create(int.Parse(args[^1]));
         for (var tick = 0; tick < 1200; tick++)

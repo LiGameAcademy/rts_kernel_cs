@@ -55,9 +55,10 @@ internal static class RoutePlanning
     }
 
     internal static bool TryRoute(RouteWorld world, FixedVector2 start, FixedVector2 goal,
-        IReadOnlyList<Walker> blockers, out IReadOnlyList<FixedVector2> points)
+        IReadOnlyList<Walker> blockers, out IReadOnlyList<FixedVector2> points, out IReadOnlyList<int> corners)
     {
         points = [];
+        corners = [];
         var navigation = world.Navigation;
         if (!navigation.TryWorldToCell(start, out var first) || !navigation.CanOccupy(first, 1))
         {
@@ -80,6 +81,7 @@ internal static class RoutePlanning
         route.AddRange(path.Cells.Skip(1).Select(navigation.CellCenter));
         if (route[^1] != goal) route.Add(goal);
         points = route.ToArray();
+        corners = RouteReference.FindCorners(points);
         return true;
     }
 
@@ -90,9 +92,15 @@ internal static class RoutePlanning
         var cursor = sameVersion ? body.Cursor : route.Points.Select((point, index) => (point, index))
             .OrderBy(item => (item.point + offset - body.Position).Length).ThenBy(item => item.index)
             .First().index;
-        if (!sameVersion) body = body with { BestRemaining = SimScalar.MaxValue };
-        if (cursor < route.Points.Count - 1
-            && (body.Position - (route.Points[cursor] + offset)).Length <= 9) cursor++;
+        while (cursor < route.Points.Count - 1)
+        {
+            var close = (body.Position - (route.Points[cursor] + offset)).Length <= 9;
+            var passed = cursor > 0 && !route.Corners.Contains(cursor)
+                && RouteReference.Project(body.Position, route.Points[cursor - 1] + offset,
+                    route.Points[cursor] + offset) >= (route.Points[cursor] - route.Points[cursor - 1]).Length;
+            if (!close && !passed) break;
+            cursor++;
+        }
         var best = cursor;
         var target = route.Points[Math.Min(cursor, route.Points.Count - 1)] + offset;
         var selectedQuarter = body.TransitQuarters;
@@ -111,12 +119,7 @@ internal static class RoutePlanning
             }
             // A reference bend represents a corridor decision, including a temporary body
             // avoided by the latest retry. Static visibility cannot erase that decision.
-            if (i > 0 && i + 1 < route.Points.Count)
-            {
-                var incoming = route.Points[i] - route.Points[i - 1];
-                var outgoing = route.Points[i + 1] - route.Points[i];
-                if ((Int128)incoming.X.Raw * outgoing.Y.Raw != (Int128)incoming.Y.Raw * outgoing.X.Raw) break;
-            }
+            if (route.Corners.Contains(i)) break;
         }
         if (best == route.Points.Count - 1 || (body.Position - body.Preference).Length <= 200)
         {
@@ -138,18 +141,4 @@ internal static class RoutePlanning
         world.Navigation.CanStandAt(point, 31) && world.Bodies.Values.All(other => other.Id == body.Id
             || (other.Position - point).Length >= 64);
 
-    internal static SimScalar Remaining(Walker body, RouteTask route)
-    {
-        var index = Math.Clamp(body.Cursor, 1, route.Points.Count - 1);
-        var from = route.Points[index - 1];
-        var to = route.Points[index];
-        var delta = to - from;
-        var length = delta.Length;
-        var remaining = SimScalar.Zero;
-        for (var i = index + 1; i < route.Points.Count; i++) remaining += (route.Points[i] - route.Points[i - 1]).Length;
-        if (length == 0) return remaining;
-        var relative = body.Position - from;
-        var projection = (relative.X * delta.X + relative.Y * delta.Y) / length;
-        return remaining + length - SimMath.Clamp(projection, 0, length);
-    }
 }

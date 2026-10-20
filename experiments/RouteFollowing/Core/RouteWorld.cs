@@ -21,7 +21,7 @@ public sealed class RouteWorld
     public int Width { get; }
     public int Height { get; }
     public IReadOnlyList<Walker> Units => Bodies.Values.Select(Copy).ToArray();
-    public IReadOnlyList<RouteTask> Paths => Routes.Values.Select(route => route with { Points = route.Points.ToArray() }).ToArray();
+    public IReadOnlyList<RouteTask> Paths => Routes.Values.Select(route => route with { Points = route.Points.ToArray(), Corners = route.Corners.ToArray() }).ToArray();
     public byte[] ReadFlags() => Flags.ToArray();
     public FixedVector2 FollowTarget(ulong id) => Bodies[id].Task == 0 ? Bodies[id].Position
         : RoutePlanning.Follow(this, Bodies[id], Routes[Bodies[id].Task]).Target;
@@ -100,7 +100,8 @@ public sealed class RouteWorld
             foreach (var body in group)
                 if (body.Phase == WalkPhase.Settled && (allSettled || body.Pending.Count > 0))
                 {
-                    Bodies[body.Id] = body with { Task = 0, Phase = WalkPhase.Idle, Velocity = default, Blocker = null, TransitQuarters = 4 };
+                    Bodies[body.Id] = body with { Task = 0, Phase = WalkPhase.Idle, Velocity = default, Blocker = null, TransitQuarters = 4,
+                        Progress = 0, ProgressCursor = 0, ProgressVersion = 0 };
                     Publish(body.Id, "completed");
                 }
         }
@@ -117,20 +118,21 @@ public sealed class RouteWorld
             {
                 var body = Bodies[id];
                 Bodies[id] = body with { Task = 0, Phase = WalkPhase.Stopped, Pending = [], Velocity = default,
-                    Blocker = null, WaitTicks = 0, Recoveries = 0, RecentGroup = 0, Connection = null, TransitQuarters = 4 };
+                    Blocker = null, WaitTicks = 0, Recoveries = 0, RecentGroup = 0, Connection = null, TransitQuarters = 4,
+                    Progress = 0, ProgressCursor = 0, ProgressVersion = 0 };
                 Publish(id, "stopped");
             }
             return;
         }
         var members = command.Members.Select(id => Bodies[id]).ToArray();
         if (!RoutePlanning.TryAssign(this, members, command.Goal, out var anchor, out var goals)
-            || !RoutePlanning.TryRoute(this, RoutePlanning.Centre(members), anchor, [], out var points))
+            || !RoutePlanning.TryRoute(this, RoutePlanning.Centre(members), anchor, [], out var points, out var corners))
         {
             foreach (var id in command.Members) Publish(id, "rejected", "no_complete_group_placement");
             return;
         }
         var taskId = NextTask++;
-        Routes.Add(taskId, new(taskId, anchor, points, 1, Revision));
+        Routes.Add(taskId, new(taskId, anchor, points, 1, Revision, corners));
         foreach (var body in members)
         {
             // Transit offsets preserve current relative placement; final slot preferences
@@ -147,7 +149,7 @@ public sealed class RouteWorld
     {
         Task = intent.Task, Preference = intent.Preference, Endpoint = intent.Preference, Offset = intent.Offset,
         Cursor = 0, Phase = WalkPhase.Following, WaitTicks = 0, RetryAtWait = 90, Recoveries = 0,
-        BestRemaining = SimScalar.MaxValue, RouteVersion = 0, Blocker = null, Velocity = default,
+        Progress = 0, ProgressCursor = 0, ProgressVersion = 0, RouteVersion = 0, Blocker = null, Velocity = default,
         RecentGroup = body.Task != 0 ? body.Task : body.RecentGroup, Connection = null, TransitQuarters = 4
     };
 
@@ -158,7 +160,7 @@ public sealed class RouteWorld
         Connection = body.Connection is { } connection ? connection with { Points = connection.Points.ToArray() } : null };
     public string Save() => JsonSerializer.Serialize(new RouteSnapshot(RouteSettings.SnapshotFormat, Width, Height, Flags.ToArray(), Frame,
         _nextUnit, NextTask, _eventSequence, Revision, Bodies.Values.Select(Copy).ToArray(),
-        Routes.Values.Select(route => route with { Points = route.Points.ToArray() }).ToArray(), _commands.ToArray()));
+        Routes.Values.Select(route => route with { Points = route.Points.ToArray(), Corners = route.Corners.ToArray() }).ToArray(), _commands.ToArray()));
     public string Hash() => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Save())));
 
     public static RouteWorld Load(string json)
@@ -170,7 +172,7 @@ public sealed class RouteWorld
             Frame = state.Frame, _nextUnit = state.NextUnit, NextTask = state.NextTask,
             _eventSequence = state.EventSequence, Revision = state.MapRevision
         };
-        foreach (var route in state.Tasks) world.Routes.Add(route.Id, route with { Points = route.Points.ToArray() });
+        foreach (var route in state.Tasks) world.Routes.Add(route.Id, route with { Points = route.Points.ToArray(), Corners = route.Corners.ToArray() });
         foreach (var body in state.Units) world.Bodies.Add(body.Id, Copy(body));
         foreach (var command in state.Commands) world._commands.Enqueue(command with { Members = command.Members.ToArray() });
         if (world.Bodies.Values.Any(body => !world.Navigation.CanStandAt(body.Position, RouteSettings.Radius)))
