@@ -1,0 +1,17 @@
+config_version=5
+
+[application]
+config/name="RTS 统一路线与等待实验 · 0.0.2"
+run/main_scene="res://route_following_probe.tscn"
+
+[display]
+window/size/viewport_width=1360
+window/size/viewport_height=960
+window/size/window_width_override=1360
+window/size/window_height_override=960
+
+[dotnet]
+project/assembly_name="RouteFollowing.Probe"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"

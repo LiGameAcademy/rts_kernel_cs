@@ -1,0 +1,4 @@
+<Project Sdk="Godot.NET.Sdk/4.7.2">
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><EnableDynamicLoading>true</EnableDynamicLoading><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Core/Rts.Movement.Prototype.csproj" /><Compile Include="../Checks/RouteCheckSuite.cs" Link="RouteCheckSuite.cs" /><Compile Include="../Checks/RouteBoundaryChecks.cs" Link="RouteBoundaryChecks.cs" /></ItemGroup>
+</Project>
