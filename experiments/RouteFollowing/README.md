@@ -11,14 +11,15 @@ Two-unit following, opposing movement and a stationary Stop blocker pass. The
 same-reference inward-step fixtures and Stop, replacement, queue and JSON
 continuation checks pass. Only an accepted safe movement commits a smaller
 transit-offset cap; it cannot expand again during that task. New tasks and Stop
-reset it. Experimental snapshots are now **format 2**; format 1 is rejected, while
+reset it. Bounded connections carry the selected absolute quarter-step cap too;
+they cannot create an extra fractional level or restore an outward offset. Experimental snapshots are now **format 3**; formats 1 and 2 are rejected, while
 production v14 is unchanged.
 
-Full 24-unit acceptance still fails. At tick 1200 the narrow passage has 12 failed
-members, 10 temporarily settled and 2 still moving/waiting, with no group completion
+Full 24-unit acceptance still fails. At tick 1200 the narrow passage has 10 failed
+members, 11 temporarily settled and 3 still moving/waiting, with no group completion
 events. Five successive direction changes complete 20/24, with 4 failures.
-The final cold CLI narrow-passage peak was 46.5812ms; normal-permission Godot Debug
-peaked at 74.1287ms (a separate sandbox run reached 110.7003ms). The unchanged
+The final cold CLI narrow-passage peak was 22.6360ms; normal-permission Godot Debug
+peaked at 42.5231ms (earlier format-2 samples, including a sandbox 110.7003ms peak, are also retained). The unchanged
 33.3333ms gate is not met. First ticks and all over-budget samples are retained.
 These results do not establish that the whole movement algorithm improved.
 

@@ -4,7 +4,7 @@ internal static class RouteSnapshotValidation
 {
     internal static void Validate(RouteSnapshot state)
     {
-        if (state.Format != 2 || state.Frame < 0 || state.EventSequence < 0 || state.MapRevision < 0
+        if (state.Format != RouteSettings.SnapshotFormat || state.Frame < 0 || state.EventSequence < 0 || state.MapRevision < 0
             || state.Units is null || state.Tasks is null || state.Commands is null || state.Flags is null
             || state.Units.Length > 500 || state.Commands.Length > 16) throw new InvalidDataException("Invalid experimental snapshot.");
         var ids = state.Units.Select(body => body.Id).ToHashSet();
@@ -35,6 +35,7 @@ internal static class RouteSnapshotValidation
                 throw new InvalidDataException("Invalid member state.");
             if (body.Connection is { } connection && (body.Task == 0 || connection.Points is null
                 || connection.Points.Count is < 2 or > 257 || connection.Next < 0 || connection.Next >= connection.Points.Count
+                || connection.TransitQuarters is < 0 or > 4 || connection.TransitQuarters > body.TransitQuarters
                 || connection.Points.Any(point => !Point(point)) || !Point(connection.Target)
                 || connection.Points[^1] != connection.Target || connection.Version < 1 || connection.Cursor < 0
                 || (connection.Target - connection.Points[0]).Length > 256))

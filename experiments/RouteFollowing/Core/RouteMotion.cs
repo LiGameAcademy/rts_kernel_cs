@@ -19,7 +19,7 @@ internal static class RouteMotion
             var cached = source.Connection is { } connection && connection.Version == route.Version
                 && connection.Next < connection.Points.Count ? connection : null;
             var (body, target, quarter) = cached is null ? RoutePlanning.Follow(world, source with { Connection = null }, route)
-                : (source, cached.Target, source.TransitQuarters);
+                : (source, cached.Target, cached.TransitQuarters);
             var direct = cached?.Points ?? StraightMovePath.TryFind(world.Navigation, body.Position, target, 1);
             if (direct is null)
             {
@@ -110,8 +110,8 @@ internal static class RouteMotion
                 || body.Id == waiting.Blocker)).ToArray();
         if (waiting.Blocker is { } blockedBy && world.Bodies[blockedBy].Task == task.Id)
         {
-            var (following, target, _) = RoutePlanning.Follow(world, waiting, task);
-            var local = RouteConnections.Find(world, waiting, target);
+            var (following, target, quarter) = RoutePlanning.Follow(world, waiting, task);
+            var local = RouteConnections.Find(world, following, target, quarter);
             var attempts = waiting.Recoveries + 1;
             if (attempts > RouteSettings.RecoveryLimit)
             {

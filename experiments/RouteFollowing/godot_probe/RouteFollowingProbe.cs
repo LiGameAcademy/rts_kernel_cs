@@ -41,7 +41,7 @@ public partial class RouteFollowingProbe : Node2D
         prepare.Stop();
         GD.Print($"[Route preparation] elapsed_ms={prepare.Elapsed.TotalMilliseconds:R}");
         Reset(4);
-        GD.Print("[Route prototype] independent experimental world; production RtsMatch/v14 unchanged");
+        GD.Print($"[Route prototype] snapshot_format={RouteSettings.SnapshotFormat}; independent experimental world; production RtsMatch/v14 unchanged");
     }
 
     private void Reset(int scenario)

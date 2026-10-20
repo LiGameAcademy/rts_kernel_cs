@@ -16,7 +16,7 @@ internal static class RouteInwardChecks
         Check(Quarter(upper, 10) < 4 && upper.Units.Single(body => body.Id == 10).Position != before[10].Position,
             "upper traffic front takes a safe inward step");
         Check(Quarter(upper, 3) < 4, "inner traffic front contracts on the same reference point");
-        Check(JsonNode.Parse(upper.Save())!["Format"]!.GetValue<int>() == 2, "experimental format covers inward state");
+        Check(JsonNode.Parse(upper.Save())!["Format"]!.GetValue<int>() == 3, "experimental format covers inward state");
         Safe(before, upper);
         var lower = Fixture(47);
         lower.Step();
@@ -25,12 +25,15 @@ internal static class RouteInwardChecks
         Lifecycle(upper);
         Corrupt(upper, -1);
         Corrupt(upper, 5);
-        var legacy = JsonNode.Parse(upper.Save())!;
-        legacy["Format"] = 1;
-        var rejected = false;
-        try { RouteWorld.Load(legacy.ToJsonString()); }
-        catch (InvalidDataException) { rejected = true; }
-        Check(rejected, "old experimental format is not silently accepted");
+        foreach (var format in new[] { 1, 2 })
+        {
+            var legacy = JsonNode.Parse(upper.Save())!;
+            legacy["Format"] = format;
+            var rejected = false;
+            try { RouteWorld.Load(legacy.ToJsonString()); }
+            catch (InvalidDataException) { rejected = true; }
+            Check(rejected, "old experimental format is not silently accepted");
+        }
     }
 
     private static void Continuation(RouteWorld initial)
@@ -47,6 +50,10 @@ internal static class RouteInwardChecks
             foreach (var body in first.Units)
                 if (body.Task != 0 && body.Task == before[body.Id].Task)
                     Check(Quarter(first, body.Id) <= quarters[body.Id], "same task never expands its transit offset");
+            foreach (var body in first.Units)
+                if (body.Connection is { } connection)
+                    Check(connection.TransitQuarters is >= 0 and <= 4
+                        && connection.TransitQuarters <= Quarter(first, body.Id), "connection preserves a permitted inward cap");
             Safe(before, first);
         }
     }

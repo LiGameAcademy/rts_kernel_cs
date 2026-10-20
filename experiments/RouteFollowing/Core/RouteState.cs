@@ -2,7 +2,7 @@ namespace Rts.Movement.Prototype;
 
 public enum WalkPhase { Idle, Following, Waiting, Settled, Stopped, Failed }
 public sealed record QueuedGoal(ulong Task, FixedVector2 Preference, FixedVector2 Offset);
-public sealed record RouteConnection(FixedVector2 Target, int Cursor, int Version, IReadOnlyList<FixedVector2> Points, int Next = 0);
+public sealed record RouteConnection(FixedVector2 Target, int Cursor, int Version, IReadOnlyList<FixedVector2> Points, int Next = 0, int TransitQuarters = 4);
 public sealed record Walker(ulong Id, FixedVector2 Position, SimScalar Facing, WalkPhase Phase,
     ulong Task, int Cursor, FixedVector2 Preference, FixedVector2 Endpoint, FixedVector2 Offset,
     long WaitTicks, long RetryAtWait, int Recoveries, SimScalar BestRemaining, int RouteVersion,
@@ -18,6 +18,7 @@ public sealed record RouteSnapshot(int Format, int Width, int Height, byte[] Fla
 /// <summary>Experimental defaults, explicitly separate from production gameplay and v14 snapshots.</summary>
 public static class RouteSettings
 {
+    public const int SnapshotFormat = 3;
     public const int TickRate = 30;
     public const int WaitBeforeRetry = 90;
     public const int RecoveryLimit = 3;

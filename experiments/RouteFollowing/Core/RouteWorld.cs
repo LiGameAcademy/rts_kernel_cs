@@ -156,7 +156,7 @@ public sealed class RouteWorld
     public IReadOnlyList<RouteEvent> Events => _events.ToArray();
     private static Walker Copy(Walker body) => body with { Pending = body.Pending.ToArray(),
         Connection = body.Connection is { } connection ? connection with { Points = connection.Points.ToArray() } : null };
-    public string Save() => JsonSerializer.Serialize(new RouteSnapshot(2, Width, Height, Flags.ToArray(), Frame,
+    public string Save() => JsonSerializer.Serialize(new RouteSnapshot(RouteSettings.SnapshotFormat, Width, Height, Flags.ToArray(), Frame,
         _nextUnit, NextTask, _eventSequence, Revision, Bodies.Values.Select(Copy).ToArray(),
         Routes.Values.Select(route => route with { Points = route.Points.ToArray() }).ToArray(), _commands.ToArray()));
     public string Hash() => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Save())));
