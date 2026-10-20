@@ -51,6 +51,45 @@ internal static class RoutePlacements
         return true;
     }
 
+    internal static bool TryBeginYield(RouteWorld world, Walker requester, ulong[] members, FixedVector2[] goals)
+    {
+        var task = world.Routes[requester.Task];
+        if (requester.Recoveries >= RouteSettings.RecoveryLimit || task.Yield is not null || members.Length is < 1 or > 2 || goals.Length != members.Length
+            || members.Distinct().Count() != members.Length || requester.Blocker != members[^1]
+            || members.Any(id => !world.Bodies.TryGetValue(id, out var body) || !RouteYielding.Eligible(body, task.Id))) return false;
+        var root = world.Bodies[members[^1]];
+        if (!CrowdGeometry.Overlap(requester.Position, requester.Endpoint, 31, root.Position, root.Position, 31)
+            || CrowdGeometry.Overlap(requester.Position, requester.Endpoint, 31, goals[^1], goals[^1], 31)) return false;
+        var claims = Claims(world.Bodies.Values);
+        var positions = world.Bodies.Values.ToDictionary(body => body.Id, body => body.Position);
+        for (var i = 0; i < members.Length; i++)
+        {
+            var body = world.Bodies[members[i]];
+            var goal = goals[i];
+            if ((goal - body.Preference).Length > 156 || (goal - body.Position).Length < 1
+                || !world.Navigation.CanStandAt(goal, 31)
+                || claims.Any(claim => claim.Task == task.Id && !members.Contains(claim.Member) && (goal - claim.Point).Length < 64)
+                || goals.Take(i).Any(other => (other - goal).Length < 64)
+                || positions.Any(other => other.Key != body.Id && (other.Value - goal).Length < 64)
+                || StraightMovePath.TryFind(world.Navigation, body.Position, goal, 1) is null
+                || positions.Any(other => other.Key != body.Id
+                    && CrowdGeometry.Overlap(body.Position, goal, 31, other.Value, other.Value, 31))) return false;
+            positions[body.Id] = goal;
+        }
+        // All reservations are validated before any authoritative goal changes.
+        for (var i = 0; i < members.Length; i++)
+        {
+            var body = world.Bodies[members[i]];
+            world.Bodies[body.Id] = body with { Endpoint = goals[i], Connection = null, Blocker = null, Velocity = default,
+                Phase = i == 0 ? WalkPhase.Yielding : WalkPhase.Settled, PlacementCheckedRevision = -1 };
+        }
+        world.Routes[task.Id] = task with { Yield = new(requester.Id, members.ToArray(), 0, world.Revision, world.Frame) };
+        world.Bodies[requester.Id] = requester with { RetryAtWait = requester.WaitTicks + 90, Recoveries = requester.Recoveries + 1 };
+        world.Publish(requester.Id, "yield_started", string.Join(",", members));
+        world.Publish(members[0], "yield_leg_started");
+        return true;
+    }
+
     internal static void Refresh(RouteWorld world)
     {
         var claims = Claims(world.Bodies.Values);

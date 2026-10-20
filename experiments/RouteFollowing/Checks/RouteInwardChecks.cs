@@ -15,7 +15,7 @@ internal static class RouteInwardChecks
         upper.Step();
         Check(upper.Units.Any(body => body.Position != before[body.Id].Position),
             "upper frozen entrance produces safe movement with the corrected reference");
-        Check(JsonNode.Parse(upper.Save())!["Format"]!.GetValue<int>() == 5, "experimental format covers inward state");
+        Check(JsonNode.Parse(upper.Save())!["Format"]!.GetValue<int>() == 6, "experimental format covers inward state");
         Safe(before, upper);
         var lower = Fixture(47);
         lower.Step();
@@ -24,7 +24,7 @@ internal static class RouteInwardChecks
         Lifecycle(upper);
         Corrupt(upper, -1);
         Corrupt(upper, 5);
-        foreach (var format in new[] { 1, 2, 3, 4 })
+        foreach (var format in new[] { 1, 2, 3, 4, 5 })
         {
             var legacy = JsonNode.Parse(upper.Save())!;
             legacy["Format"] = format;

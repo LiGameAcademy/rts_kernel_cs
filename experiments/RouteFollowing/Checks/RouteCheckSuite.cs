@@ -15,9 +15,11 @@ public static class RouteCheckSuite
         var beforePreparation = authority.Save();
         var preparation = Stopwatch.StartNew();
         RoutePreparation.Run();
+        RouteYieldChecks.Warmup();
         preparation.Stop();
         if (authority.Save() != beforePreparation) throw new Exception("Preparation changed authority.");
         output($"route_prepare_ms={preparation.Elapsed.TotalMilliseconds:R} authority_unchanged=true");
+        RouteYieldChecks.Run(output); // Hard gate: do not run the full scenarios after a frozen failure.
         var passed = true;
         foreach (var scenario in new[] { 1, 2, 3, 4, 5 }) passed &= Scenario(scenario, output);
         RoutePlacementChecks.Run();

@@ -139,7 +139,7 @@ internal static class RoutePlacementChecks
         json = JsonNode.Parse(world.Save())!;
         json["Units"]![0]!["Endpoint"]!["X"] = SimScalar.FromInteger(400).Raw;
         Reject(json, "goal outside original envelope rejected");
-        foreach (var format in new[] { 1, 2, 3, 4 })
+        foreach (var format in new[] { 1, 2, 3, 4, 5 })
         {
             json = JsonNode.Parse(world.Save())!;
             json["Format"] = format;

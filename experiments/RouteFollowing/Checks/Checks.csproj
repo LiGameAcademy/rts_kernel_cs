@@ -4,5 +4,7 @@
     <EmbeddedResource Include="Fixtures/narrow-entry-120.json" LogicalName="narrow-entry-120.json" />
     <EmbeddedResource Include="Fixtures/reference-entry-399.json" LogicalName="reference-entry-399.json" />
     <EmbeddedResource Include="Fixtures/reference-progress-789.json" LogicalName="reference-progress-789.json" />
+    <EmbeddedResource Include="Fixtures/yield-single-329.json" LogicalName="yield-single-329.json" />
+    <EmbeddedResource Include="Fixtures/yield-pair-444.json" LogicalName="yield-pair-444.json" />
   </ItemGroup>
 </Project>

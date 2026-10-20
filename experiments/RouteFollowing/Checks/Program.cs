@@ -3,7 +3,19 @@ using System.Text.Json;
 
 try
 {
-    if (args.Contains("--placement-checks")) RoutePlacementChecks.Run();
+    if (args.Contains("--yield-checks"))
+    {
+        var untouched = RouteYieldChecks.Load("yield-single-329.json");
+        var before = untouched.Save();
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        RoutePreparation.Run();
+        RouteYieldChecks.Warmup();
+        timer.Stop();
+        if (untouched.Save() != before) throw new Exception("Yield preparation changed authority.");
+        Console.WriteLine($"yield_prepare_ms={timer.Elapsed.TotalMilliseconds:R} authority_unchanged=true");
+        RouteYieldChecks.Run();
+    }
+    else if (args.Contains("--placement-checks")) RoutePlacementChecks.Run();
     else if (args.Contains("--reference-checks")) RouteReferenceChecks.Run();
     else if (args.Contains("--inward-checks")) RouteInwardChecks.Run();
     else if (args.Contains("--diagnose"))

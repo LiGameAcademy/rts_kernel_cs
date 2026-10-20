@@ -13,12 +13,13 @@ internal static class RouteMotion
             reservations.Put(CrowdBody.Stationary(new(body.Id), 31, body.Position));
         var proposals = new List<Proposal>();
         foreach (var source in world.Bodies.Values.Where(body => body.Task != 0
-            && body.Phase is WalkPhase.Following or WalkPhase.Waiting).ToArray())
+            && body.Phase is WalkPhase.Following or WalkPhase.Waiting or WalkPhase.Yielding).ToArray())
         {
             var route = world.Routes[source.Task];
             var cached = source.Connection is { } connection && connection.Version == route.Version
                 && connection.Next < connection.Points.Count ? connection : null;
-            var (body, target, quarter) = cached is null ? RoutePlanning.Follow(world, source with { Connection = null }, route)
+            var (body, target, quarter) = source.Phase == WalkPhase.Yielding ? (source, source.Endpoint, source.TransitQuarters)
+                : cached is null ? RoutePlanning.Follow(world, source with { Connection = null }, route)
                 : (source, cached.Target, cached.TransitQuarters);
             var direct = cached?.Points ?? StraightMovePath.TryFind(world.Navigation, body.Position, target, 1);
             if (direct is null)
@@ -63,11 +64,11 @@ internal static class RouteMotion
             var updated = body with { Position = blocked ? body.Position : step.Position, Facing = step.Facing,
                 TransitQuarters = moved ? quarter : body.TransitQuarters,
                 Velocity = moved ? (step.Position - body.Position) * 30 : default,
-                Phase = moved ? WalkPhase.Following : WalkPhase.Waiting, Blocker = blocker?.Value,
+                Phase = body.Phase == WalkPhase.Yielding ? WalkPhase.Yielding : moved ? WalkPhase.Following : WalkPhase.Waiting, Blocker = blocker?.Value,
                 WaitTicks = body.WaitTicks + (moved ? 0 : 1),
                 Connection = blocked || step.NextWaypoint >= (body.Connection?.Points.Count ?? 0) ? null
                     : body.Connection! with { Next = step.NextWaypoint } };
-            updated = RouteProgress.Measure(body, updated, world.Routes[body.Task]);
+            if (body.Phase != WalkPhase.Yielding) updated = RouteProgress.Measure(body, updated, world.Routes[body.Task]);
             if (!blocked && proposal.Final && step.Position == body.Endpoint)
                 updated = updated with { Phase = WalkPhase.Settled, Velocity = default, Blocker = null };
             world.Bodies[body.Id] = updated;
@@ -95,9 +96,11 @@ internal static class RouteMotion
     private static void RetryOne(RouteWorld world)
     {
         var waiting = world.Bodies.Values.Where(body => body.Task != 0 && body.Phase is WalkPhase.Waiting or WalkPhase.Following
+            && world.Routes[body.Task].Yield is null
             && (body.WaitTicks >= body.RetryAtWait || world.Routes[body.Task].MapRevision != world.Revision))
             .OrderBy(body => body.Id).FirstOrDefault();
         if (waiting is null) return;
+        if (RouteYielding.TryStart(world, waiting)) return;
         var task = world.Routes[waiting.Task];
         var blockers = world.Bodies.Values.Where(body => body.Task != task.Id && body.Id != waiting.Id
             && (body.Phase is WalkPhase.Stopped or WalkPhase.Idle or WalkPhase.Settled

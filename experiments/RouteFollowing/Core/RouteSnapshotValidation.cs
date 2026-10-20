@@ -36,7 +36,7 @@ internal static class RouteSnapshotValidation
                 || body.ProgressVersion == 0 && (body.ProgressCursor != 0 || body.Progress != 0)
                 || body.Task == 0 && (body.Progress != 0 || body.ProgressCursor != 0 || body.ProgressVersion != 0)
                 || !SimulationDomain.Contains(body.Facing) || body.Facing < -SimMath.Pi || body.Facing >= SimMath.Pi
-                || body.Task == 0 && body.Phase is WalkPhase.Following or WalkPhase.Waiting or WalkPhase.Settled
+                || body.Task == 0 && body.Phase is WalkPhase.Following or WalkPhase.Waiting or WalkPhase.Settled or WalkPhase.Yielding
                 || body.Task != 0 && body.Phase is WalkPhase.Idle or WalkPhase.Stopped or WalkPhase.Failed || body.Blocker is { } blocker && (!ids.Contains(blocker) || blocker == body.Id)
                 || body.Task != 0 && (!tasks.Contains(body.Task)
                     || body.RouteVersion == state.Tasks.Single(task => task.Id == body.Task).Version
@@ -59,6 +59,23 @@ internal static class RouteSnapshotValidation
                 || (connection.Target - connection.Points[0]).Length > 256))
                 throw new InvalidDataException("Invalid bounded connection.");
         }
+        foreach (var task in state.Tasks.Where(task => task.Yield is not null))
+        {
+            var plan = task.Yield!;
+            if (plan.Members is null || plan.Members.Count is < 1 or > 2 || plan.Members.Distinct().Count() != plan.Members.Count
+                || plan.Next < 0 || plan.Next >= plan.Members.Count || plan.StartedAt < 0 || plan.StartedAt > state.Frame
+                || plan.MapRevision < 0 || plan.MapRevision > state.MapRevision || !ids.Contains(plan.Requester)
+                || plan.Members.Contains(plan.Requester) || state.Units.Single(b => b.Id == plan.Requester).Task != task.Id
+                || state.Units.Single(b => b.Id == plan.Requester).Phase is not (WalkPhase.Following or WalkPhase.Waiting)
+                || plan.Members.Any(id => !ids.Contains(id) || state.Units.Single(b => b.Id == id).Task != task.Id
+                    || state.Units.Single(b => b.Id == id).Pending.Count != 0)
+                || plan.Members.Where((id, index) => index == plan.Next).Any(id => state.Units.Single(b => b.Id == id).Phase != WalkPhase.Yielding)
+                || plan.Members.Where((id, index) => index != plan.Next).Any(id => state.Units.Single(b => b.Id == id).Phase != WalkPhase.Settled))
+                throw new InvalidDataException("Invalid bounded yield plan.");
+        }
+        foreach (var body in state.Units.Where(body => body.Phase == WalkPhase.Yielding))
+            if (!state.Tasks.Any(task => task.Id == body.Task && task.Yield is { } plan && plan.Members[plan.Next] == body.Id))
+                throw new InvalidDataException("Yielding member has no owner.");
         foreach (var group in RoutePlacements.Claims(state.Units).GroupBy(claim => claim.Task))
         {
             var claims = group.ToArray();

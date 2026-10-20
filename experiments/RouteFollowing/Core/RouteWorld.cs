@@ -22,9 +22,10 @@ public sealed class RouteWorld
     public int Width { get; }
     public int Height { get; }
     public IReadOnlyList<Walker> Units => Bodies.Values.Select(Copy).ToArray();
-    public IReadOnlyList<RouteTask> Paths => Routes.Values.Select(route => route with { Points = route.Points.ToArray(), Corners = route.Corners.ToArray() }).ToArray();
+    public IReadOnlyList<RouteTask> Paths => Routes.Values.Select(route => route with { Points = route.Points.ToArray(), Corners = route.Corners.ToArray(), Yield = CopyYield(route.Yield) }).ToArray();
     public byte[] ReadFlags() => Flags.ToArray();
     public FixedVector2 FollowTarget(ulong id) => Bodies[id].Task == 0 ? Bodies[id].Position
+        : Bodies[id].Phase == WalkPhase.Yielding ? Bodies[id].Endpoint
         : RoutePlanning.Follow(this, Bodies[id], Routes[Bodies[id].Task]).Target;
 
     public RouteWorld(int width = 64, int height = 40, byte[]? flags = null)
@@ -97,13 +98,15 @@ public sealed class RouteWorld
                 var next = body.Pending[0];
                 Bodies[body.Id] = Activate(body with { Pending = body.Pending.Skip(1).ToArray() }, next);
             }
+        RouteYielding.Reconcile(this);
         var fixedBeforeMotion = RoutePlacements.FixedBodies(this);
         if (!fixedBeforeCommands.SequenceEqual(fixedBeforeMotion)) PlacementRevision++;
         RoutePlacements.Refresh(this);
         RouteMotion.Advance(this);
+        RouteYielding.Reconcile(this);
         foreach (var group in Bodies.Values.Where(body => body.Task != 0).GroupBy(body => body.Task).ToArray())
         {
-            var allSettled = group.All(body => body.Phase == WalkPhase.Settled);
+            var allSettled = Routes[group.Key].Yield is null && group.All(body => body.Phase == WalkPhase.Settled);
             foreach (var body in group)
                 if (body.Phase == WalkPhase.Settled && (allSettled || body.Pending.Count > 0))
                 {
@@ -164,11 +167,13 @@ public sealed class RouteWorld
     internal void Publish(ulong id, string kind, string detail = "") =>
         _events.Add(new(Frame, _eventSequence++, id, kind, detail));
     public IReadOnlyList<RouteEvent> Events => _events.ToArray();
+    private static RouteYieldPlan? CopyYield(RouteYieldPlan? plan) => plan is null ? null
+        : plan with { Members = plan.Members.ToArray() };
     private static Walker Copy(Walker body) => body with { Pending = body.Pending.ToArray(),
         Connection = body.Connection is { } connection ? connection with { Points = connection.Points.ToArray() } : null };
     public string Save() => JsonSerializer.Serialize(new RouteSnapshot(RouteSettings.SnapshotFormat, Width, Height, Flags.ToArray(), Frame,
         _nextUnit, NextTask, _eventSequence, Revision, Bodies.Values.Select(Copy).ToArray(),
-        Routes.Values.Select(route => route with { Points = route.Points.ToArray(), Corners = route.Corners.ToArray() }).ToArray(), _commands.ToArray(), PlacementRevision));
+        Routes.Values.Select(route => route with { Points = route.Points.ToArray(), Corners = route.Corners.ToArray(), Yield = CopyYield(route.Yield) }).ToArray(), _commands.ToArray(), PlacementRevision));
     public string Hash() => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Save())));
 
     public static RouteWorld Load(string json)
@@ -180,7 +185,7 @@ public sealed class RouteWorld
             Frame = state.Frame, _nextUnit = state.NextUnit, NextTask = state.NextTask,
             _eventSequence = state.EventSequence, Revision = state.MapRevision, PlacementRevision = state.PlacementRevision
         };
-        foreach (var route in state.Tasks) world.Routes.Add(route.Id, route with { Points = route.Points.ToArray(), Corners = route.Corners.ToArray() });
+        foreach (var route in state.Tasks) world.Routes.Add(route.Id, route with { Points = route.Points.ToArray(), Corners = route.Corners.ToArray(), Yield = CopyYield(route.Yield) });
         foreach (var body in state.Units) world.Bodies.Add(body.Id, Copy(body));
         foreach (var command in state.Commands) world._commands.Enqueue(command with { Members = command.Members.ToArray() });
         if (world.Bodies.Values.Any(body => !world.Navigation.CanStandAt(body.Position, RouteSettings.Radius)))
