@@ -6,7 +6,7 @@ public sealed record RouteConnection(FixedVector2 Target, int Cursor, int Versio
 public sealed record Walker(ulong Id, FixedVector2 Position, SimScalar Facing, WalkPhase Phase,
     ulong Task, int Cursor, FixedVector2 Preference, FixedVector2 Endpoint, FixedVector2 Offset,
     long WaitTicks, long RetryAtWait, int Recoveries, SimScalar BestRemaining, int RouteVersion,
-    ulong? Blocker, FixedVector2 Velocity, IReadOnlyList<QueuedGoal> Pending, ulong RecentGroup = 0, RouteConnection? Connection = null);
+    ulong? Blocker, FixedVector2 Velocity, IReadOnlyList<QueuedGoal> Pending, ulong RecentGroup = 0, RouteConnection? Connection = null, int TransitQuarters = 4);
 public sealed record RouteTask(ulong Id, FixedVector2 Anchor, IReadOnlyList<FixedVector2> Points,
     int Version, int MapRevision);
 public sealed record RouteCommand(bool Stop, IReadOnlyList<ulong> Members, FixedVector2 Goal, bool Append);

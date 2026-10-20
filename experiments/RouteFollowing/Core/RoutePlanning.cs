@@ -83,29 +83,30 @@ internal static class RoutePlanning
         return true;
     }
 
-    internal static (Walker Body, FixedVector2 Target) Follow(RouteWorld world, Walker body, RouteTask route)
+    internal static (Walker Body, FixedVector2 Target, int Quarter) Follow(RouteWorld world, Walker body, RouteTask route)
     {
+        var offset = RouteContraction.Offset(body);
         var sameVersion = body.RouteVersion == route.Version;
         var cursor = sameVersion ? body.Cursor : route.Points.Select((point, index) => (point, index))
-            .OrderBy(item => (item.point + body.Offset - body.Position).Length).ThenBy(item => item.index)
+            .OrderBy(item => (item.point + offset - body.Position).Length).ThenBy(item => item.index)
             .First().index;
         if (!sameVersion) body = body with { BestRemaining = SimScalar.MaxValue };
         if (cursor < route.Points.Count - 1
-            && (body.Position - (route.Points[cursor] + body.Offset)).Length <= 9) cursor++;
+            && (body.Position - (route.Points[cursor] + offset)).Length <= 9) cursor++;
         var best = cursor;
-        var target = route.Points[Math.Min(cursor, route.Points.Count - 1)];
+        var target = route.Points[Math.Min(cursor, route.Points.Count - 1)] + offset;
+        var selectedQuarter = body.TransitQuarters;
         // Look ahead on the shared reference, never on the previous connection's bend list.
         for (var i = cursor; i < route.Points.Count; i++)
         {
-            var candidate = route.Points[i] + body.Offset;
-            foreach (var fraction in new SimScalar[] { 1, SimScalar.FromRatio(3, 4), SimScalar.FromRatio(1, 2),
-                SimScalar.FromRatio(1, 4), 0 })
+            for (var quarter = body.TransitQuarters; quarter >= 0; quarter--)
             {
-                candidate = route.Points[i] + body.Offset * fraction;
+                var candidate = route.Points[i] + body.Offset * SimScalar.FromRatio(quarter, 4);
                 if ((candidate - body.Position).Length > 192) continue;
                 if (StraightMovePath.TryFind(world.Navigation, body.Position, candidate, 1) is null) continue;
                 best = i;
                 target = candidate;
+                selectedQuarter = quarter;
                 break;
             }
             // A reference bend represents a corridor decision, including a temporary body
@@ -130,7 +131,7 @@ internal static class RoutePlanning
             }
         }
         body = body with { Cursor = best, RouteVersion = route.Version };
-        return (body, target);
+        return (body, target, selectedQuarter);
     }
 
     internal static bool EndpointFree(RouteWorld world, Walker body, FixedVector2 point) =>

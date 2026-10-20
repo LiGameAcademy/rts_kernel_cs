@@ -18,6 +18,8 @@ public static class RouteCheckSuite
         output($"route_prepare_ms={preparation.Elapsed.TotalMilliseconds:R} authority_unchanged=true");
         var passed = true;
         foreach (var scenario in new[] { 1, 2, 3, 4, 5 }) passed &= Scenario(scenario, output);
+        RouteInwardChecks.Run();
+        output("route_inward_boundaries=PASS");
         RouteBoundaryChecks.Run();
         output("route_boundaries=PASS");
         output("route_suite=" + (passed ? "PASS" : "FAIL"));
@@ -62,7 +64,8 @@ public static class RouteCheckSuite
             if (ticks > 125 && after.All(body => body.Task == 0)) break;
         }
         var settled = world.Units.ToArray();
-        for (var idle = 0; idle < 90; idle++)
+        var stableFrames = world.Units.All(body => body.Task == 0) ? 90 : 0;
+        for (var idle = 0; idle < stableFrames; idle++)
         {
             world.Step();
             Check(settled.SequenceEqual(world.Units), "finished/failed units stay still");
@@ -72,8 +75,9 @@ public static class RouteCheckSuite
             && world.Units[1].Phase == WalkPhase.Stopped, "Stop remains stationary");
         foreach (var frame in frames) output("route_tick=" + JsonSerializer.Serialize(frame));
         var pass = failed == 0 && world.Units.All(body => body.Task == 0) && overBudget == 0;
-        output("route_result=" + JsonSerializer.Serialize(new { scenario, frames = ticks + 1,
-            failed, completed, active = world.Units.Count(body => body.Task != 0), peak_ms = peak,
+        output("route_result=" + JsonSerializer.Serialize(new { scenario, frames = frames.Count, stable_frames = stableFrames,
+            failed, completed, active = world.Units.Count(body => body.Task != 0),
+            settled = world.Units.Count(body => body.Phase == WalkPhase.Settled), peak_ms = peak,
             over_budget = overBudget, passed = pass, hash = world.Hash() }));
         return pass;
     }

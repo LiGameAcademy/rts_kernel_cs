@@ -100,7 +100,7 @@ public sealed class RouteWorld
             foreach (var body in group)
                 if (body.Phase == WalkPhase.Settled && (allSettled || body.Pending.Count > 0))
                 {
-                    Bodies[body.Id] = body with { Task = 0, Phase = WalkPhase.Idle, Velocity = default, Blocker = null };
+                    Bodies[body.Id] = body with { Task = 0, Phase = WalkPhase.Idle, Velocity = default, Blocker = null, TransitQuarters = 4 };
                     Publish(body.Id, "completed");
                 }
         }
@@ -117,7 +117,7 @@ public sealed class RouteWorld
             {
                 var body = Bodies[id];
                 Bodies[id] = body with { Task = 0, Phase = WalkPhase.Stopped, Pending = [], Velocity = default,
-                    Blocker = null, WaitTicks = 0, Recoveries = 0, RecentGroup = 0, Connection = null };
+                    Blocker = null, WaitTicks = 0, Recoveries = 0, RecentGroup = 0, Connection = null, TransitQuarters = 4 };
                 Publish(id, "stopped");
             }
             return;
@@ -148,7 +148,7 @@ public sealed class RouteWorld
         Task = intent.Task, Preference = intent.Preference, Endpoint = intent.Preference, Offset = intent.Offset,
         Cursor = 0, Phase = WalkPhase.Following, WaitTicks = 0, RetryAtWait = 90, Recoveries = 0,
         BestRemaining = SimScalar.MaxValue, RouteVersion = 0, Blocker = null, Velocity = default,
-        RecentGroup = body.Task != 0 ? body.Task : body.RecentGroup, Connection = null
+        RecentGroup = body.Task != 0 ? body.Task : body.RecentGroup, Connection = null, TransitQuarters = 4
     };
 
     internal void Publish(ulong id, string kind, string detail = "") =>
@@ -156,7 +156,7 @@ public sealed class RouteWorld
     public IReadOnlyList<RouteEvent> Events => _events.ToArray();
     private static Walker Copy(Walker body) => body with { Pending = body.Pending.ToArray(),
         Connection = body.Connection is { } connection ? connection with { Points = connection.Points.ToArray() } : null };
-    public string Save() => JsonSerializer.Serialize(new RouteSnapshot(1, Width, Height, Flags.ToArray(), Frame,
+    public string Save() => JsonSerializer.Serialize(new RouteSnapshot(2, Width, Height, Flags.ToArray(), Frame,
         _nextUnit, NextTask, _eventSequence, Revision, Bodies.Values.Select(Copy).ToArray(),
         Routes.Values.Select(route => route with { Points = route.Points.ToArray() }).ToArray(), _commands.ToArray()));
     public string Hash() => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Save())));

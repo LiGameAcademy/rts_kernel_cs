@@ -3,7 +3,7 @@ namespace Rts.Movement.Prototype;
 /// <summary>Time-aligned safety arbitration never supplies a new authoritative route.</summary>
 internal static class RouteMotion
 {
-    private sealed record Proposal(Walker Body, MovementStep Step, bool Final);
+    private sealed record Proposal(Walker Body, MovementStep Step, bool Final, int Quarter);
 
     internal static void Advance(RouteWorld world)
     {
@@ -18,8 +18,8 @@ internal static class RouteMotion
             var route = world.Routes[source.Task];
             var cached = source.Connection is { } connection && connection.Version == route.Version
                 && connection.Next < connection.Points.Count ? connection : null;
-            var (body, target) = cached is null ? RoutePlanning.Follow(world, source with { Connection = null }, route)
-                : (source, cached.Target);
+            var (body, target, quarter) = cached is null ? RoutePlanning.Follow(world, source with { Connection = null }, route)
+                : (source, cached.Target, source.TransitQuarters);
             var direct = cached?.Points ?? StraightMovePath.TryFind(world.Navigation, body.Position, target, 1);
             if (direct is null)
             {
@@ -31,7 +31,7 @@ internal static class RouteMotion
                 : MovementStepper.Compute(new(new(body.Id), 0, body.Position, body.Velocity, body.Facing),
                     new(new(target, RouteSettings.Speed, 1, RouteSettings.Motion), direct, cached?.Next ?? 0), 30, null);
             var final = target == body.Endpoint;
-            proposals.Add(new(body, step, final));
+            proposals.Add(new(body, step, final, quarter));
             reservations.Put(new(new(body.Id), 31, step.Trace, step.Times));
         }
         var held = CrowdMotionResolver.Resolve(reservations, proposals.Select(item => new EntityId(item.Body.Id)).ToArray());
@@ -39,6 +39,7 @@ internal static class RouteMotion
         {
             var body = proposal.Body;
             var step = proposal.Step;
+            var quarter = proposal.Quarter;
             var original = new CrowdBody(new(body.Id), 31, step.Trace, step.Times);
             var blocked = held.Contains(new(body.Id));
             // Revalidate an ephemeral hold against current reservations, never use it to choose a detour.
@@ -49,7 +50,18 @@ internal static class RouteMotion
             }
             var moved = !blocked && step.Position != body.Position;
             var blocker = blocked ? reservations.FirstMotionConflict(original) : null;
+            if (blocked && !proposal.Final && RouteContraction.TryStep(world, body, quarter, blocker, reservations,
+                out var inwardBody, out var inwardStep))
+            {
+                body = inwardBody;
+                step = inwardStep;
+                quarter = body.TransitQuarters;
+                blocked = false;
+                blocker = null;
+                moved = true;
+            }
             var updated = body with { Position = blocked ? body.Position : step.Position, Facing = step.Facing,
+                TransitQuarters = moved ? quarter : body.TransitQuarters,
                 Velocity = moved ? (step.Position - body.Position) * 30 : default,
                 Phase = moved ? WalkPhase.Following : WalkPhase.Waiting, Blocker = blocker?.Value,
                 WaitTicks = body.WaitTicks + (moved ? 0 : 1),
@@ -98,13 +110,13 @@ internal static class RouteMotion
                 || body.Id == waiting.Blocker)).ToArray();
         if (waiting.Blocker is { } blockedBy && world.Bodies[blockedBy].Task == task.Id)
         {
-            var (following, target) = RoutePlanning.Follow(world, waiting, task);
+            var (following, target, _) = RoutePlanning.Follow(world, waiting, task);
             var local = RouteConnections.Find(world, waiting, target);
             var attempts = waiting.Recoveries + 1;
             if (attempts > RouteSettings.RecoveryLimit)
             {
                 world.Bodies[waiting.Id] = waiting with { Task = 0, Phase = WalkPhase.Failed,
-                    Velocity = default, Blocker = null, Connection = null };
+                    Velocity = default, Blocker = null, Connection = null, TransitQuarters = 4 };
                 world.Publish(waiting.Id, "failed", "no_connection_progress");
             }
             else
@@ -123,7 +135,7 @@ internal static class RouteMotion
         if (recoveries > RouteSettings.RecoveryLimit)
         {
             world.Bodies[waiting.Id] = waiting with { Task = 0, Phase = WalkPhase.Failed,
-                Velocity = default, Blocker = null };
+                Velocity = default, Blocker = null, TransitQuarters = 4 };
             world.Publish(waiting.Id, "failed", "no_reference_progress");
         }
         else world.Bodies[waiting.Id] = waiting with { Recoveries = recoveries,

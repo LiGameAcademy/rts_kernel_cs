@@ -4,7 +4,7 @@ internal static class RouteSnapshotValidation
 {
     internal static void Validate(RouteSnapshot state)
     {
-        if (state.Format != 1 || state.Frame < 0 || state.EventSequence < 0 || state.MapRevision < 0
+        if (state.Format != 2 || state.Frame < 0 || state.EventSequence < 0 || state.MapRevision < 0
             || state.Units is null || state.Tasks is null || state.Commands is null || state.Flags is null
             || state.Units.Length > 500 || state.Commands.Length > 16) throw new InvalidDataException("Invalid experimental snapshot.");
         var ids = state.Units.Select(body => body.Id).ToHashSet();
@@ -23,6 +23,7 @@ internal static class RouteSnapshotValidation
             if (!Point(body.Position) || !Point(body.Preference) || !Point(body.Endpoint) || !Point(body.Offset)
                 || !Point(body.Velocity) || !Enum.IsDefined(body.Phase) || body.Pending is null || body.Pending.Count > 8
                 || body.WaitTicks < 0 || body.RetryAtWait < 0 || body.Recoveries < 0 || body.Recoveries > 4
+                || body.TransitQuarters is < 0 or > 4 || body.Task == 0 && body.TransitQuarters != 4
                 || body.Cursor is < 0 or > 16384 || body.RouteVersion < 0
                 || !SimulationDomain.Contains(body.Facing) || body.Facing < -SimMath.Pi || body.Facing >= SimMath.Pi
                 || body.Task == 0 && body.Phase is WalkPhase.Following or WalkPhase.Waiting or WalkPhase.Settled

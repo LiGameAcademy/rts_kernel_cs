@@ -40,7 +40,7 @@ public partial class RouteFollowingProbe : Node2D
         RoutePreparation.Run();
         prepare.Stop();
         GD.Print($"[Route preparation] elapsed_ms={prepare.Elapsed.TotalMilliseconds:R}");
-        Reset(2);
+        Reset(4);
         GD.Print("[Route prototype] independent experimental world; production RtsMatch/v14 unchanged");
     }
 

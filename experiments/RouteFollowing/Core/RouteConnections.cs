@@ -18,7 +18,7 @@ internal static class RouteConnections
         var candidates = new List<(FixedVector2 Point, int Cursor)> { (target, walker.Cursor) };
         for (var i = route.Points.Count - 1; i >= walker.Cursor; i--)
             foreach (var fraction in new SimScalar[] { 1, SimScalar.FromRatio(1, 2), 0 })
-                candidates.Add((route.Points[i] + walker.Offset * fraction, i));
+                candidates.Add((route.Points[i] + RouteContraction.Offset(walker) * fraction, i));
         var left = Math.Max(0, start.X - 8);
         var top = Math.Max(0, start.Y - 8);
         var area = new GridArea(left, top, Math.Min(world.Width - left, start.X + 9 - left),
