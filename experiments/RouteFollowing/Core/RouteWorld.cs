@@ -14,6 +14,7 @@ public sealed class RouteWorld
     internal NavigationState Navigation;
     internal byte[] Flags;
     internal int Revision;
+    internal long PlacementRevision;
     internal ulong NextTask = 1;
     private ulong _nextUnit = 1;
     private long _eventSequence;
@@ -45,6 +46,7 @@ public sealed class RouteWorld
         var id = _nextUnit++;
         Bodies.Add(id, new(id, position, 0, stopped ? WalkPhase.Stopped : WalkPhase.Idle, 0, 0,
             position, position, default, 0, 90, 0, 0, 0, null, default, []));
+        PlacementRevision++;
         return id;
     }
 
@@ -78,6 +80,7 @@ public sealed class RouteWorld
         Flags = flags;
         Navigation = candidate;
         Revision++;
+        PlacementRevision++;
         return true;
     }
 
@@ -85,6 +88,7 @@ public sealed class RouteWorld
     {
         Frame++;
         _events.Clear();
+        var fixedBeforeCommands = RoutePlacements.FixedBodies(this);
         // One new group search per tick; queued commands preserve the previous active order until processed.
         if (_commands.TryDequeue(out var command)) Apply(command);
         foreach (var body in Bodies.Values.ToArray())
@@ -93,6 +97,9 @@ public sealed class RouteWorld
                 var next = body.Pending[0];
                 Bodies[body.Id] = Activate(body with { Pending = body.Pending.Skip(1).ToArray() }, next);
             }
+        var fixedBeforeMotion = RoutePlacements.FixedBodies(this);
+        if (!fixedBeforeCommands.SequenceEqual(fixedBeforeMotion)) PlacementRevision++;
+        RoutePlacements.Refresh(this);
         RouteMotion.Advance(this);
         foreach (var group in Bodies.Values.Where(body => body.Task != 0).GroupBy(body => body.Task).ToArray())
         {
@@ -101,10 +108,11 @@ public sealed class RouteWorld
                 if (body.Phase == WalkPhase.Settled && (allSettled || body.Pending.Count > 0))
                 {
                     Bodies[body.Id] = body with { Task = 0, Phase = WalkPhase.Idle, Velocity = default, Blocker = null, TransitQuarters = 4,
-                        Progress = 0, ProgressCursor = 0, ProgressVersion = 0 };
+                        Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1 };
                     Publish(body.Id, "completed");
                 }
         }
+        if (!fixedBeforeMotion.SequenceEqual(RoutePlacements.FixedBodies(this))) PlacementRevision++;
         var referenced = Bodies.Values.Select(body => body.Task)
             .Concat(Bodies.Values.SelectMany(body => body.Pending.Select(goal => goal.Task))).ToHashSet();
         foreach (var id in Routes.Keys.Where(id => !referenced.Contains(id)).ToArray()) Routes.Remove(id);
@@ -119,13 +127,13 @@ public sealed class RouteWorld
                 var body = Bodies[id];
                 Bodies[id] = body with { Task = 0, Phase = WalkPhase.Stopped, Pending = [], Velocity = default,
                     Blocker = null, WaitTicks = 0, Recoveries = 0, RecentGroup = 0, Connection = null, TransitQuarters = 4,
-                    Progress = 0, ProgressCursor = 0, ProgressVersion = 0 };
+                    Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1 };
                 Publish(id, "stopped");
             }
             return;
         }
         var members = command.Members.Select(id => Bodies[id]).ToArray();
-        if (!RoutePlanning.TryAssign(this, members, command.Goal, out var anchor, out var goals)
+        if (!RoutePlacements.TryAssign(this, members, command.Goal, out var anchor, out var goals)
             || !RoutePlanning.TryRoute(this, RoutePlanning.Centre(members), anchor, [], out var points, out var corners))
         {
             foreach (var id in command.Members) Publish(id, "rejected", "no_complete_group_placement");
@@ -145,13 +153,13 @@ public sealed class RouteWorld
         }
     }
 
-    private static Walker Activate(Walker body, QueuedGoal intent) => body with
+    private static Walker Activate(Walker body, QueuedGoal intent) => RoutePlacements.Initialise(body with
     {
-        Task = intent.Task, Preference = intent.Preference, Endpoint = intent.Preference, Offset = intent.Offset,
+        Task = intent.Task, Offset = intent.Offset,
         Cursor = 0, Phase = WalkPhase.Following, WaitTicks = 0, RetryAtWait = 90, Recoveries = 0,
         Progress = 0, ProgressCursor = 0, ProgressVersion = 0, RouteVersion = 0, Blocker = null, Velocity = default,
         RecentGroup = body.Task != 0 ? body.Task : body.RecentGroup, Connection = null, TransitQuarters = 4
-    };
+    }, intent.Preference);
 
     internal void Publish(ulong id, string kind, string detail = "") =>
         _events.Add(new(Frame, _eventSequence++, id, kind, detail));
@@ -160,7 +168,7 @@ public sealed class RouteWorld
         Connection = body.Connection is { } connection ? connection with { Points = connection.Points.ToArray() } : null };
     public string Save() => JsonSerializer.Serialize(new RouteSnapshot(RouteSettings.SnapshotFormat, Width, Height, Flags.ToArray(), Frame,
         _nextUnit, NextTask, _eventSequence, Revision, Bodies.Values.Select(Copy).ToArray(),
-        Routes.Values.Select(route => route with { Points = route.Points.ToArray(), Corners = route.Corners.ToArray() }).ToArray(), _commands.ToArray()));
+        Routes.Values.Select(route => route with { Points = route.Points.ToArray(), Corners = route.Corners.ToArray() }).ToArray(), _commands.ToArray(), PlacementRevision));
     public string Hash() => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Save())));
 
     public static RouteWorld Load(string json)
@@ -170,7 +178,7 @@ public sealed class RouteWorld
         var world = new RouteWorld(state.Width, state.Height, state.Flags)
         {
             Frame = state.Frame, _nextUnit = state.NextUnit, NextTask = state.NextTask,
-            _eventSequence = state.EventSequence, Revision = state.MapRevision
+            _eventSequence = state.EventSequence, Revision = state.MapRevision, PlacementRevision = state.PlacementRevision
         };
         foreach (var route in state.Tasks) world.Routes.Add(route.Id, route with { Points = route.Points.ToArray(), Corners = route.Corners.ToArray() });
         foreach (var body in state.Units) world.Bodies.Add(body.Id, Copy(body));

@@ -2,7 +2,7 @@ using System.Text.Json.Nodes;
 using Rts.Kernel;
 using Rts.Movement.Prototype;
 
-/// <summary>Frozen pre-fix traffic states expose the missed inward steps without changing their inputs.</summary>
+/// <summary>Historical traffic states exercise inward steps after explicit test-only goal reservation repair.</summary>
 internal static class RouteInwardChecks
 {
     internal static void Run()
@@ -15,7 +15,7 @@ internal static class RouteInwardChecks
         upper.Step();
         Check(upper.Units.Any(body => body.Position != before[body.Id].Position),
             "upper frozen entrance produces safe movement with the corrected reference");
-        Check(JsonNode.Parse(upper.Save())!["Format"]!.GetValue<int>() == 4, "experimental format covers inward state");
+        Check(JsonNode.Parse(upper.Save())!["Format"]!.GetValue<int>() == 5, "experimental format covers inward state");
         Safe(before, upper);
         var lower = Fixture(47);
         lower.Step();
@@ -24,7 +24,7 @@ internal static class RouteInwardChecks
         Lifecycle(upper);
         Corrupt(upper, -1);
         Corrupt(upper, 5);
-        foreach (var format in new[] { 1, 2, 3 })
+        foreach (var format in new[] { 1, 2, 3, 4 })
         {
             var legacy = JsonNode.Parse(upper.Save())!;
             legacy["Format"] = format;
@@ -81,18 +81,29 @@ internal static class RouteInwardChecks
         queued.Step();
         Check(Quarter(queued, 10) <= cap && queued.Units.Single(body => body.Id == 10).Pending.Count == 1,
             "append preserves current contraction until takeover");
-        // Exercise the existing settled-member/queued-leg handover with an explicit legal state.
-        var json = JsonNode.Parse(queued.Save())!;
-        var member = json["Units"]!.AsArray().Single(node => node!["Id"]!.GetValue<ulong>() == 10)!;
+        // Construct a legal single-member settled state at its reserved goal.
+        // This isolates queue handover from the narrow-route traversal under test above.
+        var handover = new RouteWorld();
+        var id = handover.Spawn(new(400, 640));
+        handover.Move([id], new(850, 640));
+        handover.Step();
+        handover.Move([id], new(700, 1000), append: true);
+        handover.Step();
+        var json = JsonNode.Parse(handover.Save())!;
+        var member = json["Units"]![0]!;
+        member["Position"] = member["Endpoint"]!.DeepClone();
         member["Phase"] = (int)WalkPhase.Settled;
-        member["Endpoint"] = member["Position"]!.DeepClone();
         member["Blocker"] = null;
         member["Connection"] = null;
-        queued = RouteWorld.Load(json.ToJsonString());
-        queued.Step();
-        Check(queued.Units.Single(body => body.Id == 10).Task == 0, "settled queued member releases before next frame");
-        queued.Step();
-        Check(Quarter(queued, 10) == 4 && queued.Units.Single(body => body.Id == 10).Pending.Count == 0,
+        member["TransitQuarters"] = 2;
+        member["Progress"] = 0;
+        member["ProgressCursor"] = 0;
+        member["ProgressVersion"] = 0;
+        handover = RouteWorld.Load(json.ToJsonString());
+        handover.Step();
+        Check(handover.Units.Single().Task == 0, "settled queued member releases before next frame");
+        handover.Step();
+        Check(Quarter(handover, id) == 4 && handover.Units.Single().Pending.Count == 0,
             "queued task resets inward state");
     }
 

@@ -111,7 +111,7 @@ internal static class RouteProgressChecks
         Rejected(json => json["Units"]![0]!["Progress"] = SimScalar.FromInteger(32).Raw, "uncommitted progress threshold rejected");
         Rejected(json => json["Tasks"]![0]!["Corners"] = null, "missing corner metadata rejected");
         Rejected(json => json["Tasks"]![0]!["Corners"] = new JsonArray(0), "invalid corner index rejected");
-        foreach (var format in new[] { 1, 2, 3 })
+        foreach (var format in new[] { 1, 2, 3, 4 })
             Rejected(json => json["Format"] = format, "old experimental snapshot rejected");
     }
 

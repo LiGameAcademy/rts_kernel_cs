@@ -17,36 +17,54 @@ member cannot publish another shared route or retry event.
 
 Safe inward steps still commit only after temporal collision checks. Their absolute
 quarter-step offset cap never expands within a task; Stop/new tasks reset it.
-Experimental snapshots are **format 4**, including corridor corners and physical
-progress state; formats 1, 2 and 3 are rejected. Production v14 is unchanged.
+
+## Task-owned goals
+
+`RoutePlacements` is the sole runtime writer of initial and revised task goals.
+Reservations are derived from active endpoints and queued preferences; there is no
+second mutable goal store. Each task's claims have at least 64 units of separation.
+The follow calculation reads the assigned endpoint and cannot independently change it.
+Passing moving teammates do not invalidate goals. Terrain changes or external fixed
+bodies can trigger a deterministic, task-wide repair within 156 units of the original
+preference. Each accepted replacement immediately reserves its space for subsequent
+members. A failed repair preserves the old claim and is not searched again until
+the fixed-body/terrain context changes. Settled teammates do not yield in this step.
+
+Experimental snapshots are **format 5**, saving placement context/check revisions
+alongside corridor corners and physical progress. Formats 1–4 are rejected.
+Production v14 is unchanged. Historical motion fixtures explicitly repair conflicting
+goals for test setup only; their positions, phases and routes are retained. This is
+neither an unchanged historical full trajectory nor a runtime migration.
 
 | Case | Result | Cold CLI Release peak | Godot Debug peak |
 | --- | --- | ---: | ---: |
-| Two followers | 2/2 complete | 2.6600ms | 5.5603ms |
-| Opposing units | 2/2 complete | 3.2957ms | 3.6538ms |
-| Stop blocker | 1/1 complete; Stop stays fixed | 1.7914ms | 2.6631ms |
-| 24-unit passage | 12 complete / 12 fail, ends at tick 807 | 72.9730ms | 49.1516ms |
-| Five direction changes | 17 complete / 7 fail, ends at tick 897 | 25.2783ms | 34.0352ms |
+| Two followers | 2/2 complete | 2.3288ms | 4.4661ms |
+| Opposing units | 2/2 complete | 2.1984ms | 3.8132ms |
+| Stop blocker | 1/1 complete; Stop stays fixed | 1.5383ms | 2.6440ms |
+| 24-unit passage | 13 complete / 11 fail, ends at tick 670 | 28.5524ms | 49.4125ms |
+| Five direction changes | 15 complete / 9 fail, ends at tick 743 | 8.2838ms | 25.0662ms |
 
-Both processes executed all 2,451 timed ticks, retaining every first tick and every
-over-budget sample. All five per-frame state/event transcript digests and final
-hashes agree. Reference/progress, contraction, Stop, replacement, queue and JSON
-continuation checks pass; each ended case has 90 additional stability-check ticks.
-The unchanged 33.3333ms gate still fails. Explicit preparation took 2,759.7560ms
-(CLI) / 4,294.0393ms (Godot) and did not mutate the real world.
+Both processes retain all 2,160 timed ticks and every first tick; all five per-frame
+state/event transcript digests and final hashes agree. Reservation, reference/progress,
+contraction, Stop, replacement, queue and JSON checks pass. Each ended case has 90
+additional stability-check ticks. All timed frames have zero overlapping task goals.
+Direction-change endpoint edits fell from 134 to 6 (none during the first 125 ticks);
+all six repairs follow external fixed-body occupancy, not a passing teammate.
 
-Previous format-3 results remain part of the record: the passage was still active
-at 1,200 ticks (10 failed, 11 settled, 3 executing), while direction changes
-completed 20/24. The new direction-change result is a regression, not acceptance.
-A development CLI run also recorded a 271.9081ms direction-change peak; earlier
-format-2 and sandbox slow samples are retained separately. No slow sample was
-removed to make the performance gate pass. A separate editor-import process
-again exited with a native error; the final Godot runtime self-test completed its
-checks and returned the expected failure code 1.
+Preparation took 2,742.0713ms (CLI) / 4,032.5162ms (Godot), without changing the real
+world. CLI has no over-budget ticks in this sample; Godot's passage has two above the
+unchanged 33.3333ms gate. Both suites return 1 because whole-group acceptance fails.
+The direction-change completion count regressed from 17 to 15; stable claims alone
+do not solve local passage. No production integration is approved by these checks.
 
-Temporarily settled members still do not move to clear a teammate's route. That
-separate design step is deliberately not implemented here. These changes do not
-establish whole-group convergence or production readiness.
+Earlier format-4 passage peaks of 72.9730/49.1516ms, the development 271.9081ms
+sample and previous format-2/3 results remain failures in their respective records.
+Development placement runs and an interrupted run with an obsolete synthetic test
+state are retained separately. No slow first tick is excluded. The current isolated
+Godot import exited cleanly, and its runtime self-test completed all boundary checks.
+
+Temporarily settled members still do not move to clear a teammate's route. No new
+local passage algorithm or reference-retry ownership change is included here.
 
 ## Run
 
@@ -76,7 +94,7 @@ is checked. Preparation does not turn a failed acceptance run into a pass.
 
 Settings (32-unit net progress, 90 waiting ticks before retry, three recovery
 attempts) are provisional experiment parameters. Saves have a separate experimental
-format. The fixed traffic fixtures keep historical inputs and explicitly convert
-their snapshot shape for test setup only; they are not a runtime migration. No flow field, generic idle yielding, formation speed lock or 500-unit spawn
+format. The fixed traffic fixtures explicitly adapt snapshot shape and conflicting goal claims
+for test setup only; they are not a runtime migration. No flow field, generic idle yielding, formation speed lock or 500-unit spawn
 work is included. Whole-group completion, the direction-change regression and performance still
 need evidence before a production migration can be considered.

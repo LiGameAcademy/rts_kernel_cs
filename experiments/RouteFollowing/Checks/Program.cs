@@ -3,7 +3,8 @@ using System.Text.Json;
 
 try
 {
-    if (args.Contains("--reference-checks")) RouteReferenceChecks.Run();
+    if (args.Contains("--placement-checks")) RoutePlacementChecks.Run();
+    else if (args.Contains("--reference-checks")) RouteReferenceChecks.Run();
     else if (args.Contains("--inward-checks")) RouteInwardChecks.Run();
     else if (args.Contains("--diagnose"))
     {

@@ -20,6 +20,8 @@ public static class RouteCheckSuite
         output($"route_prepare_ms={preparation.Elapsed.TotalMilliseconds:R} authority_unchanged=true");
         var passed = true;
         foreach (var scenario in new[] { 1, 2, 3, 4, 5 }) passed &= Scenario(scenario, output);
+        RoutePlacementChecks.Run();
+        output("route_placement_boundaries=PASS");
         RouteReferenceChecks.Run();
         output("route_reference_boundaries=PASS");
         RouteInwardChecks.Run();
@@ -40,6 +42,8 @@ public static class RouteCheckSuite
         var ticks = 0;
         var overBudget = 0;
         var peak = 0.0;
+        var endpointChanges = 0;
+        var goalEvents = new List<RouteEvent>();
         for (; ticks < 1200; ticks++)
         {
             if (scenario == 5 && ticks is 31 or 62 or 93 or 124)
@@ -58,13 +62,17 @@ public static class RouteCheckSuite
                 Check(JsonSerializer.Serialize(resumed.Events) == JsonSerializer.Serialize(world.Events), "JSON events");
             }
             transcript.AppendData(Encoding.UTF8.GetBytes(world.Hash() + "\n" + JsonSerializer.Serialize(world.Events) + "\n"));
+            RoutePlacementChecks.AssertReserved(world);
             var after = world.Units;
+            endpointChanges += after.Count(body => body.Task != 0 && body.Task == before.Single(old => old.Id == body.Id).Task
+                && body.Endpoint != before.Single(old => old.Id == body.Id).Endpoint);
             for (var i = 0; i < after.Count; i++)
             {
                 Check((after[i].Position - before[i].Position).Length <= 10, "no teleport/speedup");
                 for (var j = i + 1; j < after.Count; j++)
                     Check((after[i].Position - after[j].Position).Length >= 62, "no overlap");
             }
+            goalEvents.AddRange(world.Events.Where(item => item.Kind is "goal_reassigned" or "goal_repair_blocked"));
             failed += world.Events.Count(item => item.Kind == "failed");
             completed += world.Events.Count(item => item.Kind == "completed");
             if (ticks > 125 && after.All(body => body.Task == 0)) break;
@@ -83,7 +91,8 @@ public static class RouteCheckSuite
         var pass = failed == 0 && world.Units.All(body => body.Task == 0) && overBudget == 0;
         output("route_result=" + JsonSerializer.Serialize(new { scenario, frames = frames.Count, stable_frames = stableFrames,
             failed, completed, active = world.Units.Count(body => body.Task != 0),
-            settled = world.Units.Count(body => body.Phase == WalkPhase.Settled), peak_ms = peak,
+            settled = world.Units.Count(body => body.Phase == WalkPhase.Settled), endpoint_changes = endpointChanges,
+            goal_overlap_frames = 0, goal_events = goalEvents, peak_ms = peak,
             over_budget = overBudget, passed = pass, hash = world.Hash(),
             trace_sha256 = Convert.ToHexString(transcript.GetHashAndReset()) }));
         return pass;

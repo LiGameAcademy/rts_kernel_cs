@@ -4,7 +4,7 @@ internal static class RouteSnapshotValidation
 {
     internal static void Validate(RouteSnapshot state)
     {
-        if (state.Format != RouteSettings.SnapshotFormat || state.Frame < 0 || state.EventSequence < 0 || state.MapRevision < 0
+        if (state.Format != RouteSettings.SnapshotFormat || state.Frame < 0 || state.EventSequence < 0 || state.MapRevision < 0 || state.PlacementRevision < 0
             || state.Units is null || state.Tasks is null || state.Commands is null || state.Flags is null
             || state.Units.Length > 500 || state.Commands.Length > 16) throw new InvalidDataException("Invalid experimental snapshot.");
         var ids = state.Units.Select(body => body.Id).ToHashSet();
@@ -28,6 +28,9 @@ internal static class RouteSnapshotValidation
                 || body.WaitTicks < 0 || body.RetryAtWait < 0 || body.Recoveries < 0 || body.Recoveries > 4
                 || body.TransitQuarters is < 0 or > 4 || body.Task == 0 && body.TransitQuarters != 4
                 || body.Cursor is < 0 or > 16384 || body.RouteVersion < 0
+                || body.PlacementCheckedRevision < -1 || body.PlacementCheckedRevision > state.PlacementRevision
+                || body.Task == 0 && body.PlacementCheckedRevision != -1
+                || body.Task != 0 && (body.Endpoint - body.Preference).Length > 156
                 || body.ProgressCursor is < 0 or > 16384 || body.ProgressVersion < 0
                 || !SimulationDomain.Contains(body.Progress) || body.Progress >= RouteSettings.ProgressThreshold
                 || body.ProgressVersion == 0 && (body.ProgressCursor != 0 || body.Progress != 0)
@@ -55,6 +58,16 @@ internal static class RouteSnapshotValidation
                 || connection.Points[^1] != connection.Target || connection.Version < 1 || connection.Cursor < 0
                 || (connection.Target - connection.Points[0]).Length > 256))
                 throw new InvalidDataException("Invalid bounded connection.");
+        }
+        foreach (var group in RoutePlacements.Claims(state.Units).GroupBy(claim => claim.Task))
+        {
+            var claims = group.ToArray();
+            if (claims.Length > 24 || claims.Select(claim => claim.Member).Distinct().Count() != claims.Length)
+                throw new InvalidDataException("Invalid task goal membership.");
+            for (var i = 0; i < claims.Length; i++)
+            for (var j = i + 1; j < claims.Length; j++)
+                if ((claims[i].Point - claims[j].Point).Length < 64)
+                    throw new InvalidDataException("Overlapping task goal reservations.");
         }
         for (var i = 0; i < state.Units.Length; i++)
         for (var j = i + 1; j < state.Units.Length; j++)

@@ -6,39 +6,6 @@ internal static class RoutePlanning
     internal static FixedVector2 Centre(IReadOnlyList<Walker> members) =>
         members.Aggregate(FixedVector2.Zero, (sum, body) => sum + body.Position) / members.Count;
 
-    internal static bool TryAssign(RouteWorld world, Walker[] members, FixedVector2 goal,
-        out FixedVector2 anchor, out Dictionary<ulong, FixedVector2> assigned)
-    {
-        anchor = goal;
-        assigned = [];
-        var occupied = world.Bodies.Values.Where(body => !members.Any(member => member.Id == body.Id)
-            && body.Phase is WalkPhase.Stopped or WalkPhase.Idle or WalkPhase.Settled).Select(body => body.Position).ToList();
-        bool Free(FixedVector2 point) => world.Navigation.CanStandAt(point, RouteSettings.Radius)
-            && occupied.All(other => (other - point).Length >= RouteSettings.Radius * 2 + 2);
-        var centre = Centre(members);
-        if (!world.Navigation.CanStandAt(anchor, RouteSettings.Radius))
-        {
-            var adjusted = Candidates(world, goal, 256).FirstOrDefault(point => Free(point));
-            if (adjusted == default) return false;
-            anchor = adjusted;
-        }
-        var slots = FormationLayout.Create(FormationKind.Compact, members.Length, 72, anchor,
-            SimMath.Atan2(anchor.Y - centre.Y, anchor.X - centre.X));
-        var match = FormationLayout.Match(members.Select(body => body.Position).ToArray(), slots, 0);
-        for (var i = 0; i < members.Length; i++)
-        {
-            var preferred = slots[match[i]];
-            var point = Free(preferred) ? preferred : Candidates(world, preferred, 256).FirstOrDefault(Free);
-            if (point == default || !Free(point)) return false;
-            if (!world.Navigation.TryWorldToCell(members[i].Position, out var start)
-                || !world.Navigation.TryWorldToCell(point, out var end)
-                || !world.Navigation.Components.Connected(start, end, 1)) return false;
-            assigned.Add(members[i].Id, point);
-            occupied.Add(point);
-        }
-        return true;
-    }
-
     internal static IEnumerable<FixedVector2> Candidates(RouteWorld world, FixedVector2 goal, SimScalar radius)
     {
         if (!world.Navigation.TryWorldToCell(goal, out var cell)) yield break;
@@ -122,23 +89,9 @@ internal static class RoutePlanning
             if (route.Corners.Contains(i)) break;
         }
         if (best == route.Points.Count - 1 || (body.Position - body.Preference).Length <= 200)
-        {
             target = body.Endpoint;
-            if (!EndpointFree(world, body, target))
-            {
-                var replacement = Candidates(world, body.Preference, 156)
-                    .Where(point => EndpointFree(world, body, point)
-                        && StraightMovePath.TryFind(world.Navigation, body.Position, point, 1) is not null)
-                    .OrderBy(point => (point - body.Position).Length).FirstOrDefault();
-                if (replacement != default) { body = body with { Endpoint = replacement }; target = replacement; }
-            }
-        }
         body = body with { Cursor = best, RouteVersion = route.Version };
         return (body, target, selectedQuarter);
     }
-
-    internal static bool EndpointFree(RouteWorld world, Walker body, FixedVector2 point) =>
-        world.Navigation.CanStandAt(point, 31) && world.Bodies.Values.All(other => other.Id == body.Id
-            || (other.Position - point).Length >= 64);
 
 }

@@ -3,6 +3,7 @@
   <ItemGroup><ProjectReference Include="../Core/Rts.Movement.Prototype.csproj" /><Compile Include="../Checks/RouteCheckSuite.cs" Link="RouteCheckSuite.cs" /><Compile Include="../Checks/RouteBoundaryChecks.cs" Link="RouteBoundaryChecks.cs" /></ItemGroup>
 
   <ItemGroup>
+    <Compile Include="../Checks/RoutePlacementChecks.cs" Link="RoutePlacementChecks.cs" />
     <Compile Include="../Checks/RouteProgressChecks.cs" Link="RouteProgressChecks.cs" />
     <Compile Include="../Checks/RouteReferenceChecks.cs" Link="RouteReferenceChecks.cs" />
     <Compile Include="../Checks/RouteFixture.cs" Link="RouteFixture.cs" />

@@ -110,7 +110,7 @@ internal static class RouteMotion
             if (attempts > RouteSettings.RecoveryLimit)
             {
                 world.Bodies[waiting.Id] = waiting with { Task = 0, Phase = WalkPhase.Failed,
-                    Velocity = default, Blocker = null, Connection = null, TransitQuarters = 4, Progress = 0, ProgressCursor = 0, ProgressVersion = 0 };
+                    Velocity = default, Blocker = null, Connection = null, TransitQuarters = 4, Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1 };
                 world.Publish(waiting.Id, "failed", "no_connection_progress");
             }
             else
@@ -129,7 +129,7 @@ internal static class RouteMotion
         {
             world.Bodies[waiting.Id] = waiting with { Task = 0, Phase = WalkPhase.Failed,
                 Velocity = default, Blocker = null, Connection = null, TransitQuarters = 4,
-                Progress = 0, ProgressCursor = 0, ProgressVersion = 0 };
+                Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1 };
             world.Publish(waiting.Id, "failed", "no_reference_progress");
             return;
         }
