@@ -43,6 +43,10 @@ Experimental snapshots are **format 6**, saving plan membership, stage and lifet
 alongside goal ownership. Formats 1–5 are rejected; production v14 is unchanged.
 Public task views and snapshots copy plan membership arrays.
 
+## Historical acceptance at 2c569e2
+
+The following measurements predate the range optimization below.
+
 Both frozen gates pass automatically in CLI and Godot:
 
 - Member 13 starts at frame 330 and finishes at 339.
@@ -80,6 +84,39 @@ completed every check and returned the expected failure code 1; the import was
 terminated with exit -1 and is not reported as a clean import. Historical failures
 remain attached to their original code versions. No production integration, new
 local passage algorithm, generic idle yielding or further tuning is included.
+
+## Follow range optimization (2026-10-21)
+
+Only the 9/192/200 range predicates in `RoutePlanning.Follow` now compare squared
+integers. For nonnegative Raw radius R, the old floored Length <= R is exactly
+D < (R + 1)^2, not D <= R^2. The checked Length overflow remains an overflow.
+Nearest-point ordering, projection, path sampling, collision, recovery, yielding
+and snapshot format 6 are unchanged.
+
+813 comparisons against the original Length predicate and 15 actual follow-target
+boundary cases pass, including one-Raw shells, negative deltas and overflow.
+One optimized cold CLI Release and one control/optimized cold Godot Debug process
+per version retain all 6,957 timed ticks and 21 first ticks. All seven final hashes
+and timed state/event transcript digests match 2c569e2 in every process; Stop,
+new orders, append, bounded yielding and JSON continuation checks pass.
+
+| Cold Godot Debug, 24-unit direction changes | Control | Optimized |
+| --- | ---: | ---: |
+| First tick | 25.0255ms | 11.6408ms |
+| P95, all 817 ticks | 10.7877ms | 2.7699ms |
+| Maximum | 25.0255ms | 20.0255ms |
+| Over 33.3333ms | 0 | 0 |
+
+Full-case medians are 0.5008/0.5943ms; the first 125 ticks' medians are
+8.6457/2.2424ms. These are one bounded pair, not a claim that every tick improved.
+Both still complete 24/24 with the same eight cooperation goal edits. Optimized
+CLI peak is 6.6067ms. Preparation costs are fully reported (CLI 1,728.9728ms;
+control/optimized Godot 4,193.2057/2,904.5571ms), with authority unchanged.
+
+**Overall acceptance remains FAIL:** the passage is still 13 complete / 11 fail;
+optimized Godot retains two over-budget passage ticks, peak 44.2130ms. The
+historical 229.2037ms remains a failure, not retroactively fixed by a faster run.
+No WPR, priorities, JIT flags, traffic rules, budgets or host integration change.
 
 ## Run
 

@@ -9,6 +9,7 @@
     <EmbeddedResource Include="../Checks/Fixtures/yield-pair-444.json" LogicalName="yield-pair-444.json" />
     <Compile Include="../Checks/RoutePlacementChecks.cs" Link="RoutePlacementChecks.cs" />
     <Compile Include="../Checks/RouteProgressChecks.cs" Link="RouteProgressChecks.cs" />
+    <Compile Include="../Checks/RouteFollowRangeChecks.cs" Link="RouteFollowRangeChecks.cs" />
     <Compile Include="../Checks/RouteReferenceChecks.cs" Link="RouteReferenceChecks.cs" />
     <Compile Include="../Checks/RouteFixture.cs" Link="RouteFixture.cs" />
     <EmbeddedResource Include="../Checks/Fixtures/reference-entry-399.json" LogicalName="reference-entry-399.json" />
