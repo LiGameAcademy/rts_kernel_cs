@@ -16,6 +16,7 @@ try
         RouteYieldChecks.Run();
     }
     else if (args.Contains("--placement-checks")) RoutePlacementChecks.Run();
+    else if (args.Contains("--connection-checks")) Environment.ExitCode = RouteConnectionChecks.Run(Console.WriteLine) ? 0 : 1;
     else if (args.Contains("--follow-range-checks")) RouteFollowRangeChecks.Run();
     else if (args.Contains("--reference-checks")) RouteReferenceChecks.Run();
     else if (args.Contains("--inward-checks")) RouteInwardChecks.Run();

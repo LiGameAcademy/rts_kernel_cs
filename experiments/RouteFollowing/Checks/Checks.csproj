@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors></PropertyGroup><ItemGroup><ProjectReference Include="../Core/Rts.Movement.Prototype.csproj" /></ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Fixtures/connection-before-150.json" LogicalName="connection-before-150.json" />
+    <EmbeddedResource Include="Fixtures/connection-before-150.expected.json" LogicalName="connection-before-150.expected.json" />
+    <EmbeddedResource Include="Fixtures/connection-before-251.json" LogicalName="connection-before-251.json" />
+    <EmbeddedResource Include="Fixtures/connection-before-251.expected.json" LogicalName="connection-before-251.expected.json" />
     <EmbeddedResource Include="Fixtures/narrow-entry-47.json" LogicalName="narrow-entry-47.json" />
     <EmbeddedResource Include="Fixtures/narrow-entry-120.json" LogicalName="narrow-entry-120.json" />
     <EmbeddedResource Include="Fixtures/reference-entry-399.json" LogicalName="reference-entry-399.json" />

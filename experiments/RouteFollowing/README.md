@@ -118,6 +118,50 @@ optimized Godot retains two over-budget passage ticks, peak 44.2130ms. The
 historical 229.2037ms remains a failure, not retroactively fixed by a faster run.
 No WPR, priorities, JIT flags, traffic rules, budgets or host integration change.
 
+## Short-connection broad phase (2026-10-21)
+
+`RouteConnections.Clear` now computes one segment AABB per query, expanded by
+both 31-unit radii. Only strictly outside body centres skip the original exact
+capsule predicate. Box-boundary contact and all inside cases retain exact checks.
+The body order, candidate order, 256-node budget, 8-cell window, route and recovery
+rules are unchanged. No cross-frame cache or new snapshot state is introduced.
+
+888 comparisons against the original exact geometry pass for points, horizontal,
+vertical/reversed and diagonal segments, negative coordinates, contact and +/-one
+Raw around the box boundary. Two format-6 snapshots before frames 150/251 have
+30-frame expected state hashes/events generated using the unchanged 76203de DLL;
+both optimized runtimes match every frame and JSON continuation.
+
+One optimized CLI Release, one 76203de Godot Debug control and one optimized Godot
+Debug process run serially with the existing explicit preparation. All seven
+common state/event transcript digests and final hashes match in all processes.
+The two optimized processes additionally retain 60 timed connection-fixture ticks
+each: 7,077 timed ticks and 25 first ticks total, without removing slow samples.
+
+| Cold Godot Debug passage | 76203de control | Filtered |
+| --- | ---: | ---: |
+| Frame 150 | 40.5145ms | 4.5282ms |
+| Frame 251 | 39.7731ms | 4.0137ms |
+| All 635 ticks maximum | 40.5145ms | 11.7660ms |
+| Over 33.3333ms | 2 | 0 |
+
+The optimized Godot's complete 2,379 timed ticks, including nine first ticks and
+four frozen cases, peak at 11.7660ms with zero overruns. Its 24-unit direction
+changes still complete 24/24, peak 11.7512ms. The optimized CLI's complete 2,379
+ticks peak at 19.5046ms with no overruns. Preparation remains separate and state
+preserving: CLI 2,195.4793ms; control/optimized Godot 2,585.4768/2,424.6314ms.
+These are bounded cold-process observations, not a guarantee for every machine.
+
+A separate development `--connection-checks` run bypassed the standard preparation
+and retained a 165.8948ms first tick (FAIL), plus all remaining 59 ticks. It is not
+erased or reclassified as passing by the later prepared runs; this direct entry
+can incur cold initialization and is not the prepared match-start path.
+
+**Overall acceptance remains FAIL:** passage completion is unchanged at 13/24.
+Both complete suites still return failure code 1. This performance-only change
+does not repair passage behavior, integrate the host, change 30Hz, or authorize
+merging/tagging 0.0.2. Stop, new orders, append, yielding and restore regressions pass.
+
 ## Run
 
 Requires .NET 10 for CLI checks and Godot 4.7.2 .NET with .NET 8 targeting support.

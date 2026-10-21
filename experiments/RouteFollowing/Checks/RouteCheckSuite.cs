@@ -24,6 +24,8 @@ public static class RouteCheckSuite
         foreach (var scenario in new[] { 1, 2, 3, 4, 5 }) passed &= Scenario(scenario, output);
         RoutePlacementChecks.Run();
         output("route_placement_boundaries=PASS");
+        passed &= RouteConnectionChecks.Run(output);
+        output("route_connection_boundaries=PASS");
         RouteFollowRangeChecks.Run();
         output("route_follow_range_boundaries=PASS");
         RouteReferenceChecks.Run();

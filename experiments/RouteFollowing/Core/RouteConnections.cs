@@ -9,8 +9,7 @@ internal static class RouteConnections
         var navigation = world.Navigation;
         if (!navigation.TryWorldToCell(walker.Position, out var start)) return null;
         var others = world.Bodies.Values.Where(body => body.Id != walker.Id).ToArray();
-        bool Clear(FixedVector2 from, FixedVector2 to) => others.All(body =>
-            !CrowdGeometry.Overlap(from, to, 31, body.Position, body.Position, 31));
+        bool Clear(FixedVector2 from, FixedVector2 to) => ClearOfBodies(from, to, others);
         bool Cell(GridCell cell) => navigation.CanOccupy(cell, 1)
             && (cell == start || Clear(navigation.CellCenter(cell), navigation.CellCenter(cell)));
         bool Edge(GridCell a, GridCell b) => navigation.CanTraverse(a, b, 1)
@@ -41,5 +40,24 @@ internal static class RouteConnections
             if (remaining <= 0) break;
         }
         return null;
+    }
+
+    private static bool ClearOfBodies(FixedVector2 from, FixedVector2 to, Walker[] others)
+    {
+        // The swept segment box expanded by both radii contains every possible collision.
+        // Strict separation only: contact on the box boundary still uses the exact predicate.
+        var reach = (Int128)62 * SimScalar.Scale;
+        var left = (Int128)Math.Min(from.X.Raw, to.X.Raw) - reach;
+        var right = (Int128)Math.Max(from.X.Raw, to.X.Raw) + reach;
+        var bottom = (Int128)Math.Min(from.Y.Raw, to.Y.Raw) - reach;
+        var top = (Int128)Math.Max(from.Y.Raw, to.Y.Raw) + reach;
+        foreach (var body in others)
+        {
+            var centre = body.Position;
+            if (centre.X.Raw < left || centre.X.Raw > right || centre.Y.Raw < bottom || centre.Y.Raw > top)
+                continue;
+            if (CrowdGeometry.Overlap(from, to, 31, centre, centre, 31)) return false;
+        }
+        return true;
     }
 }
