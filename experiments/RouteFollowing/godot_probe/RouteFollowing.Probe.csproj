@@ -1,0 +1,26 @@
+<Project Sdk="Godot.NET.Sdk/4.7.2">
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><EnableDynamicLoading>true</EnableDynamicLoading><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors></PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../Checks/Fixtures/connection-before-150.json" LogicalName="connection-before-150.json" />
+    <EmbeddedResource Include="../Checks/Fixtures/connection-before-150.expected.json" LogicalName="connection-before-150.expected.json" />
+    <EmbeddedResource Include="../Checks/Fixtures/connection-before-251.json" LogicalName="connection-before-251.json" />
+    <EmbeddedResource Include="../Checks/Fixtures/connection-before-251.expected.json" LogicalName="connection-before-251.expected.json" /><ProjectReference Include="../Core/Rts.Movement.Prototype.csproj" /><Compile Include="../Checks/RouteCheckSuite.cs" Link="RouteCheckSuite.cs" /><Compile Include="../Checks/RouteBoundaryChecks.cs" Link="RouteBoundaryChecks.cs" /></ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../Checks/RouteYieldChecks.cs" Link="RouteYieldChecks.cs" />
+    <Compile Include="../Checks/RouteYieldBoundaries.cs" Link="RouteYieldBoundaries.cs" />
+    <EmbeddedResource Include="../Checks/Fixtures/yield-single-329.json" LogicalName="yield-single-329.json" />
+    <EmbeddedResource Include="../Checks/Fixtures/yield-pair-444.json" LogicalName="yield-pair-444.json" />
+    <Compile Include="../Checks/RoutePlacementChecks.cs" Link="RoutePlacementChecks.cs" />
+    <Compile Include="../Checks/RouteProgressChecks.cs" Link="RouteProgressChecks.cs" />
+    <Compile Include="../Checks/RouteConnectionChecks.cs" Link="RouteConnectionChecks.cs" />
+    <Compile Include="../Checks/RouteFollowRangeChecks.cs" Link="RouteFollowRangeChecks.cs" />
+    <Compile Include="../Checks/RouteReferenceChecks.cs" Link="RouteReferenceChecks.cs" />
+    <Compile Include="../Checks/RouteFixture.cs" Link="RouteFixture.cs" />
+    <EmbeddedResource Include="../Checks/Fixtures/reference-entry-399.json" LogicalName="reference-entry-399.json" />
+    <EmbeddedResource Include="../Checks/Fixtures/reference-progress-789.json" LogicalName="reference-progress-789.json" />
+    <Compile Include="../Checks/RouteInwardChecks.cs" Link="RouteInwardChecks.cs" />
+    <EmbeddedResource Include="../Checks/Fixtures/narrow-entry-47.json" LogicalName="narrow-entry-47.json" />
+    <EmbeddedResource Include="../Checks/Fixtures/narrow-entry-120.json" LogicalName="narrow-entry-120.json" />
+  </ItemGroup>
+</Project>
