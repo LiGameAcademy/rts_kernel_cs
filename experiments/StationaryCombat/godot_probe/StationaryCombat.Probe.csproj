@@ -1,0 +1,14 @@
+<Project Sdk="Godot.NET.Sdk/4.7.2">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/Rts.Kernel/Rts.Kernel.csproj" />
+    <Compile Include="../../../tests/Rts.Kernel.Tests/Combat*Checks.cs" Link="Checks/%(Filename)%(Extension)" />
+    <Compile Include="../../../tests/Rts.Kernel.Tests/CombatTestWorld.cs" Link="Checks/CombatTestWorld.cs" />
+  </ItemGroup>
+</Project>

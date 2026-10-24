@@ -1,0 +1,11 @@
+config_version=5
+
+[application]
+config/name="Stationary Combat Runtime Probe"
+run/main_scene="res://combat_probe.tscn"
+
+[dotnet]
+project/assembly_name="StationaryCombat.Probe"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
