@@ -14,6 +14,31 @@ public sealed class StationaryCombat(ulong seed)
     public long Frame { get; private set; }
     public ulong RngState => _rng.State;
 
+    public IReadOnlyList<CombatDefinitionEntry> ReadDefinitions() =>
+        Array.AsReadOnly(_units.Values.Select(unit => new CombatDefinitionEntry(unit.Id.Value, unit.Definition)).ToArray());
+
+    /// <summary>Capture between frames; excludes host entities, command scheduling and already returned events.</summary>
+    public CombatSnapshot CaptureSnapshot() => new(
+        CombatSnapshotJson.CurrentFormatVersion, Frame, _rng.State, _nextStrikeId, _nextEventSequence,
+        CombatSnapshotJson.HashDefinitions(ReadDefinitions()),
+        Array.AsReadOnly(_units.Values.Select(unit => unit.Capture()).ToArray()));
+
+    public string ComputeStateHash() => CombatSnapshotJson.Hash(CaptureSnapshot());
+
+    public static StationaryCombat Restore(CombatSnapshot snapshot, IReadOnlyList<CombatDefinitionEntry> definitions)
+    {
+        var catalog = CombatSnapshotRules.ValidateForRestore(snapshot, definitions);
+        var combat = new StationaryCombat(snapshot.RngState)
+        {
+            Frame = snapshot.Frame,
+            _nextStrikeId = snapshot.NextStrikeId,
+            _nextEventSequence = snapshot.NextEventSequence
+        };
+        foreach (var unit in snapshot.Units.OrderBy(unit => unit.Id))
+            combat._units.Add(new(unit.Id), Combatant.Restore(unit, catalog[unit.Id]));
+        return combat;
+    }
+
     /// <summary>Register between frames. IDs, including dead IDs, cannot be reused.</summary>
     public void AddCombatant(EntityId id, CombatDefinition definition)
     {

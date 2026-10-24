@@ -27,6 +27,25 @@ void CheckThrows<TException>(Action action, string message) where TException : E
     throw new InvalidOperationException(message);
 }
 
+if (args.Length == 3 && args[0] == "--combat-create-resume")
+{
+    CombatResumeProfileChecks.Create(int.Parse(args[1]), args[2]);
+    return;
+}
+
+if (args.Length == 3 && args[0] == "--combat-resume")
+{
+    CombatResumeProfileChecks.Run(Check, int.Parse(args[1]), args[2]);
+    return;
+}
+
+if (args.Contains("--combat-snapshots"))
+{
+    CombatSnapshotChecks.Run(Check);
+    Console.WriteLine($"Combat snapshots PASS ({checks} checks)");
+    return;
+}
+
 if (args.Contains("--combat-profile"))
 {
     CombatProfileChecks.Run(Check, int.Parse(args[Array.IndexOf(args, "--combat-profile") + 1]));
@@ -240,6 +259,7 @@ CheckThrows<ArgumentException>(() => new TerrainHeights(2, 2, 128, default, new 
 
 CombatRulesChecks.Run(Check);
 CombatExecutionChecks.Run(Check);
+CombatSnapshotChecks.Run(Check);
 SnapshotDiagnosticChecks.Run(Check);
 EntityReadChecks.Run(Check);
 EntityLifecycleChecks.Run(Check);
