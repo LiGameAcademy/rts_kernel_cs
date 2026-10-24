@@ -14,11 +14,14 @@ public partial class CombatProbe : Node
         {
             var args = OS.GetCmdlineUserArgs();
             var profile = Array.IndexOf(args, "--combat-profile");
-            if (profile >= 0) CombatProfileChecks.Run(Check, int.Parse(args[profile + 1]));
+            var resume = Array.IndexOf(args, "--combat-resume");
+            if (resume >= 0) CombatResumeProfileChecks.Run(Check, int.Parse(args[resume + 1]), args[resume + 2]);
+            else if (profile >= 0) CombatProfileChecks.Run(Check, int.Parse(args[profile + 1]));
             else
             {
                 CombatRulesChecks.Run(Check);
                 CombatExecutionChecks.Run(Check);
+                CombatSnapshotChecks.Run(Check);
             }
             GD.Print($"COMBAT_PROBE_DONE checks={checks}");
             GetTree().Quit();

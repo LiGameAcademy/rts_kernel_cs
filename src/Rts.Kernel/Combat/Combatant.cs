@@ -17,6 +17,20 @@ internal sealed class Combatant(EntityId id, CombatDefinition definition, long a
     internal CombatantState Read() =>
         new(Id, Definition, Health, Target, DamageFrame, NextAttackFrame, StrikeId, Stopped, ActiveFromFrame);
 
+    internal CombatUnitSnapshot Capture() =>
+        new(Id.Value, Health, Target.Value, DamageFrame, NextAttackFrame, StrikeId, Stopped, ActiveFromFrame);
+
+    internal static Combatant Restore(CombatUnitSnapshot unit, CombatDefinition definition) =>
+        new(new(unit.Id), definition, unit.ActiveFromFrame)
+        {
+            Health = unit.Health,
+            Target = new(unit.Target),
+            DamageFrame = unit.DamageFrame,
+            NextAttackFrame = unit.NextAttackFrame,
+            StrikeId = unit.StrikeId,
+            Stopped = unit.Stopped
+        };
+
     internal void SetTarget(EntityId target)
     {
         Target = target;

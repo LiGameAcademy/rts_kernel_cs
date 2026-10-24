@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="../../../src/Rts.Kernel/Rts.Kernel.csproj" />
     <Compile Include="../../../tests/Rts.Kernel.Tests/Combat*Checks.cs" Link="Checks/%(Filename)%(Extension)" />
+    <Compile Include="../../../tests/Rts.Kernel.Tests/CombatReplayFixture.cs" Link="Checks/CombatReplayFixture.cs" />
     <Compile Include="../../../tests/Rts.Kernel.Tests/CombatTestWorld.cs" Link="Checks/CombatTestWorld.cs" />
   </ItemGroup>
 </Project>
