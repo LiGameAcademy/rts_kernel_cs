@@ -27,6 +27,13 @@ void CheckThrows<TException>(Action action, string message) where TException : E
     throw new InvalidOperationException(message);
 }
 
+if (args.Contains("--combat-rules"))
+{
+    CombatRulesChecks.Run(Check);
+    Console.WriteLine($"Combat rules PASS ({checks} checks)");
+    return;
+}
+
 if (args.Contains("--prepared-multi-party"))
 {
     MultiPartyCloseoutChecks.Run(Check, prepared: true);
@@ -218,6 +225,7 @@ Check(terrain.TrySample(FixedVector2.Zero, out altitude) && altitude == 30, "las
 Check(!terrain.TrySample(new FixedVector2(1, 0), out _), "height outside map explicitly missing");
 CheckThrows<ArgumentException>(() => new TerrainHeights(2, 2, 128, default, new SimScalar[] { 0, 0, 0, SimScalar.MaxValue }), "out-of-domain height rejected");
 
+CombatRulesChecks.Run(Check);
 SnapshotDiagnosticChecks.Run(Check);
 EntityReadChecks.Run(Check);
 EntityLifecycleChecks.Run(Check);
