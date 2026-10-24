@@ -27,6 +27,19 @@ void CheckThrows<TException>(Action action, string message) where TException : E
     throw new InvalidOperationException(message);
 }
 
+if (args.Contains("--combat-profile"))
+{
+    CombatProfileChecks.Run(Check, int.Parse(args[Array.IndexOf(args, "--combat-profile") + 1]));
+    return;
+}
+
+if (args.Contains("--combat-execution"))
+{
+    CombatExecutionChecks.Run(Check);
+    Console.WriteLine($"Combat execution PASS ({checks} checks)");
+    return;
+}
+
 if (args.Contains("--combat-rules"))
 {
     CombatRulesChecks.Run(Check);
@@ -226,6 +239,7 @@ Check(!terrain.TrySample(new FixedVector2(1, 0), out _), "height outside map exp
 CheckThrows<ArgumentException>(() => new TerrainHeights(2, 2, 128, default, new SimScalar[] { 0, 0, 0, SimScalar.MaxValue }), "out-of-domain height rejected");
 
 CombatRulesChecks.Run(Check);
+CombatExecutionChecks.Run(Check);
 SnapshotDiagnosticChecks.Run(Check);
 EntityReadChecks.Run(Check);
 EntityLifecycleChecks.Run(Check);
