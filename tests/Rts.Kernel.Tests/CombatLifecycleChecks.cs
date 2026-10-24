@@ -86,4 +86,3 @@ internal static class CombatLifecycleChecks
         check(!rejection.Events.Any(e => e.Kind == CombatEventKind.UnitDied), "rejected dead orders cannot duplicate deaths");
     }
 }
-

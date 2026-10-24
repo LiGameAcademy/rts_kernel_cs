@@ -56,4 +56,3 @@ internal static class CombatProfileChecks
         }));
     }
 }
-
