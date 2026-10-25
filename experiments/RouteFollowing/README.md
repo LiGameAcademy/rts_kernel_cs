@@ -1,5 +1,12 @@
 # Route-following experiment (not a production replacement)
 
+**2026-10-25 closeout candidate:** member-owned terrain references replace the mandatory
+shared centre line. Experimental format is now **7**; runtime loading rejects format6.
+The earlier sections below describe the retained historical format6 experiment.
+The new executed gate is **FAIL** at the 18→7 cooperation case. Do not integrate or
+merge this candidate. See [current status](CLOSEOUT_STATUS.md).
+
+
 A deterministic C# experiment for one reference route per task, per-member following,
 current-frame temporal collision safety, explicit waiting and bounded recovery.
 Godot is an input/rendering host only. The production `RtsMatch`, snapshot v14 and
