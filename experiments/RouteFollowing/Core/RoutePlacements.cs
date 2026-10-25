@@ -81,6 +81,7 @@ internal static class RoutePlacements
         {
             var body = world.Bodies[members[i]];
             world.Bodies[body.Id] = body with { Endpoint = goals[i], Connection = null, Blocker = null, Velocity = default,
+                Navigation = null, Passage = null, Progress = 0, ProgressCursor = 0, ProgressVersion = 0,
                 Phase = i == 0 ? WalkPhase.Yielding : WalkPhase.Settled, PlacementCheckedRevision = -1 };
         }
         world.Routes[task.Id] = task with { Yield = new(requester.Id, members.ToArray(), 0, world.Revision, world.Frame) };

@@ -6,6 +6,9 @@ internal static class RouteNavigationValidation
     {
         foreach (var body in state.Units)
         {
+            if (body.Passage is { } passage && (body.Task == 0 || passage.Side is not (-1 or 1)
+                || passage.Blocker == body.Id || !state.Units.Any(other => other.Id == passage.Blocker)))
+                throw new InvalidDataException("Invalid local passage relation.");
             if (body.Navigation is not { } reference) continue;
             if (body.Task == 0 || reference.Points is null || reference.Corners is null
                 || !Enum.IsDefined(reference.Kind) || reference.Version < 1

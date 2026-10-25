@@ -111,7 +111,7 @@ public sealed class RouteWorld
                 if (body.Phase == WalkPhase.Settled && (allSettled || body.Pending.Count > 0))
                 {
                     Bodies[body.Id] = body with { Task = 0, Phase = WalkPhase.Idle, Velocity = default, Blocker = null, TransitQuarters = 4,
-                        Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1, Navigation = null };
+                        Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1, Navigation = null, Passage = null };
                     Publish(body.Id, "completed");
                 }
         }
@@ -130,7 +130,7 @@ public sealed class RouteWorld
                 var body = Bodies[id];
                 Bodies[id] = body with { Task = 0, Phase = WalkPhase.Stopped, Pending = [], Velocity = default,
                     Blocker = null, WaitTicks = 0, Recoveries = 0, RecentGroup = 0, Connection = null, TransitQuarters = 4,
-                    Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1, Navigation = null };
+                    Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1, Navigation = null, Passage = null };
                 Publish(id, "stopped");
             }
             return;
@@ -165,7 +165,7 @@ public sealed class RouteWorld
         Task = intent.Task, Offset = intent.Offset,
         Cursor = 0, Phase = WalkPhase.Following, WaitTicks = 0, RetryAtWait = 90, Recoveries = 0,
         Progress = 0, ProgressCursor = 0, ProgressVersion = 0, RouteVersion = 0, Blocker = null, Velocity = default,
-        RecentGroup = body.Task != 0 ? body.Task : body.RecentGroup, Connection = null, TransitQuarters = 4, Navigation = null
+        RecentGroup = body.Task != 0 ? body.Task : body.RecentGroup, Connection = null, TransitQuarters = 4, Navigation = null, Passage = null
     }, intent.Preference);
 
     internal void Publish(ulong id, string kind, string detail = "") =>

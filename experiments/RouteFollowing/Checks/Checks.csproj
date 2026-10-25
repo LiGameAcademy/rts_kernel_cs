@@ -11,4 +11,8 @@
     <EmbeddedResource Include="Fixtures/yield-single-329.json" LogicalName="yield-single-329.json" />
     <EmbeddedResource Include="Fixtures/yield-pair-444.json" LogicalName="yield-pair-444.json" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Fixtures/closeout-before-151.json" LogicalName="closeout-before-151.json" />
+    <EmbeddedResource Include="Fixtures/closeout-before-259.json" LogicalName="closeout-before-259.json" />
+  </ItemGroup>
 </Project>

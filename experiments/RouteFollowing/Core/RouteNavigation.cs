@@ -32,14 +32,14 @@ internal static class RouteNavigation
         else
         {
             if (!RoutePlanning.TryRoute(world, body.Position, body.Endpoint, blockers, out points, out corners))
-                return body with { Navigation = null, Connection = null, Cursor = 0, RouteVersion = 0,
+                return body with { Navigation = null, Passage = null, Connection = null, Cursor = 0, RouteVersion = 0,
                     Progress = 0, ProgressCursor = 0, ProgressVersion = 0 };
             kind = MemberReferenceKind.Independent;
         }
         return body with
         {
             Navigation = new(body.Endpoint, world.Revision, version, kind, points, corners),
-            Cursor = 0, RouteVersion = version, Connection = null,
+            Cursor = 0, RouteVersion = version, Connection = null, Passage = null,
             // Changing a route cannot manufacture signed physical progress or erase waits.
             Progress = 0, ProgressCursor = 0, ProgressVersion = 0, TransitQuarters = 4
         };

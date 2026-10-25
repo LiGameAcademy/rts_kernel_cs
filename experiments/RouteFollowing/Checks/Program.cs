@@ -3,7 +3,9 @@ using System.Text.Json;
 
 try
 {
-    if (args.Contains("--navigation-checks")) RouteNavigationChecks.Run();
+    if (args.Contains("--closeout-failure-audit")) RouteCloseoutFailureAudit.Run(Console.WriteLine);
+    else if (args.Contains("--closeout-gates")) Environment.ExitCode = RouteCloseoutChecks.Run(Console.WriteLine) ? 0 : 1;
+    else if (args.Contains("--navigation-checks")) RouteNavigationChecks.Run();
     else if (args.Contains("--yield-checks"))
     {
         var untouched = RouteYieldChecks.Load("yield-single-329.json");
