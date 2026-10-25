@@ -3,11 +3,14 @@ namespace Rts.Movement.Prototype;
 public enum WalkPhase { Idle, Following, Waiting, Settled, Stopped, Failed, Yielding }
 public sealed record QueuedGoal(ulong Task, FixedVector2 Preference, FixedVector2 Offset);
 public sealed record RouteConnection(FixedVector2 Target, int Cursor, int Version, IReadOnlyList<FixedVector2> Points, int Next = 0, int TransitQuarters = 4);
+public enum MemberReferenceKind { Direct, SharedSuffix, Independent }
+public sealed record MemberReference(FixedVector2 Goal, int MapRevision, int Version,
+    MemberReferenceKind Kind, IReadOnlyList<FixedVector2> Points, IReadOnlyList<int> Corners);
 public sealed record Walker(ulong Id, FixedVector2 Position, SimScalar Facing, WalkPhase Phase,
     ulong Task, int Cursor, FixedVector2 Preference, FixedVector2 Endpoint, FixedVector2 Offset,
     long WaitTicks, long RetryAtWait, int Recoveries, SimScalar Progress, int RouteVersion,
     ulong? Blocker, FixedVector2 Velocity, IReadOnlyList<QueuedGoal> Pending, ulong RecentGroup = 0, RouteConnection? Connection = null, int TransitQuarters = 4,
-    int ProgressCursor = 0, int ProgressVersion = 0, long PlacementCheckedRevision = -1);
+    int ProgressCursor = 0, int ProgressVersion = 0, long PlacementCheckedRevision = -1, MemberReference? Navigation = null);
 public sealed record RouteTask(ulong Id, FixedVector2 Anchor, IReadOnlyList<FixedVector2> Points,
     int Version, int MapRevision, IReadOnlyList<int> Corners, RouteYieldPlan? Yield = null);
 public sealed record RouteYieldPlan(ulong Requester, IReadOnlyList<ulong> Members, int Next, int MapRevision, long StartedAt);
@@ -20,7 +23,7 @@ public sealed record RouteSnapshot(int Format, int Width, int Height, byte[] Fla
 /// <summary>Experimental defaults, explicitly separate from production gameplay and v14 snapshots.</summary>
 public static class RouteSettings
 {
-    public const int SnapshotFormat = 6;
+    public const int SnapshotFormat = 7;
     public const int TickRate = 30;
     public const int WaitBeforeRetry = 90;
     public const int RecoveryLimit = 3;

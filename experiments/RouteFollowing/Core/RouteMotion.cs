@@ -16,7 +16,7 @@ internal static class RouteMotion
             && body.Phase is WalkPhase.Following or WalkPhase.Waiting or WalkPhase.Yielding).ToArray())
         {
             var route = world.Routes[source.Task];
-            var cached = source.Connection is { } connection && connection.Version == route.Version
+            var cached = source.Navigation is not null && source.Connection is { } connection && connection.Version == source.Navigation.Version
                 && connection.Next < connection.Points.Count ? connection : null;
             var (body, target, quarter) = source.Phase == WalkPhase.Yielding ? (source, source.Endpoint, source.TransitQuarters)
                 : cached is null ? RoutePlanning.Follow(world, source with { Connection = null }, route)
@@ -68,7 +68,7 @@ internal static class RouteMotion
                 WaitTicks = body.WaitTicks + (moved ? 0 : 1),
                 Connection = blocked || step.NextWaypoint >= (body.Connection?.Points.Count ?? 0) ? null
                     : body.Connection! with { Next = step.NextWaypoint } };
-            if (body.Phase != WalkPhase.Yielding) updated = RouteProgress.Measure(body, updated, world.Routes[body.Task]);
+            if (body.Phase != WalkPhase.Yielding && body.Navigation is not null) updated = RouteProgress.Measure(body, updated, RouteNavigation.Reference(body));
             if (!blocked && proposal.Final && step.Position == body.Endpoint)
                 updated = updated with { Phase = WalkPhase.Settled, Velocity = default, Blocker = null };
             world.Bodies[body.Id] = updated;
@@ -101,45 +101,21 @@ internal static class RouteMotion
             .OrderBy(body => body.Id).FirstOrDefault();
         if (waiting is null) return;
         if (RouteYielding.TryStart(world, waiting)) return;
-        var task = world.Routes[waiting.Task];
-        var blockers = world.Bodies.Values.Where(body => body.Task != task.Id && body.Id != waiting.Id
-            && (body.Phase is WalkPhase.Stopped or WalkPhase.Idle or WalkPhase.Settled
-                || body.Id == waiting.Blocker)).ToArray();
-        if (waiting.Blocker is { } blockedBy && world.Bodies[blockedBy].Task == task.Id)
+        var attempts = waiting.Recoveries + 1;
+        if (attempts > RouteSettings.RecoveryLimit)
         {
-            var (following, target, quarter) = RoutePlanning.Follow(world, waiting, task);
-            var local = RouteConnections.Find(world, following, target, quarter);
-            var attempts = waiting.Recoveries + 1;
-            if (attempts > RouteSettings.RecoveryLimit)
+            world.Bodies[waiting.Id] = waiting with
             {
-                world.Bodies[waiting.Id] = waiting with { Task = 0, Phase = WalkPhase.Failed,
-                    Velocity = default, Blocker = null, Connection = null, TransitQuarters = 4, Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1 };
-                world.Publish(waiting.Id, "failed", "no_connection_progress");
-            }
-            else
-            {
-                world.Bodies[waiting.Id] = following with
-                {
-                    Connection = local, Cursor = local?.Cursor ?? following.Cursor,
-                    RetryAtWait = waiting.WaitTicks + 90, Recoveries = attempts
-                };
-                world.Publish(waiting.Id, "retry", local is null ? "connection_wait" : "bounded_reference_connection");
-            }
+                Task = 0, Phase = WalkPhase.Failed, Velocity = default, Blocker = null,
+                Navigation = null, Connection = null, TransitQuarters = 4,
+                Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1
+            };
+            world.Publish(waiting.Id, "failed", "no_member_progress");
             return;
         }
-        var recoveries = waiting.Recoveries + 1;
-        if (recoveries > RouteSettings.RecoveryLimit)
-        {
-            world.Bodies[waiting.Id] = waiting with { Task = 0, Phase = WalkPhase.Failed,
-                Velocity = default, Blocker = null, Connection = null, TransitQuarters = 4,
-                Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1 };
-            world.Publish(waiting.Id, "failed", "no_reference_progress");
-            return;
-        }
-        var found = RoutePlanning.TryRoute(world, waiting.Position, task.Anchor, blockers, out var points, out var corners);
-        world.Bodies[waiting.Id] = waiting with { Recoveries = recoveries, RetryAtWait = waiting.WaitTicks + 90 };
-        if (found) world.Routes[task.Id] = task with { Points = points, Corners = corners,
-            Version = task.Version + 1, MapRevision = world.Revision };
-        world.Publish(waiting.Id, "retry", found ? "reference_replaced" : "no_route_this_round");
+        var prepared = RouteNavigation.Prepare(world, waiting, rebuild: true);
+        world.Bodies[waiting.Id] = prepared with
+            { Recoveries = attempts, RetryAtWait = waiting.WaitTicks + RouteSettings.WaitBeforeRetry };
+        world.Publish(waiting.Id, "retry", prepared.Navigation is null ? "member_route_unavailable" : "member_reference_replaced");
     }
 }

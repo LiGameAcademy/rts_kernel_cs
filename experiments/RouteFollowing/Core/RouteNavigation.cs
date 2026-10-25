@@ -1,0 +1,90 @@
+namespace Rts.Movement.Prototype;
+
+/// <summary>A member follows one terrain reference ending at its own task-owned goal.</summary>
+internal static class RouteNavigation
+{
+    internal static RouteTask Reference(Walker body) => body.Navigation is { } reference
+        ? new(body.Task, reference.Goal, reference.Points, reference.Version,
+            reference.MapRevision, reference.Corners)
+        : throw new InvalidOperationException("Member reference has not been prepared.");
+
+    internal static Walker Prepare(RouteWorld world, Walker body, bool rebuild = false)
+    {
+        var prior = body.Navigation;
+        if (!rebuild && prior is not null && prior.MapRevision == world.Revision && prior.Goal == body.Endpoint)
+            return body;
+        var blockers = world.Bodies.Values.Where(other => other.Id != body.Id
+            && RoutePlacements.IsFixed(other) && (other.Task != body.Task || other.Task == 0)).ToArray();
+        var version = (prior?.Version ?? 0) + 1;
+        IReadOnlyList<FixedVector2> points;
+        IReadOnlyList<int> corners;
+        var kind = MemberReferenceKind.Direct;
+        if (RoutePlanning.TryDirect(world, body.Position, body.Endpoint, blockers) is { } direct)
+        {
+            points = direct;
+            corners = [];
+        }
+        else if (TryShared(world, body, blockers, out points))
+        {
+            corners = RouteReference.FindCorners(points);
+            kind = MemberReferenceKind.SharedSuffix;
+        }
+        else
+        {
+            if (!RoutePlanning.TryRoute(world, body.Position, body.Endpoint, blockers, out points, out corners))
+                return body with { Navigation = null, Connection = null, Cursor = 0, RouteVersion = 0,
+                    Progress = 0, ProgressCursor = 0, ProgressVersion = 0 };
+            kind = MemberReferenceKind.Independent;
+        }
+        return body with
+        {
+            Navigation = new(body.Endpoint, world.Revision, version, kind, points, corners),
+            Cursor = 0, RouteVersion = version, Connection = null,
+            // Changing a route cannot manufacture signed physical progress or erase waits.
+            Progress = 0, ProgressCursor = 0, ProgressVersion = 0, TransitQuarters = 4
+        };
+    }
+
+    internal static (Walker Body, FixedVector2 Target, int Quarter) Follow(RouteWorld world, Walker source)
+    {
+        var body = Prepare(world, source);
+        if (body.Navigation is null) return (body, body.Position, 4);
+        var route = Reference(body);
+        var cursor = Math.Min(body.Cursor, route.Points.Count - 1);
+        while (cursor < route.Points.Count - 1 && body.Position == route.Points[cursor]) cursor++;
+        var target = route.Points[cursor];
+        // Visibility may skip terrain waypoints, but never relies on another body's predicted departure.
+        for (var i = cursor; i < route.Points.Count; i++)
+        {
+            if (SquaredDistance.Between(body.Position, route.Points[i]).Raw > (Int128)192 * 192 * SimScalar.Scale * SimScalar.Scale)
+                break;
+            if (StraightMovePath.TryFind(world.Navigation, body.Position, route.Points[i], 1) is null) continue;
+            cursor = i;
+            target = route.Points[i];
+        }
+        return (body with { Cursor = cursor }, target, 4);
+    }
+
+    private static bool TryShared(RouteWorld world, Walker body, Walker[] blockers,
+        out IReadOnlyList<FixedVector2> points)
+    {
+        points = [];
+        var shared = world.Routes[body.Task];
+        if (shared.MapRevision != world.Revision
+            || RoutePlanning.TryDirect(world, shared.Points[^1], body.Endpoint, blockers) is null) return false;
+        // Reuse only a reachable local suffix. No requirement to reach a fixed centre-line interval.
+        for (var i = shared.Points.Count - 1; i >= 0; i--)
+        {
+            if ((shared.Points[i] - body.Position).Length > 192
+                || RoutePlanning.TryDirect(world, body.Position, shared.Points[i], blockers) is null) continue;
+            var suffix = new List<FixedVector2> { body.Position };
+            suffix.AddRange(shared.Points.Skip(i));
+            if (suffix[^1] != body.Endpoint) suffix.Add(body.Endpoint);
+            if (suffix.Zip(suffix.Skip(1)).Any(edge => RoutePlanning.TryDirect(world, edge.First, edge.Second, blockers) is null))
+                continue;
+            points = suffix.ToArray();
+            return true;
+        }
+        return false;
+    }
+}

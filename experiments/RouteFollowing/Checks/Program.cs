@@ -3,7 +3,8 @@ using System.Text.Json;
 
 try
 {
-    if (args.Contains("--yield-checks"))
+    if (args.Contains("--navigation-checks")) RouteNavigationChecks.Run();
+    else if (args.Contains("--yield-checks"))
     {
         var untouched = RouteYieldChecks.Load("yield-single-329.json");
         var before = untouched.Save();

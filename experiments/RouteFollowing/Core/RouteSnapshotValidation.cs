@@ -21,6 +21,7 @@ internal static class RouteSnapshotValidation
                 || !task.Corners.SequenceEqual(task.Corners.Distinct().Order())
                 || !Point(task.Anchor) || task.Version < 1 || task.MapRevision < 0 || task.MapRevision > state.MapRevision)
                 throw new InvalidDataException("Invalid route.");
+        RouteNavigationValidation.Validate(state);
         foreach (var body in state.Units)
         {
             if (!Point(body.Position) || !Point(body.Preference) || !Point(body.Endpoint) || !Point(body.Offset)
@@ -39,13 +40,13 @@ internal static class RouteSnapshotValidation
                 || body.Task == 0 && body.Phase is WalkPhase.Following or WalkPhase.Waiting or WalkPhase.Settled or WalkPhase.Yielding
                 || body.Task != 0 && body.Phase is WalkPhase.Idle or WalkPhase.Stopped or WalkPhase.Failed || body.Blocker is { } blocker && (!ids.Contains(blocker) || blocker == body.Id)
                 || body.Task != 0 && (!tasks.Contains(body.Task)
-                    || body.RouteVersion == state.Tasks.Single(task => task.Id == body.Task).Version
+                    || body.Navigation is null && body.RouteVersion == state.Tasks.Single(task => task.Id == body.Task).Version
                     && body.Cursor >= state.Tasks.Single(task => task.Id == body.Task).Points.Count)
                 || body.Pending.Any(goal => !tasks.Contains(goal.Task) || !Point(goal.Preference) || !Point(goal.Offset)))
                 throw new InvalidDataException("Invalid member state.");
             if (body.Task != 0 && body.ProgressVersion > 0)
             {
-                var route = state.Tasks.Single(task => task.Id == body.Task);
+                var route = body.Navigation is null ? state.Tasks.Single(task => task.Id == body.Task) : RouteNavigation.Reference(body);
                 if (body.ProgressVersion > route.Version || body.ProgressVersion == route.Version
                     && (body.ProgressCursor < 1 || body.ProgressCursor >= route.Points.Count
                         || body.ProgressCursor != route.Points.Count - 1 && !route.Corners.Contains(body.ProgressCursor)))
