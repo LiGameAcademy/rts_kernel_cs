@@ -9,6 +9,37 @@ suffix or use existing terrain pathfinding. Local half-speed/six-direction sides
 proposals do not write another long-term route. Task-owned placement and existing
 bounded two-member cooperation remain authoritative.
 
+## Remaining-helper corridor protection — 2026-10-25
+
+Implementation d40233e; shared acceptance entry ba2d5be. Remaining active and future
+helper corridors derive from the existing task plan and bodies each tick. Direct,
+half-speed and side proposals check the same permission before timed safety;
+clear body queries cannot resurrect denied entry. Existing occupants can move
+outward. Control, map and deadline cancellation release the derived lease immediately.
+No extra authoritative fields, directions, helpers or changed retries/timeouts.
+
+All frozen executed gates now PASS: member 21 at frame 442, members 4/23 at 276/378,
+13 at 339; 18→7 finishes at 488 within the original 504 cutoff. All 34 corridor
+checks, 54 navigation checks and lifecycle, yield, placement, Stop/queue/restore
+boundary checks pass.
+
+Two cold CLI and two cold Godot processes agree on all nine state/event transcripts.
+All 7,116 timed ticks and 36 firsts are retained. Direction changes complete 24/24,
+followed by 90 settled ticks. The narrow scenario completes 17/24 with seven failures.
+All seven are already beyond the terrain gap, failing during destination gathering:
+three face active waiting peers, one a settled peer, three previously movement-failed
+stationary peers. This does not prove 24 units cannot traverse the gap, or authorize
+extending recovery until success.
+
+Overall remains FAIL. CLI peaks are 14.3980/49.8566ms, Godot 46.1787/16.6785ms; two
+narrow samples exceed 33.333ms, including CLI's first command. No CPU/scheduling
+attribution is claimed. First editor import also returned nonzero and is retained,
+although both runtime processes completed their checks normally. No production/host
+takeover, 300/500 matrix, new black-box window, merge or completion tag.
+
+Run the current member contract via CLI/Godot --member-acceptance; legacy --self-test
+and centre-line goldens remain separate. RTS_CLOSEOUT_EVIDENCE saves failure inputs.
+
 ## Space-clearing proof and corridor reoccupation — 2026-10-25
 
 External counterfactual only; runtime remains91d6f70. In the full504 world, a
