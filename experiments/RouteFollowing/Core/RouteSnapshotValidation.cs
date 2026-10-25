@@ -67,7 +67,8 @@ internal static class RouteSnapshotValidation
                 || plan.Next < 0 || plan.Next >= plan.Members.Count || plan.StartedAt < 0 || plan.StartedAt > state.Frame
                 || plan.MapRevision < 0 || plan.MapRevision > state.MapRevision || !ids.Contains(plan.Requester)
                 || plan.Members.Contains(plan.Requester) || state.Units.Single(b => b.Id == plan.Requester).Task != task.Id
-                || state.Units.Single(b => b.Id == plan.Requester).Phase is not (WalkPhase.Following or WalkPhase.Waiting)
+                || state.Units.Single(b => b.Id == plan.Requester).Phase is not (WalkPhase.Following or WalkPhase.Waiting or WalkPhase.Settled)
+                || state.Units.Single(b => b.Id == plan.Requester) is { Phase: WalkPhase.Settled, Pending.Count: > 0 }
                 || plan.Members.Any(id => !ids.Contains(id) || state.Units.Single(b => b.Id == id).Task != task.Id
                     || state.Units.Single(b => b.Id == id).Pending.Count != 0)
                 || plan.Members.Where((id, index) => index == plan.Next).Any(id => state.Units.Single(b => b.Id == id).Phase != WalkPhase.Yielding)

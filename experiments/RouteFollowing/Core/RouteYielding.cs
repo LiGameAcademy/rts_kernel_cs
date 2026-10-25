@@ -47,7 +47,9 @@ internal static class RouteYielding
         {
             var plan = source.Yield!;
             var valid = world.Bodies.TryGetValue(plan.Requester, out var requester)
-                && requester.Task == source.Id && requester.Phase is WalkPhase.Following or WalkPhase.Waiting
+                && requester.Task == source.Id
+                && (requester.Phase is WalkPhase.Following or WalkPhase.Waiting
+                    || requester.Phase == WalkPhase.Settled && requester.Pending.Count == 0)
                 && plan.MapRevision == world.Revision && world.Frame - plan.StartedAt < 90
                 && plan.Members.All(id => world.Bodies[id].Task == source.Id && world.Bodies[id].Pending.Count == 0);
             if (!valid)

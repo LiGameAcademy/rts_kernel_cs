@@ -15,6 +15,7 @@ internal static class RouteMotion
         {
             var (body, target, _) = source.Phase == WalkPhase.Yielding
                 ? (source, source.Endpoint, 4) : RouteNavigation.Follow(world, source);
+            body = body with { Passage = RouteMotionCandidates.RetainPassage(world, body) };
             var step = RouteMotionCandidates.Compute(world, body, target, RouteSettings.Speed);
             proposals.Add(new(body, target, step));
             reservations.Put(new(new(body.Id), 31, step.Trace, step.Times));
@@ -29,7 +30,7 @@ internal static class RouteMotion
             var body = proposal.Body;
             var blocker = held.Contains(new(body.Id))
                 ? reservations.FirstMotionConflict(new(new(body.Id), 31, step.Trace, step.Times))?.Value : null;
-            PassageState? passage = null;
+            var passage = body.Passage;
             // A cancelled proposal whose dependencies are now safe may resume immediately.
             if (blocker is { } id && alternatives++ < 16
                 && RouteMotionCandidates.TryAlternative(world, proposal, id, reservations, out var alternative, out passage))

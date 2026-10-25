@@ -5,6 +5,17 @@ internal sealed record MotionProposal(Walker Body, FixedVector2 Target, Movement
 /// <summary>Frame-local alternatives never replace a member's navigation reference or endpoint.</summary>
 internal static class RouteMotionCandidates
 {
+    internal static PassageState? RetainPassage(RouteWorld world, Walker body)
+    {
+        if (body.Passage is not { } passage
+            || !world.Bodies.TryGetValue(passage.Blocker, out var other)) return null;
+        // One conflict-free tick is not a completed encounter. Release beyond the
+        // bodies' contact range plus one existing pathing cell, without a timer.
+        var reach = RouteSettings.Radius * 2 + world.Navigation.Grid.CellSize;
+        return SquaredDistance.Between(body.Position, other.Position).Raw <= (Int128)reach.Raw * reach.Raw
+            ? passage : null;
+    }
+
     internal static MovementStep Compute(RouteWorld world, Walker body, FixedVector2 target, SimScalar speed)
     {
         if (StraightMovePath.TryFind(world.Navigation, body.Position, target, 1) is null)

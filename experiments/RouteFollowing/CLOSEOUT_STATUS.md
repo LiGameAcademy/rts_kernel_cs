@@ -9,6 +9,36 @@ suffix or use existing terrain pathfinding. Local half-speed/six-direction sides
 proposals do not write another long-term route. Task-owned placement and existing
 bounded two-member cooperation remain authoritative.
 
+## Lifecycle repair follow-up — 2026-10-25
+
+The two reproduced lifecycle defects are repaired: a direct clear tick retains a
+nearby passage side, and a requester still settled in its task can retain an active
+helper leg. Stop, new orders, queued takeover, map invalidation and the90-tick plan
+deadline still cancel old control. Nearby means body contact range plus one existing
+pathing cell (94 for the current experiment), an experimental geometric hysteresis,
+not a Warcraft III constant or a newly approved final gameplay parameter.
+
+Four lifecycle boundary groups pass; the54 navigation checks and original yield
+boundary checks also pass. Production code and all golden expectations are unchanged.
+
+The executed gate remains **FAIL**.21 reaches its endpoint at455 rather than328
+(a127-tick regression, with6 rather than3 goal revisions);4/23 still reach at276/377,
+and13 finishes cooperation at339.18 starts at445 and7 at470, but at504 the plan is
+still on its second leg:7 waits for1,1 waits for7;7 remains85.329642 units from its
+goal. The60-tick diagnostic replay preserves the original deadline and matches hash
+`AC9FFD40455E29BD0CC11B7432C5F17FD9BED566D841A309BF8FBE5614064CA2`.
+Requester settlement no longer cancels the plan. This is not evidence of permanent
+deadlock, nor permission to extend the test until it passes.
+
+544 actual Step records and all four first ticks are retained. CLI peaks are
+3.9938/1.3706/0.5276/2.2647ms. These are frozen samples after explicit preparation,
+not500-unit or cold-Godot acceptance. The existing production mover prioritizes
+helpers; this experiment still sorts by waiting and ID. Whether prioritizing the
+helper is sufficient has not been tested and is not claimed as a solution.
+
+Stop at this failed gate. No aggregate24 regression,300/500 load, production takeover
+or new test window. Preserve the old failure history below;PR155 remains draft.
+
 ## Actual verification
 
 - Navigation/state boundary suite:54 assertions pass, including restore continuation,
