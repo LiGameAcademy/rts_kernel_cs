@@ -6,6 +6,7 @@ internal static class RouteMotion
     internal static void Advance(RouteWorld world)
     {
         RouteRecovery.Advance(world);
+        var corridors = new RouteYieldCorridors(world);
         var reservations = new CrowdReservations(64);
         foreach (var body in world.Bodies.Values)
             reservations.Put(CrowdBody.Stationary(new(body.Id), 31, body.Position));
@@ -18,7 +19,9 @@ internal static class RouteMotion
             body = body with { Passage = RouteMotionCandidates.RetainPassage(world, body) };
             var step = RouteMotionCandidates.Compute(world, body, target, RouteSettings.Speed);
             proposals.Add(new(body, target, step));
-            reservations.Put(new(new(body.Id), 31, step.Trace, step.Times));
+            reservations.Put(corridors.FirstConflict(body, step.Trace) is null
+                ? new(new(body.Id), 31, step.Trace, step.Times)
+                : CrowdBody.Stationary(new(body.Id), 31, body.Position));
         }
         var ordered = proposals.OrderByDescending(item => item.Body.WaitTicks).ThenBy(item => item.Body.Id).ToArray();
         var held = CrowdMotionResolver.Resolve(reservations, ordered.Select(item => new EntityId(item.Body.Id)).ToArray());
@@ -28,12 +31,14 @@ internal static class RouteMotion
         {
             var step = proposal.Step;
             var body = proposal.Body;
-            var blocker = held.Contains(new(body.Id))
-                ? reservations.FirstMotionConflict(new(new(body.Id), 31, step.Trace, step.Times))?.Value : null;
+            // A clear body query cannot restore a proposal denied by the active corridor.
+            var blocker = corridors.FirstConflict(body, step.Trace)
+                ?? (held.Contains(new(body.Id))
+                    ? reservations.FirstMotionConflict(new(new(body.Id), 31, step.Trace, step.Times))?.Value : null);
             var passage = body.Passage;
             // A cancelled proposal whose dependencies are now safe may resume immediately.
             if (blocker is { } id && alternatives++ < 16
-                && RouteMotionCandidates.TryAlternative(world, proposal, id, reservations, out var alternative, out passage))
+                && RouteMotionCandidates.TryAlternative(world, proposal, id, reservations, corridors, out var alternative, out passage))
             {
                 step = alternative;
                 blocker = null;

@@ -25,12 +25,12 @@ internal static class RouteMotionCandidates
     }
 
     internal static bool TryAlternative(RouteWorld world, MotionProposal proposal, ulong blocker,
-        CrowdReservations reservations, out MovementStep step, out PassageState? passage)
+        CrowdReservations reservations, RouteYieldCorridors corridors, out MovementStep step, out PassageState? passage)
     {
         var body = proposal.Body;
         passage = body.Passage?.Blocker == blocker ? body.Passage : null;
         step = Compute(world, body, proposal.Target, RouteSettings.Speed / 2);
-        if (Safe(body, step, reservations)) return true;
+        if (Safe(body, step, reservations, corridors)) return true;
         var heading = SimMath.Atan2(proposal.Target.Y - body.Position.Y, proposal.Target.X - body.Position.X);
         // The first safe side persists for this blocker. With no history, prefer right-hand passage.
         var sides = passage is not null ? new[] { passage.Side } : new[] { -1, 1 };
@@ -41,14 +41,15 @@ internal static class RouteMotionCandidates
             var reach = world.Navigation.Grid.CellSize / 2;
             var target = body.Position + new FixedVector2(SimMath.Cos(angle) * reach, SimMath.Sin(angle) * reach);
             step = Compute(world, body, target, RouteSettings.Speed);
-            if (!Safe(body, step, reservations)) continue;
+            if (!Safe(body, step, reservations, corridors)) continue;
             passage = new(blocker, side);
             return true;
         }
         return false;
     }
 
-    private static bool Safe(Walker body, MovementStep step, CrowdReservations reservations) =>
+    private static bool Safe(Walker body, MovementStep step, CrowdReservations reservations, RouteYieldCorridors corridors) =>
         step.Failure is null && step.Position != body.Position
+        && corridors.FirstConflict(body, step.Trace) is null
         && reservations.FirstMotionConflict(new(new(body.Id), 31, step.Trace, step.Times)) is null;
 }

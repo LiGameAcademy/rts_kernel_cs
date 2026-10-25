@@ -4,6 +4,7 @@ using System.Text.Json;
 try
 {
     if (args.Contains("--yield-boundaries-only")) { RouteYieldBoundaries.Run(); Console.WriteLine("yield_boundaries_only=PASS"); }
+    else if (args.Contains("--corridor-checks")) RouteYieldCorridorChecks.Run();
     else if (args.Contains("--lifecycle-checks")) RouteLifecycleChecks.Run();
     else if (args.Contains("--closeout-failure-audit")) RouteCloseoutFailureAudit.Run(Console.WriteLine);
     else if (args.Contains("--closeout-gates")) Environment.ExitCode = RouteCloseoutChecks.Run(Console.WriteLine) ? 0 : 1;
