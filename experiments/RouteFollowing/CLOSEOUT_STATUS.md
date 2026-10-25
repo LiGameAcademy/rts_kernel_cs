@@ -9,6 +9,27 @@ suffix or use existing terrain pathfinding. Local half-speed/six-direction sides
 proposals do not write another long-term route. Task-owned placement and existing
 bounded two-member cooperation remain authoritative.
 
+## Space-clearing proof and corridor reoccupation — 2026-10-25
+
+External counterfactual only; runtime remains91d6f70. In the full504 world, a
+geometry-derived retreat within half a cell reaches its target at510. Member1
+advances, but1/7 wait again from512. At534,7 is91.515174 from its unchanged endpoint
+(control85.329642); the original plan deadline remains535. Reject this candidate.
+The30 extra diagnostic ticks do not extend or pass the already-failed60-tick gate.
+
+An unmodified444→504 replay reproduces the original final hash. The future7-helper
+corridor is initially clear of nonparticipants;5 enters at465, still occupies it
+when7 activates at469, and1 enters at473. Both occupy it at504. Plan-time full-sweep
+validation does not preserve that space during execution. Next work should first
+prove bounded protection of the existing remaining helper corridor, not add retreat
+angles or another priority order. No such protection is implemented or proven yet.
+
+All120 actual diagnostic steps and four first ticks are kept, including unprepared
+control first ticks66.2304/52.1612ms over33.333ms. Warm candidate timings are not cold
+performance acceptance. A deferred-enumeration defect affected first-run member
+rows; corrected replay retains matching per-frame hashes/events. Full evidence is
+archived in internal documents. No production takeover, host launch or completion.
+
 ## Helper-priority A/B validation — 2026-10-25
 
 Validation only; the algorithm in this branch remains91d6f70. Two external cold
