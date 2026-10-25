@@ -38,7 +38,7 @@ public static class RouteCheckSuite
         return passed;
     }
 
-    private static bool Scenario(int scenario, Action<string> output)
+    internal static bool Scenario(int scenario, Action<string> output)
     {
         var world = RouteScenarios.Create(scenario);
         var frames = new List<object>();
@@ -55,7 +55,8 @@ public static class RouteCheckSuite
             if (scenario == 5 && ticks is 31 or 62 or 93 or 124)
                 world.Move(world.Units.Select(body => body.Id), ticks % 62 == 0 ? new(1550, 640) : new(450, 640));
             var before = world.Units;
-            var resumed = ticks % 37 == 0 ? RouteWorld.Load(world.Save()) : null;
+            var beforeSnapshot = world.Save();
+            var resumed = RouteWorld.Load(beforeSnapshot);
             var watch = Stopwatch.StartNew(); world.Step(); watch.Stop();
             var ms = watch.Elapsed.TotalMilliseconds;
             peak = Math.Max(peak, ms);
@@ -77,6 +78,13 @@ public static class RouteCheckSuite
                 Check((after[i].Position - before[i].Position).Length <= 10, "no teleport/speedup");
                 for (var j = i + 1; j < after.Count; j++)
                     Check((after[i].Position - after[j].Position).Length >= 62, "no overlap");
+            }
+            if (world.Events.Any(item => item.Kind == "failed")
+                && Environment.GetEnvironmentVariable("RTS_CLOSEOUT_EVIDENCE") is { Length: > 0 } folder)
+            {
+                Directory.CreateDirectory(folder);
+                File.WriteAllText(Path.Combine(folder, $"scenario-{scenario}-before-{world.Frame}-failure.json"), beforeSnapshot);
+                File.WriteAllText(Path.Combine(folder, $"scenario-{scenario}-after-{world.Frame}-failure.json"), world.Save());
             }
             goalEvents.AddRange(world.Events.Where(item => item.Kind is "goal_reassigned" or "goal_repair_blocked"));
             failed += world.Events.Count(item => item.Kind == "failed");

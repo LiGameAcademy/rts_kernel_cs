@@ -29,10 +29,15 @@ public partial class RouteFollowingProbe : Node2D
     {
         _capture = OS.GetCmdlineUserArgs().Contains("--capture");
         _font = new SystemFont { FontNames = ["Microsoft YaHei UI", "Arial"] };
-        if (OS.GetCmdlineUserArgs().Contains("--self-test"))
+        if (OS.GetCmdlineUserArgs().Contains("--self-test") || OS.GetCmdlineUserArgs().Contains("--member-acceptance"))
         {
             SetProcess(false);
-            try { GetTree().Quit(RouteCheckSuite.Run(line => GD.Print(line)) ? 0 : 1); }
+            try
+            {
+                var passed = OS.GetCmdlineUserArgs().Contains("--member-acceptance")
+                    ? RouteMemberChecks.Run(line => GD.Print(line)) : RouteCheckSuite.Run(line => GD.Print(line));
+                GetTree().Quit(passed ? 0 : 1);
+            }
             catch (Exception error) { GD.PushError(error.ToString()); GetTree().Quit(1); }
             return;
         }

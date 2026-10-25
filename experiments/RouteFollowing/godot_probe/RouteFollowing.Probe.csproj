@@ -23,4 +23,10 @@
     <EmbeddedResource Include="../Checks/Fixtures/narrow-entry-47.json" LogicalName="narrow-entry-47.json" />
     <EmbeddedResource Include="../Checks/Fixtures/narrow-entry-120.json" LogicalName="narrow-entry-120.json" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Checks/RouteMemberChecks.cs" Link="RouteMemberChecks.cs" />
+    <Compile Include="../Checks/RouteCloseoutChecks.cs" Link="RouteCloseoutChecks.cs" />
+    <EmbeddedResource Include="../Checks/Fixtures/closeout-before-151.json" LogicalName="closeout-before-151.json" />
+    <EmbeddedResource Include="../Checks/Fixtures/closeout-before-259.json" LogicalName="closeout-before-259.json" />
+  </ItemGroup>
 </Project>
