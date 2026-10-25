@@ -9,6 +9,37 @@ suffix or use existing terrain pathfinding. Local half-speed/six-direction sides
 proposals do not write another long-term route. Task-owned placement and existing
 bounded two-member cooperation remain authoritative.
 
+## Helper-priority A/B validation — 2026-10-25
+
+Validation only; the algorithm in this branch remains91d6f70. Two external cold
+CLI processes use the same source, fixtures and kernel DLLs; the sole candidate
+change ranks Yielding before the existing waiting/ID keys. Both builds have zero
+warnings and errors after fixing the external projects' initially shared NuGet
+intermediate path. The initial failed build log is retained.
+
+The control reproduces the previous pair's complete frame transcript and final
+hash. The helper-first candidate starts7 at469 rather than470, but both still fail
+the original60-tick18→7 gate. At504 the candidate also has1↔7 waiting and the plan
+still atNext1.13's single-helper case finishes at339 in both variants.
+
+240 measured steps and all four first ticks are retained. Control peaks are
+1.2768/3.5763ms; candidate peaks1.9553/2.9205ms. Preparation1826.7172/2041.9168ms is
+separate and does not mutate authority. One run per variant cannot establish a
+performance improvement; functional acceptance fails regardless.
+
+Diagnostic60-tick replays reproduce each variant's measured final hash. Read-only
+queries of both504 worlds leave Save unchanged. With the other bodies held at their
+snapshot positions, direct/half-speed/all six side steps for1 and7 each conflict
+with bodies while all terrain checks pass. This explains why priority alone is
+insufficient here; it does not prove all coordinated multi-body motion impossible.
+For the candidate,7's right-side choices meet5/6 and its left choices meet1;1's
+rightmost choice meets10. These are body constraints, not hidden terrain obstacles.
+
+The candidate is rejected, not adopted. No extra directions, changed thresholds,
+expanded search, new joint solver or production takeover. Next work needs an actual
+executable passage/space-clearing proof, not another priority permutation. No
+aggregate24/500 or cold-Godot acceptance was run. PR155 stays draft.
+
 ## Lifecycle repair follow-up — 2026-10-25
 
 The two reproduced lifecycle defects are repaired: a direct clear tick retains a
