@@ -16,4 +16,6 @@
     <EmbeddedResource Include="Fixtures/closeout-before-259.json" LogicalName="closeout-before-259.json" />
   </ItemGroup>
   <ItemGroup><EmbeddedResource Include="Fixtures/passage-cancel-before-476.json" LogicalName="passage-cancel-before-476.json" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="Fixtures/gathering-before-268.json" LogicalName="gathering-before-268.json" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="Fixtures/gathering-before-357.json" LogicalName="gathering-before-357.json" /></ItemGroup>
 </Project>

@@ -55,8 +55,8 @@ internal static class RoutePlacements
     {
         var task = world.Routes[requester.Task];
         if (requester.Recoveries >= RouteSettings.RecoveryLimit || task.Yield is not null || members.Length is < 1 or > 2 || goals.Length != members.Length
-            || members.Distinct().Count() != members.Length || requester.Blocker != members[^1]
-            || members.Any(id => !world.Bodies.TryGetValue(id, out var body) || !RouteYielding.Eligible(body, task.Id))) return false;
+            || members.Distinct().Count() != members.Length || members.Contains(requester.Id) || requester.Blocker != members[^1]
+            || members.Any(id => !world.Bodies.TryGetValue(id, out var body) || !RouteYielding.CanParticipate(body, task.Id))) return false;
         var root = world.Bodies[members[^1]];
         if (!CrowdGeometry.Overlap(requester.Position, requester.Endpoint, 31, root.Position, root.Position, 31)
             || CrowdGeometry.Overlap(requester.Position, requester.Endpoint, 31, goals[^1], goals[^1], 31)) return false;
