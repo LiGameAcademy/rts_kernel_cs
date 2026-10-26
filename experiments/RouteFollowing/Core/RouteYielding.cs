@@ -12,8 +12,13 @@ internal static class RouteYielding
     internal static bool TryStart(RouteWorld world, Walker requester)
     {
         var work = 0;
-        return TryStart(world, requester, allowWaiting: false, ref work)
-            || work < 2048 && TryStart(world, requester, allowWaiting: true, ref work);
+        return TryStart(world, requester, ref work);
+    }
+
+    internal static bool TryStart(RouteWorld world, Walker requester, ref int work)
+    {
+        return work < 2048 && (TryStart(world, requester, allowWaiting: false, ref work)
+            || work < 2048 && TryStart(world, requester, allowWaiting: true, ref work));
     }
 
     private static bool TryStart(RouteWorld world, Walker requester, bool allowWaiting, ref int work)
@@ -93,7 +98,7 @@ internal static class RouteYielding
             var body = world.Bodies[id];
             if (body.Task != task.Id) continue; // Stop/new orders already own this body.
             world.Bodies[id] = body with { Phase = body.Position == body.Endpoint ? WalkPhase.Settled : WalkPhase.Following,
-                Connection = null, Blocker = null, Velocity = default };
+                Connection = null, Blocker = null, Velocity = default, Recovery = null, BlockingContacts = null };
         }
         world.Routes[task.Id] = task with { Yield = null };
         world.Publish(task.Yield.Requester, "yield_cancelled");

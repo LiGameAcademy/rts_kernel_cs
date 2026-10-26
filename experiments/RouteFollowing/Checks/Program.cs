@@ -3,7 +3,9 @@ using System.Text.Json;
 
 try
 {
-    if (args.Contains("--yield-boundaries-only")) { RouteYieldBoundaries.Run(); Console.WriteLine("yield_boundaries_only=PASS"); }
+    if (args.Contains("--recovery-boundaries")) RouteRecoveryBoundaries.Run();
+    else if (args.Contains("--recovery-gate")) RouteRecoveryChecks.Frozen(Console.WriteLine);
+    else if (args.Contains("--yield-boundaries-only")) { RouteYieldBoundaries.Run(); Console.WriteLine("yield_boundaries_only=PASS"); }
     else if (args.Contains("--active-yield-checks")) RouteActiveYieldChecks.Run(Console.WriteLine);
     else if (args.Contains("--gathering-audit")) RouteGatheringAudit.Run(Console.WriteLine);
     else if (args.Contains("--member-acceptance")) Environment.ExitCode = RouteMemberChecks.Run(Console.WriteLine) ? 0 : 1;

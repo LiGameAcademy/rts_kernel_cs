@@ -29,11 +29,17 @@ public partial class RouteFollowingProbe : Node2D
     {
         _capture = OS.GetCmdlineUserArgs().Contains("--capture");
         _font = new SystemFont { FontNames = ["Microsoft YaHei UI", "Arial"] };
-        if (OS.GetCmdlineUserArgs().Contains("--self-test") || OS.GetCmdlineUserArgs().Contains("--member-acceptance"))
+        if (OS.GetCmdlineUserArgs().Contains("--self-test") || OS.GetCmdlineUserArgs().Contains("--member-acceptance") || OS.GetCmdlineUserArgs().Contains("--recovery-gate"))
         {
             SetProcess(false);
             try
             {
+                if (OS.GetCmdlineUserArgs().Contains("--recovery-gate"))
+                {
+                    RouteRecoveryChecks.Frozen(line => GD.Print(line));
+                    GetTree().Quit();
+                    return;
+                }
                 var passed = OS.GetCmdlineUserArgs().Contains("--member-acceptance")
                     ? RouteMemberChecks.Run(line => GD.Print(line)) : RouteCheckSuite.Run(line => GD.Print(line));
                 GetTree().Quit(passed ? 0 : 1);

@@ -8,9 +8,7 @@ public static class RouteActiveYieldChecks
 {
     public static void Run(Action<string> output)
     {
-        using var stream = typeof(RouteActiveYieldChecks).Assembly.GetManifestResourceStream("gathering-before-357.json")!;
-        using var reader = new StreamReader(stream);
-        var world = RouteWorld.Load(reader.ReadToEnd());
+        var world = RouteYieldChecks.Load("gathering-before-357.json");
         ContractChecks(world, output);
         var original = world.Units.ToDictionary(body => body.Id);
         var saved = world.Save();
@@ -84,9 +82,7 @@ public static class RouteActiveYieldChecks
         var requester = world.Units.Single(body => body.Id == 17);
         Check(!RoutePlacements.TryBeginYield(world, requester, [requester.Id], [requester.Endpoint]), "Requester cannot recruit itself");
         Check(world.Save() == before, "Rejected participant admission preserves authority");
-        using var input = typeof(RouteActiveYieldChecks).Assembly.GetManifestResourceStream("gathering-before-268.json")!;
-        using var reader = new StreamReader(input);
-        var rejected = RouteWorld.Load(reader.ReadToEnd());
+        var rejected = RouteYieldChecks.Load("gathering-before-268.json");
         var saved = rejected.Save();
         Check(!RouteYielding.TryStart(rejected, rejected.Units.Single(body => body.Id == 7)), "No forced plan in the 267 rejection case");
         Check(rejected.Save() == saved, "Failed search commits no partial goals, attempts or plans");

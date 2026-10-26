@@ -82,6 +82,8 @@ public sealed class RouteWorld
         Navigation = candidate;
         Revision++;
         PlacementRevision++;
+        foreach (var body in Bodies.Values.Where(body => body.Recovery is not null || body.BlockingContacts is not null).ToArray())
+            Bodies[body.Id] = body with { Recovery = null, BlockingContacts = null };
         return true;
     }
 
@@ -111,7 +113,7 @@ public sealed class RouteWorld
                 if (body.Phase == WalkPhase.Settled && (allSettled || body.Pending.Count > 0))
                 {
                     Bodies[body.Id] = body with { Task = 0, Phase = WalkPhase.Idle, Velocity = default, Blocker = null, TransitQuarters = 4,
-                        Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1, Navigation = null, Passage = null };
+                        Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1, Navigation = null, Passage = null, Recovery = null, BlockingContacts = [] };
                     Publish(body.Id, "completed");
                 }
         }
@@ -130,7 +132,7 @@ public sealed class RouteWorld
                 var body = Bodies[id];
                 Bodies[id] = body with { Task = 0, Phase = WalkPhase.Stopped, Pending = [], Velocity = default,
                     Blocker = null, WaitTicks = 0, Recoveries = 0, RecentGroup = 0, Connection = null, TransitQuarters = 4,
-                    Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1, Navigation = null, Passage = null };
+                    Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1, Navigation = null, Passage = null, Recovery = null, BlockingContacts = [] };
                 Publish(id, "stopped");
             }
             return;
@@ -165,7 +167,7 @@ public sealed class RouteWorld
         Task = intent.Task, Offset = intent.Offset,
         Cursor = 0, Phase = WalkPhase.Following, WaitTicks = 0, RetryAtWait = 90, Recoveries = 0,
         Progress = 0, ProgressCursor = 0, ProgressVersion = 0, RouteVersion = 0, Blocker = null, Velocity = default,
-        RecentGroup = body.Task != 0 ? body.Task : body.RecentGroup, Connection = null, TransitQuarters = 4, Navigation = null, Passage = null
+        BlockingContacts = null, Recovery = null, RecentGroup = body.Task != 0 ? body.Task : body.RecentGroup, Connection = null, TransitQuarters = 4, Navigation = null, Passage = null
     }, intent.Preference);
 
     internal void Publish(ulong id, string kind, string detail = "") =>
@@ -174,6 +176,8 @@ public sealed class RouteWorld
     private static RouteYieldPlan? CopyYield(RouteYieldPlan? plan) => plan is null ? null
         : plan with { Members = plan.Members.ToArray() };
     private static Walker Copy(Walker body) => body with { Pending = body.Pending.ToArray(),
+        BlockingContacts = body.BlockingContacts?.ToArray(),
+        Recovery = body.Recovery is { } probe ? probe with { Candidates = probe.Candidates.ToArray() } : null,
         Connection = body.Connection is { } connection ? connection with { Points = connection.Points.ToArray() } : null,
         Navigation = body.Navigation is { } reference ? reference with
             { Points = reference.Points.ToArray(), Corners = reference.Corners.ToArray() } : null };

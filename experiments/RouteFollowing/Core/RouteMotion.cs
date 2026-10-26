@@ -49,11 +49,15 @@ internal static class RouteMotion
         }
         // Selection may update reservations, but authority remains untouched until every choice is fixed.
         foreach (var (proposal, step, blocker, passage) in selected)
-            Commit(world, proposal, step, blocker, passage);
+        {
+            var proposed = new CrowdBody(new(proposal.Body.Id), 31, proposal.Step.Trace, proposal.Step.Times);
+            var contacts = blocker is null ? Array.Empty<ulong>() : reservations.MotionConflicts(proposed).Select(id => id.Value).ToArray();
+            Commit(world, proposal, step, blocker, passage, contacts);
+        }
     }
 
     private static void Commit(RouteWorld world, MotionProposal proposal, MovementStep step,
-        ulong? blocker, PassageState? passage)
+        ulong? blocker, PassageState? passage, ulong[] contacts)
     {
         var body = proposal.Body;
         var moved = blocker is null && step.Position != body.Position;
@@ -63,13 +67,13 @@ internal static class RouteMotion
             Facing = step.Facing,
             Velocity = moved ? (step.Position - body.Position) * RouteSettings.TickRate : default,
             Phase = body.Phase == WalkPhase.Yielding ? WalkPhase.Yielding : moved ? WalkPhase.Following : WalkPhase.Waiting,
-            Blocker = blocker, Passage = passage, Connection = null, TransitQuarters = 4,
+            Blocker = blocker, BlockingContacts = contacts, Passage = passage, Connection = null, TransitQuarters = 4,
             WaitTicks = body.WaitTicks + (moved ? 0 : 1)
         };
         if (body.Phase != WalkPhase.Yielding && body.Navigation is not null)
             updated = RouteProgress.Measure(body, updated, RouteNavigation.Reference(body));
         if (blocker is null && step.Position == body.Endpoint)
-            updated = updated with { Phase = WalkPhase.Settled, Velocity = default, Blocker = null, Passage = null };
+            updated = updated with { Phase = WalkPhase.Settled, Velocity = default, Blocker = null, Passage = null, Recovery = null, BlockingContacts = [] };
         world.Bodies[body.Id] = updated;
     }
 }

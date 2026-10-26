@@ -38,6 +38,19 @@ internal static class TimedTrajectoryChecks
             check(reservations.FirstMotionConflict(reservations.Read(new(id))) is null, "resolved chain is simultaneously safe");
         check(reservations.Read(new(3)).Trace[0] == new FixedVector2(8, 0), "static obstacle does not move during conflict resolution");
 
+        var contacts = new CrowdReservations(4);
+        contacts.Put(a);
+        contacts.Put(crossing);
+        contacts.Put(Body(7, [new(0, -10), new(0, 10)], [0, 1]));
+        contacts.Put(earlier with { Id = new(9) });
+        var beforeQuery = contacts.Read(new(2));
+        check(contacts.MotionConflicts(a).SequenceEqual(new EntityId[] { new(2), new(7) }),
+            "all contacts use timed geometry and stable identity order");
+        check(contacts.FirstMotionConflict(a) == new EntityId(2) && contacts.Read(new(2)) == beforeQuery,
+            "reading all contacts preserves first-conflict result and reservations");
+        var detached = contacts.MotionConflicts(a); detached[0] = new(499);
+        check(contacts.MotionConflicts(a)[0] == new EntityId(2), "contact query returns an independent result");
+
         var entity = new EntityState(new(1), 0, default, default);
         var order = new MoveOrder(new(new(10, 0), 120), new FixedVector2[] { new(1, 0), new(10, 0) });
         var step = MovementStepper.Compute(entity, order, 30, null);

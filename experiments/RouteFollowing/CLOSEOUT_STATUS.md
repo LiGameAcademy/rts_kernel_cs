@@ -9,6 +9,31 @@ suffix or use existing terrain pathfinding. Local half-speed/six-direction sides
 proposals do not write another long-term route. Task-owned placement and existing
 bounded two-member cooperation remain authoritative.
 
+## Actual contacts and bounded recovery rounds — 2026-10-26
+
+Experimental snapshot8 persists final timed collision contacts and a bounded recovery
+cursor. Format7 is rejected at runtime; frozen fixture adaptation changes only shape.
+Recovery tries the original contact first, then other real eligible contacts, one root
+per tick sharing the old 2,048 pair cap. Candidate waiting does not consume a round.
+Unchanged reference geometry retains version/cursor/physical progress and reports
+no_recovery_candidate after an exhausted round. Limits remain32/90/3 and two helpers.
+
+The exact frame387 world now automatically tries1/3 at388/389 and starts13→4 at390.
+All24 finish at889, followed by90 stable ticks. Two cold CLI and two cold Godot
+processes retain592 ticks each, including firsts, agree on every state/event and
+per-tick restore. Peaks21.9764/19.8748/30.3711/22.1432ms all meet33.333ms in this gate.
+
+Full-from-start narrow remains21/24;1/22/23 fail at559/560/625. Both final cold CLI
+runs confirm it; direction changes remain24/24. Stop/new-order/queue/map/restore,
+contact/probe ownership and old/corrupt snapshot checks pass. The existing timed
+kernel checks pass24,382 assertions with the new read-only all-contact query.
+
+Two cold Godot full-suite processes stop at the original21 frozen case because
+frame430 costs119.8594/38.0377ms (arrival itself succeeds at442). Later full scenarios
+were NOT run there. Keep these overruns and earlier37.314ms/intermediate failures;
+no CPU/scheduling attribution is claimed for the untimed-CPU430 samples. No300/500
+matrix, main-game takeover, merge, tag or new black-box handoff. Overall FAIL.
+
 ## Waiting-member cooperation — 2026-10-26
 
 f077595 preserves settled-first planning, then admits same-task Waiting helpers

@@ -29,4 +29,9 @@
     <EmbeddedResource Include="../Checks/Fixtures/closeout-before-151.json" LogicalName="closeout-before-151.json" />
     <EmbeddedResource Include="../Checks/Fixtures/closeout-before-259.json" LogicalName="closeout-before-259.json" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Checks/RouteRecoveryChecks.cs" Link="RouteRecoveryChecks.cs" />
+    <Compile Include="../Checks/RecoveryClock.cs" Link="RecoveryClock.cs" />
+    <EmbeddedResource Include="../Checks/Fixtures/recovery-blockers-before-388.json" LogicalName="recovery-blockers-before-388.json" />
+  </ItemGroup>
 </Project>
