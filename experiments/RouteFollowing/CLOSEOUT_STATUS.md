@@ -9,6 +9,24 @@ suffix or use existing terrain pathfinding. Local half-speed/six-direction sides
 proposals do not write another long-term route. Task-owned placement and existing
 bounded two-member cooperation remain authoritative.
 
+## Waiting-member cooperation — 2026-10-26
+
+f077595 preserves settled-first planning, then admits same-task Waiting helpers
+with no pending work. Following, Stop, ordinary Idle and other tasks remain excluded.
+Both passes share the original 2,048 pair-check cap; no larger window or extra state.
+
+A complete frame-356 world admits 18→7 cooperation for member 17 at 357. It finishes
+at 383; the requester gains 48.994749 toward its original goal within 90 ticks.
+Per-tick restore, 10 admission contracts and all original frozen/boundary gates pass.
+Frame 267 remains a safe rejection case, not a demand for instant universal recovery.
+
+Controlled CLI full-world completion improves 17/24 to 20/24; 1/2/22/23 still fail.
+Direction changes remain 24/24 with 90 stable ticks. Unchanged-path retries fall
+from 13 to 7, so ineffective recovery accounting is still unresolved. Global A*,
+production/host and snapshot format 7 are unchanged. No new Godot/300/500 matrix,
+merge, black-box handoff or completion claim. Driver mistakes and failed probes
+are archived alongside controlled results; they are not substituted as passing runs.
+
 ## Remaining-helper corridor protection — 2026-10-25
 
 Implementation d40233e; shared acceptance entry ba2d5be. Remaining active and future
