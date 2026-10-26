@@ -41,41 +41,56 @@ public static class RouteCloseoutChecks
         var failures = new HashSet<ulong>();
         var revisions = 0;
         var finished = false;
-        for (var tick = 0; tick < 1200; tick++)
+        var observations = new FrameSpikeLog(1200);
+        try
         {
-            var previous = world.Units.ToDictionary(body => body.Id);
-            var resumed = RouteWorld.Load(world.Save());
-            var watch = Stopwatch.StartNew();
-            world.Step();
-            watch.Stop();
-            var elapsed = watch.Elapsed.TotalMilliseconds;
-            peak = Math.Max(peak, elapsed);
-            overBudget += elapsed > 1000.0 / 30 ? 1 : 0;
-            // Write timing before any assertion, including the exact failing frame.
-            output("closeout_tick=" + JsonSerializer.Serialize(new
+            for (var tick = 0; tick < 1200; tick++)
             {
-                name, frame = world.Frame, first = tick == 0, elapsed_ms = elapsed,
-                selected = world.Units.Where(body => targets.Contains(body.Id)), world.Events
-            }));
-            resumed.Step();
-            Check(world.Hash() == resumed.Hash() && world.Events.SequenceEqual(resumed.Events), "Per-frame restore continuation");
-            transcript.AppendData(Encoding.UTF8.GetBytes(world.Hash() + "\n" + JsonSerializer.Serialize(world.Events) + "\n"));
-            RoutePlacementChecks.AssertReserved(world);
-            foreach (var body in world.Units)
-            {
-                Check((body.Position - previous[body.Id].Position).Length <= 9 + SimScalar.FromRaw(32), "Speed/teleport");
-                Check(!fixedBodies.TryGetValue(body.Id, out var fixedPoint) || body.Position == fixedPoint, "Stop/Idle moved");
-                foreach (var other in world.Units.Where(other => other.Id > body.Id))
-                    Check(SquaredDistance.Between(body.Position, other.Position).Raw >= (Int128)62 * 62 * SimScalar.Scale * SimScalar.Scale,
-                        "Bodies overlap");
-                if (targets.Contains(body.Id) && body.Phase is WalkPhase.Settled or WalkPhase.Idle && body.Position == body.Endpoint)
-                    arrived.TryAdd(body.Id, world.Frame);
-                if (body.Task != 0 && body.Task == previous[body.Id].Task && body.Endpoint != previous[body.Id].Endpoint) revisions++;
+                var previous = world.Units.ToDictionary(body => body.Id);
+                var resumed = RouteWorld.Load(world.Save());
+                var counters = FrameSpikeLog.ReadCounters();
+                var bytes = GC.GetAllocatedBytesForCurrentThread();
+                var started = Stopwatch.GetTimestamp();
+                world.Step();
+                var ended = Stopwatch.GetTimestamp();
+                var afterCounters = FrameSpikeLog.ReadCounters();
+                observations.Record((int)world.Frame, started, ended, GC.GetAllocatedBytesForCurrentThread() - bytes, counters, afterCounters);
+                var elapsed = Stopwatch.GetElapsedTime(started, ended).TotalMilliseconds;
+                peak = Math.Max(peak, elapsed);
+                overBudget += elapsed > 1000.0 / 30 ? 1 : 0;
+                // Write timing before any assertion, including the exact failing frame.
+                output("closeout_tick=" + JsonSerializer.Serialize(new
+                {
+                    name, frame = world.Frame, first = tick == 0, elapsed_ms = elapsed,
+                    selected = world.Units.Where(body => targets.Contains(body.Id)), world.Events
+                }));
+                if (world.Frame == 430 && name == "closeout-before-151.json"
+                    && Environment.GetEnvironmentVariable("RTS_CLOSEOUT_EVIDENCE") is { Length: > 0 } target)
+                {
+                    Directory.CreateDirectory(target);
+                    File.WriteAllText(Path.Combine(target, "closeout-before-frame430.json"), resumed.Save());
+                }
+                resumed.Step();
+                Check(world.Hash() == resumed.Hash() && world.Events.SequenceEqual(resumed.Events), "Per-frame restore continuation");
+                transcript.AppendData(Encoding.UTF8.GetBytes(world.Hash() + "\n" + JsonSerializer.Serialize(world.Events) + "\n"));
+                RoutePlacementChecks.AssertReserved(world);
+                foreach (var body in world.Units)
+                {
+                    Check((body.Position - previous[body.Id].Position).Length <= 9 + SimScalar.FromRaw(32), "Speed/teleport");
+                    Check(!fixedBodies.TryGetValue(body.Id, out var fixedPoint) || body.Position == fixedPoint, "Stop/Idle moved");
+                    foreach (var other in world.Units.Where(other => other.Id > body.Id))
+                        Check(SquaredDistance.Between(body.Position, other.Position).Raw >= (Int128)62 * 62 * SimScalar.Scale * SimScalar.Scale,
+                            "Bodies overlap");
+                    if (targets.Contains(body.Id) && body.Phase is WalkPhase.Settled or WalkPhase.Idle && body.Position == body.Endpoint)
+                        arrived.TryAdd(body.Id, world.Frame);
+                    if (body.Task != 0 && body.Task == previous[body.Id].Task && body.Endpoint != previous[body.Id].Endpoint) revisions++;
+                }
+                foreach (var ev in world.Events.Where(ev => ev.Kind == "failed")) failures.Add(ev.Id);
+                if (targets.All(arrived.ContainsKey)) { finished = true; break; }
+                if (targets.Any(failures.Contains)) break;
             }
-            foreach (var ev in world.Events.Where(ev => ev.Kind == "failed")) failures.Add(ev.Id);
-            if (targets.All(arrived.ContainsKey)) { finished = true; break; }
-            if (targets.Any(failures.Contains)) break;
         }
+        finally { observations.Report(24, 0, name); }
         var passed = finished && overBudget == 0 && !targets.Any(failures.Contains);
         output("closeout_result=" + JsonSerializer.Serialize(new
         {

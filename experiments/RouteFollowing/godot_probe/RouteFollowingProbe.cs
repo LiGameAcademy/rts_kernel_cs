@@ -27,21 +27,24 @@ public partial class RouteFollowingProbe : Node2D
 
     public override void _Ready()
     {
-        _capture = OS.GetCmdlineUserArgs().Contains("--capture");
+        var arguments = OS.GetCmdlineUserArgs();
+        _capture = arguments.Contains("--capture");
         _font = new SystemFont { FontNames = ["Microsoft YaHei UI", "Arial"] };
-        if (OS.GetCmdlineUserArgs().Contains("--self-test") || OS.GetCmdlineUserArgs().Contains("--member-acceptance") || OS.GetCmdlineUserArgs().Contains("--recovery-gate"))
+        if (arguments.Contains("--self-test") || arguments.Contains("--member-acceptance") || arguments.Contains("--recovery-gate") || arguments.Contains("--closeout-gates"))
         {
             SetProcess(false);
             try
             {
-                if (OS.GetCmdlineUserArgs().Contains("--recovery-gate"))
+                if (arguments.Contains("--recovery-gate"))
                 {
                     RouteRecoveryChecks.Frozen(line => GD.Print(line));
                     GetTree().Quit();
                     return;
                 }
-                var passed = OS.GetCmdlineUserArgs().Contains("--member-acceptance")
-                    ? RouteMemberChecks.Run(line => GD.Print(line)) : RouteCheckSuite.Run(line => GD.Print(line));
+                bool passed;
+                if (arguments.Contains("--closeout-gates")) passed = RouteCloseoutChecks.Run(line => GD.Print(line));
+                else if (arguments.Contains("--member-acceptance")) passed = RouteMemberChecks.Run(line => GD.Print(line));
+                else passed = RouteCheckSuite.Run(line => GD.Print(line));
                 GetTree().Quit(passed ? 0 : 1);
             }
             catch (Exception error) { GD.PushError(error.ToString()); GetTree().Quit(1); }

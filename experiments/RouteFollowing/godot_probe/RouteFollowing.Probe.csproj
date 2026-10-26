@@ -34,4 +34,8 @@
     <Compile Include="../Checks/RecoveryClock.cs" Link="RecoveryClock.cs" />
     <EmbeddedResource Include="../Checks/Fixtures/recovery-blockers-before-388.json" LogicalName="recovery-blockers-before-388.json" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../../tests/Rts.Kernel.Tests/FrameSpikeLog.cs" Link="FrameSpikeLog.cs" />
+    <Compile Include="../../../tests/Rts.Kernel.Tests/ThreadWorkObservation.cs" Link="ThreadWorkObservation.cs" />
+  </ItemGroup>
 </Project>

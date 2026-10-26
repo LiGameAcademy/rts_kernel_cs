@@ -9,6 +9,30 @@ suffix or use existing terrain pathfinding. Local half-speed/six-direction sides
 proposals do not write another long-term route. Task-owned placement and existing
 bounded two-member cooperation remain authoritative.
 
+## Full-history diagnosis and CPU evidence — 2026-10-26
+
+This round changes diagnostics only. The complete narrow history reproduces21/24
+(failed1/22/23) and the same final state/event transcript. Actual recovery roots
+were not omitted or stale; pair work was0 or148 of2048 in the remaining cases.
+The current candidate generator cannot admit the existing one/two-helper straight
+relocations under placement/body/full-goal-clearance constraints. This is not a
+proof that the world or every possible joint motion is unreachable.
+
+Four cold CPU-instrumented runs retain all firsts. Frame430 belongs to member20
+trying helper7: CLI wall9.2046/7.5364ms; Godot30.9618/45.8441ms. Godot threadCPU is
+31.25ms (quantized), JIT0, GC pause0.195/0.243ms, about110M cycles and2.85MB allocated.
+The old119.8594/38.0377ms samples remain unclassified; new data cannot backfill them.
+All four first-frozen state/event transcripts agree with the prior build. One new
+Godot run still fails30Hz; no release claim or dropped firsts.
+
+Isolated progress-retention and turn-only counterfactuals both still finish21/24,
+with different failed members; neither is deployed. The requested six-side geometry
+also remains blocked at the representative frozen state. Reject further simple
+parameter patches. The next functional step needs a bounded intermediate-passage
+execution proof separate from final goal ownership; it is a proposal, not implemented.
+The minimal performance candidate is per-search immutable admission observations,
+without changing candidate order, collision predicates or cross-frame caching.
+
 ## Actual contacts and bounded recovery rounds — 2026-10-26
 
 Experimental snapshot8 persists final timed collision contacts and a bounded recovery
