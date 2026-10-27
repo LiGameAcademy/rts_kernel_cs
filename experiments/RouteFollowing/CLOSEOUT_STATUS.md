@@ -9,6 +9,18 @@ suffix or use existing terrain pathfinding. Local half-speed/six-direction sides
 proposals do not write another long-term route. Task-owned placement and existing
 bounded two-member cooperation remain authoritative.
 
+## Temporary passage execution proof — 2026-10-27: FAIL
+
+The isolated TemporaryPassageProof candidate separates temporary targets from final
+claims, with the same two helpers/156 radius/2048 pair work/32 progress/90 ticks/3 rounds.
+The368 world now actually completes24/24 at769 plus90 stable ticks, but retains a
+41.1815ms cold overrun. In the369 world requester23 passes, while helpers3/10 later
+fail, leaving22/24; the442 world expires without passage. A new104.5788ms cold first
+frame is retained. Neither requester-only success nor a later fast replay is release
+acceptance. Candidate snapshot9 is isolated; ordinary experimental8, production14
+and combat1 are unchanged. Stop before aggregate/boundary/Godot/300/500 regressions,
+host takeover or a new black-box handoff. See TemporaryPassageProof/README.md.
+
 ## Full-history diagnosis and CPU evidence — 2026-10-26
 
 This round changes diagnostics only. The complete narrow history reproduces21/24

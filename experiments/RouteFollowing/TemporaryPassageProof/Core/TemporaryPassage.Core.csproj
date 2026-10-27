@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework><AssemblyName>Rts.Movement.Prototype</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../src/Rts.Kernel/Rts.Kernel.csproj" />
+    <Compile Include="../../Core/*.cs" Exclude="../../Core/RouteMotion.cs;../../Core/RouteSnapshotValidation.cs;../../Core/RouteState.cs;../../Core/RouteWorld.cs;../../Core/RouteYieldCorridors.cs;../../Core/RouteYielding.cs;../../Core/RouteTemporaryYield.cs" Link="Baseline/%(Filename)%(Extension)" />
+    <InternalsVisibleTo Include="Checks" />
+  </ItemGroup>
+</Project>
