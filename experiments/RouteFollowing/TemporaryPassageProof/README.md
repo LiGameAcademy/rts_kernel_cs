@@ -1,14 +1,60 @@
-# Temporary passage proof — rejected candidate, 2026-10-27
+# Temporary passage proof — still failing overall, 2026-10-28
 
 Refs #154 and draft PR #155. Author: Codex.
 
 This is an isolated, failing execution experiment. It does not replace the normal
 RouteFollowing Core, Godot lab, production movement or host. The normal experimental
-snapshot remains8; only this candidate uses9. Production movement14 and combat1
+snapshot remains8; only this candidate uses10. Production movement14 and combat1
 are unchanged. Do not merge or interpret a generated `passed` field for an individual
 requester as group acceptance.
 
-## Candidate contract
+## Requester connection follow-up — 2026-10-28
+
+The442/22 admission forecast was not the executed movement:22 drifted while8/2
+were clearing, then encountered2 again after opening. The old clearance test also
+missed nonparticipant1 on the predicted tail. Admission now checks the predicted
+trace against all projected final body positions. If the original32-progress
+forecast is blocked, it may instead prove a complete connection to the root's
+existing, vacated position within156. No new sampled target is introduced.
+
+For this connection only, the requester retains its position/facing during outward
+legs, then executes the admitted target without generic sidesteps. The derived
+corridor protects it from other same-task members. Actual arrival releases the
+helpers to their original tasks; interruption still cancels ownership. The new
+flag is copied with the plan, persisted and hashed in candidate format10; runtime
+load rejects9. Final claims, two helpers,2048 work,156 radius and90-tick deadline
+are unchanged. Holding does not count as physical progress or extend that deadline.
+
+|Complete frozen input|Current actual outcome|Retained cold wall peak|
+|---|---|---|
+|442/22, strict cold A/B|8→2 opens484;22 reaches handoff491; stop at623 when23 fails|41.3419/53.1761ms, both frame492|
+|442/22, diagnostic tail|22/8/2 complete original tasks737, then90 stable;23 remains failed, only23/24|17.7465ms; exit1, diagnostic only|
+|368/1, regression|24/24 finish827, then90 stable|26.6674ms|
+|369/23, regression|24/24 finish704, then90 stable|31.4854ms|
+
+The two strict442 runs agree on every state/event digest. All timed runs compare
+per-frame restored state/events and check speed, body separation and final claims.
+The369 regression improving does not erase23's failure in the different442 world.
+Both strict overruns and all historical overruns remain failures of30Hz33.333ms.
+No aggregate from-start, Godot or300/500 validation follows this failed gate.
+
+`--requester-boundaries` passes1418 assertions across actual Outward and Passing
+states: requester/helper Stop and replacement, requester/helper append, rejected
+out-of-map input, map changes, queued-command restore, old/malformed snapshots and
+public-array isolation. These are functional checks, not cold performance samples.
+The initial test at an exact current-position goal exposed an unchanged baseline
+zero-heading exception in RoutePlacements.TryAssign. That separate defect remains
+unfixed; normal replacement checks use an explicit nonzero goal. Raw failure is
+retained, not counted as a pass.
+
+The strict executable stops on any failed body. Optional `--diagnostic-tail` keeps
+unrelated failures visible while observing requester/helpers to completion; it
+still returns failure if any body failed. It cannot waive group acceptance.
+
+No production or host takeover, merge or tag. Internal evidence:
+V002_REQUESTER_PASSAGE_EXECUTION_2026_10_28.md.
+
+## Original candidate contract — 2026-10-27
 
 Final endpoints and task claims remain unchanged during temporary cooperation.
 At most two existing same-task Waiting/Settled members without queued orders may
@@ -31,10 +77,10 @@ are copied on Save/Load/public views and included in the candidate hash.
 
 This does **not** establish that resuming original tasks is executable: the tests
 below reject that assumption. Unmodified Core files are linked from the baseline;
-the seven files in this Core directory are explicit candidate overrides. Build and
+the original seven files in this Core directory are explicit candidate overrides. Build and
 results belong to this revision together; future baseline changes require revalidation.
 
-## Execution results
+## Preserved execution results — 2026-10-27
 
 The three fixtures preserve the complete original worlds before frames368,369,442.
 The loader only adapts the experimental format to9; no position, goal, blocker,
@@ -58,7 +104,7 @@ passage, but the remaining failures above persist. Earlier logs that only assess
 the requester are diagnostic, not passing acceptance results. Neither lifecycle
 variant is deployed.
 
-Stop here: no full-from-start24-unit narrow/return regression, candidate Stop/new
+At that revision, no full-from-start24-unit narrow/return regression, candidate Stop/new
 command/queue/map boundary suite, Godot cold run,300/500 release matrix or black-box
 handoff. Per-frame restore/state/event equality, final claim separation, physical
 separation and speed were checked in the frozen runs; they do not substitute for
@@ -78,7 +124,10 @@ Example from repository root:
 dotnet run --project experiments/RouteFollowing/TemporaryPassageProof/Checks -c Release -- $env:TEMP/rts-passage-proof-23 23
 ```
 
-Expected exit1 for23 and22. Store each cold run separately. Internal evidence is
+Current strict22 expects exit1. IDs1/23 passed their individual current frozen runs;
+the preserved table above describes the old revision, not current expectations.
+Use `Checks.dll --requester-boundaries` for the connection boundary checks.
+Store each cold run separately. Historical evidence is
 documented in V002_TEMPORARY_PASSAGE_PROOF_2026_10_27.md; it includes raw failures,
 CPU observations, source snapshots and checksum manifests. No performance fix or
 larger traffic algorithm was attempted in this batch.

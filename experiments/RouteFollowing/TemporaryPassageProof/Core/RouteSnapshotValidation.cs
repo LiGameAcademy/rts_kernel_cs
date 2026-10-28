@@ -81,6 +81,13 @@ internal static class RouteSnapshotValidation
                     || temporary.Targets.Any(point => !Point(point)) || temporary.Origins.Any(point => !Point(point))
                     || !Point(temporary.RequesterStart) || !Point(temporary.RequesterTarget))
                     throw new InvalidDataException("Invalid temporary passage.");
+                if (temporary.HasRequesterConnection
+                    && (temporary.RequesterTarget != temporary.Origins[^1]
+                        || (temporary.RequesterTarget - temporary.RequesterStart).Length > 156
+                        || temporary.RequesterStart == temporary.RequesterTarget
+                        || temporary.Phase == TemporaryYieldPhase.Outward
+                            && state.Units.Single(body => body.Id == plan.Requester).Position != temporary.RequesterStart))
+                    throw new InvalidDataException("Invalid requester connection.");
                 for (var index = 0; index < plan.Members.Count; index++)
                 {
                     var body = state.Units.Single(body => body.Id == plan.Members[index]);

@@ -12,10 +12,12 @@ internal static class RouteTemporaryYield
         var (_, followTarget, _) = RouteNavigation.Follow(world, requester);
         var requested = RouteMotionCandidates.Compute(world, requester, followTarget, RouteSettings.Speed);
         if (!Blocked(requester.Position, requested.Position, root.Position)) return false;
-        var clearance = Clearance(world, requester, followTarget);
+        var direct = RouteRequesterPassage.Predict(world, requester, followTarget, reachTarget: false);
+        var connection = (root.Position - requester.Position).Length <= 156
+            ? RouteRequesterPassage.Predict(world, requester with { Velocity = default }, root.Position, reachTarget: true) : null;
         var candidates = RoutePlanning.Candidates(world, root.Position, 156).ToArray();
         foreach (var target in candidates)
-            if (TryAdmit(world, requester, followTarget, clearance, [root.Id], [target])) return true;
+            if (TryAdmit(world, requester, direct, connection, [root.Id], [target])) return true;
         // Existing occupied body centres are semantic hand-off positions, not extra angular samples.
         // Moving the one obstructing body first can expose a narrow passage between packed neighbours.
         var helpers = world.Bodies.Values.Where(body => body.Id != requester.Id && body.Id != root.Id
@@ -29,16 +31,15 @@ internal static class RouteTemporaryYield
             foreach (var alternative in RoutePlanning.Candidates(world, helper.Position, 156))
             {
                 if (++work > 2048) return false;
-                if (TryAdmit(world, requester, followTarget, clearance, [helper.Id, root.Id], [alternative, target])) return true;
+                if (TryAdmit(world, requester, direct, connection, [helper.Id, root.Id], [alternative, target])) return true;
             }
         }
         return false;
     }
 
-    private static bool TryAdmit(RouteWorld world, Walker requester, FixedVector2 followTarget, IReadOnlyList<FixedVector2> clearance,
+    private static bool TryAdmit(RouteWorld world, Walker requester, RequesterPassage direct, RequesterPassage? connection,
         ulong[] members, FixedVector2[] targets)
     {
-        if (targets.Any(target => clearance.Zip(clearance.Skip(1)).Any(edge => Blocked(edge.First, edge.Second, target)))) return false;
         var positions = world.Bodies.Values.ToDictionary(body => body.Id, body => body.Position);
         for (var index = 0; index < members.Length; index++)
         {
@@ -51,10 +52,13 @@ internal static class RouteTemporaryYield
                     && ((other.Value - target).Length < 64 || Blocked(body.Position, target, other.Value)))) return false;
             positions[body.Id] = target;
         }
+        var selected = RouteRequesterPassage.Clear(direct, requester.Id, positions) ? direct
+            : connection is not null && RouteRequesterPassage.Clear(connection, requester.Id, positions) ? connection : null;
+        if (selected is null) return false;
         var task = world.Routes[requester.Task];
         var origins = members.Select(id => world.Bodies[id].Position).ToArray();
         var plan = new RouteYieldPlan(requester.Id, members, 0, world.Revision, world.Frame,
-            new(targets, origins, requester.Position, followTarget));
+            new(targets, origins, requester.Position, selected.Target, HasRequesterConnection: selected.ViaVacatedBody));
         foreach (var id in members)
         {
             var body = world.Bodies[id];
@@ -64,7 +68,9 @@ internal static class RouteTemporaryYield
         }
         world.Routes[task.Id] = task with { Yield = plan };
         world.Bodies[requester.Id] = requester with { Recovery = null, RetryAtWait = requester.WaitTicks + 90,
-            Recoveries = requester.Recoveries + 1 };
+            Recoveries = requester.Recoveries + 1,
+            Passage = selected.ViaVacatedBody ? null : requester.Passage,
+            Velocity = selected.ViaVacatedBody ? default : requester.Velocity };
         world.Publish(requester.Id, "yield_started", string.Join(",", members));
         world.Publish(requester.Id, "temporary_passage_started");
         return true;
@@ -94,8 +100,9 @@ internal static class RouteTemporaryYield
             // Resume the original tasks after real passage, rather than requiring a complete
             // straight return to distant final goals before releasing the temporary plan.
             var requester = world.Bodies[plan.Requester];
-            if (requester.Position != requester.Endpoint
-                && Advance(temporary.RequesterStart, temporary.RequesterTarget, requester.Position) < 32) return;
+            if (temporary.HasRequesterConnection ? requester.Position != temporary.RequesterTarget
+                : requester.Position != requester.Endpoint
+                    && Advance(temporary.RequesterStart, temporary.RequesterTarget, requester.Position) < 32) return;
             foreach (var id in plan.Members)
             {
                 var body = world.Bodies[id];
@@ -121,23 +128,6 @@ internal static class RouteTemporaryYield
             var body = world.Bodies[plan.Members[next]];
             world.Bodies[body.Id] = body with { Phase = WalkPhase.Yielding, Passage = null };
         }
-    }
-
-    private static IReadOnlyList<FixedVector2> Clearance(RouteWorld world, Walker body, FixedVector2 target)
-    {
-        var start = body.Position;
-        var trace = new List<FixedVector2> { start };
-        // Predict only the existing progress threshold, using the real turn/step rule.
-        // This is bounded by the unchanged cooperation deadline, not a sampled search.
-        for (var tick = 0; tick < 90 && body.Position != target && Advance(start, target, body.Position) < 32; tick++)
-        {
-            var step = RouteMotionCandidates.Compute(world, body, target, RouteSettings.Speed);
-            trace.AddRange(step.Trace.Skip(1));
-            if (step.Position == body.Position) break;
-            body = body with { Position = step.Position, Facing = step.Facing,
-                Velocity = (step.Position - body.Position) * RouteSettings.TickRate };
-        }
-        return trace;
     }
 
     private static SimScalar Advance(FixedVector2 start, FixedVector2 target, FixedVector2 point)

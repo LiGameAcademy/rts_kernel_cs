@@ -10,9 +10,17 @@ internal sealed class RouteYieldCorridors
     internal RouteYieldCorridors(RouteWorld world)
     {
         _corridors = world.Routes.Values.Where(route => route.Yield is not null)
-            .SelectMany(route => RouteTemporaryYield.Remaining(world, route.Yield!).Select(leg =>
-                new Corridor(route.Id, leg.Member, route.Yield!.Members, world.Bodies[leg.Member].Position, leg.Target)))
-            .ToArray();
+            .SelectMany(route => Remaining(world, route)).ToArray();
+    }
+
+    private static IEnumerable<Corridor> Remaining(RouteWorld world, RouteTask route)
+    {
+        var plan = route.Yield!;
+        foreach (var leg in RouteTemporaryYield.Remaining(world, plan))
+            yield return new(route.Id, leg.Member, plan.Members, world.Bodies[leg.Member].Position, leg.Target);
+        if (plan.Temporary is { HasRequesterConnection: true } connection)
+            yield return new(route.Id, plan.Requester, plan.Members.Append(plan.Requester).ToArray(),
+                connection.RequesterStart, connection.RequesterTarget);
     }
 
     internal ulong? FirstConflict(Walker body, IReadOnlyList<FixedVector2> trace)

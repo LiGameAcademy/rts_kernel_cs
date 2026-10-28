@@ -12,10 +12,13 @@ internal static class RouteMotion
             reservations.Put(CrowdBody.Stationary(new(body.Id), 31, body.Position));
         var proposals = new List<MotionProposal>();
         foreach (var source in world.Bodies.Values.Where(body => body.Task != 0
-            && body.Phase is WalkPhase.Following or WalkPhase.Waiting or WalkPhase.Yielding))
+            && body.Phase is WalkPhase.Following or WalkPhase.Waiting or WalkPhase.Yielding
+            && !RouteRequesterPassage.Hold(world, body)))
         {
             var (body, target, _) = source.Phase == WalkPhase.Yielding
-                ? (source, RouteTemporaryYield.Target(world, source), 4) : RouteNavigation.Follow(world, source);
+                ? (source, RouteTemporaryYield.Target(world, source), 4)
+                : RouteRequesterPassage.TryTarget(world, source, out var passageTarget)
+                    ? (source, passageTarget, 4) : RouteNavigation.Follow(world, source);
             body = body with { Passage = RouteMotionCandidates.RetainPassage(world, body) };
             var step = RouteMotionCandidates.Compute(world, body, target, RouteSettings.Speed);
             proposals.Add(new(body, target, step));
@@ -37,7 +40,7 @@ internal static class RouteMotion
                     ? reservations.FirstMotionConflict(new(new(body.Id), 31, step.Trace, step.Times))?.Value : null);
             var passage = body.Passage;
             // A cancelled proposal whose dependencies are now safe may resume immediately.
-            if (blocker is { } id && alternatives++ < 16
+            if (blocker is { } id && !RouteRequesterPassage.TryTarget(world, body, out _) && alternatives++ < 16
                 && RouteMotionCandidates.TryAlternative(world, proposal, id, reservations, corridors, out var alternative, out passage))
             {
                 step = alternative;

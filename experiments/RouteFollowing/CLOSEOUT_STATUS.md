@@ -9,6 +9,29 @@ suffix or use existing terrain pathfinding. Local half-speed/six-direction sides
 proposals do not write another long-term route. Task-owned placement and existing
 bounded two-member cooperation remain authoritative.
 
+## Requester admission/execution repair — 2026-10-28: local pass, overall FAIL
+
+Only isolated TemporaryPassageProof changes, now candidate format10. In the442
+world,22 moved during helper clearance and invalidated its forecast; the forecast
+also missed nonparticipant1. Full-body admission plus an executable connection to
+the existing root origin holds the requester until clearance, then reaches the
+actual handoff491. Helpers8/2 retain their final claims and resume original tasks.
+They and22 finish737 plus90 stable ticks in an explicitly failing diagnostic tail.
+
+Strict complete-world checks stop at623 when23 fails; both cold runs reproduce the
+same state/event digest and retain frame492 overruns41.3419/53.1761ms. The tail
+keeps23 failed and exits1, not repaired to pass. Other frozen regression worlds
+finish24/24:368→827 (26.6674ms),369→704 (31.4854ms), each plus90 stable ticks.
+These different input worlds do not erase the442 failure or historical overruns.
+
+1418 requester-connection boundary assertions pass, including actual Outward and
+Passing Stop/new commands/append/reject/map/restore and public-copy isolation.
+Exact current-position replacement exposed a pre-existing zero-heading exception;
+it is recorded, not fixed or counted as passing. Default Core8, production14,
+combat1 and host remain unchanged. Stop before from-start24, Godot,300/500 release
+matrix or a new black-box handoff. See TemporaryPassageProof/README.md and the
+internal2026-10-28 execution report. PR155 remains draft; no movement closeout tag.
+
 ## Temporary passage execution proof — 2026-10-27: FAIL
 
 The isolated TemporaryPassageProof candidate separates temporary targets from final

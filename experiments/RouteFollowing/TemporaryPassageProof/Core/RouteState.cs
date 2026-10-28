@@ -19,7 +19,7 @@ public sealed record RouteTask(ulong Id, FixedVector2 Anchor, IReadOnlyList<Fixe
 public enum TemporaryYieldPhase { Outward, Passing }
 public sealed record TemporaryYield(IReadOnlyList<FixedVector2> Targets,
     IReadOnlyList<FixedVector2> Origins, FixedVector2 RequesterStart, FixedVector2 RequesterTarget,
-    TemporaryYieldPhase Phase = TemporaryYieldPhase.Outward);
+    TemporaryYieldPhase Phase = TemporaryYieldPhase.Outward, bool HasRequesterConnection = false);
 public sealed record RouteYieldPlan(ulong Requester, IReadOnlyList<ulong> Members, int Next, int MapRevision, long StartedAt,
     TemporaryYield? Temporary = null);
 public sealed record RouteCommand(bool Stop, IReadOnlyList<ulong> Members, FixedVector2 Goal, bool Append);
@@ -31,7 +31,7 @@ public sealed record RouteSnapshot(int Format, int Width, int Height, byte[] Fla
 /// <summary>Experimental defaults, explicitly separate from production gameplay and v14 snapshots.</summary>
 public static class RouteSettings
 {
-    public const int SnapshotFormat = 9;
+    public const int SnapshotFormat = 10;
     public const int TickRate = 30;
     public const int WaitBeforeRetry = 90;
     public const int RecoveryLimit = 3;
