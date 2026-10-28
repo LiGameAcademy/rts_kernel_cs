@@ -70,8 +70,8 @@ internal static class RoutePlacements
             var replacement = i == 0 ? default : goals[0];
             if ((goal - body.Preference).Length > 156 || observation.Distance(body, goal) < 1
                 || !observation.CanStand(goal)
-                || claims.Any(claim => claim.Task == task.Id && !members.Contains(claim.Member) && (goal - claim.Point).Length < 64)
-                || goals.Take(i).Any(other => (other - goal).Length < 64)
+                || claims.Any(claim => claim.Task == task.Id && !members.Contains(claim.Member) && RouteYieldGeometry.GoalOverlap(goal, claim.Point))
+                || goals.Take(i).Any(other => RouteYieldGeometry.GoalOverlap(other, goal))
                 || observation.BodyAtGoal(body.Id, goal, relocated, replacement)
                 || !observation.CanTravel(body, goal)
                 || observation.BodyOnLeg(body.Id, body.Position, goal, relocated, replacement)) return false;

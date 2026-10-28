@@ -4,13 +4,14 @@ using System.Text;
 using System.Text.Json;
 using Rts.Movement.Prototype;
 
-if (args is [var boundaryMode] && boundaryMode is "--requester-boundaries" or "--recovery-entry-boundaries" or "--yield-observation-boundaries")
+if (args is [var boundaryMode] && boundaryMode is "--requester-boundaries" or "--recovery-entry-boundaries" or "--yield-observation-boundaries" or "--yield-geometry-boundaries")
 {
     try
     {
         if (boundaryMode == "--requester-boundaries") RequesterConnectionChecks.Run();
         else if (boundaryMode == "--recovery-entry-boundaries") RecoveryEntryChecks.Run();
-        else YieldObservationChecks.Run();
+        else if (boundaryMode == "--yield-observation-boundaries") YieldObservationChecks.Run();
+        else YieldGeometryChecks.Run();
     }
     catch (Exception error)
     {

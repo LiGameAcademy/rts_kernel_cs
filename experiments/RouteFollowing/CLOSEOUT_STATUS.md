@@ -9,6 +9,22 @@ suffix or use existing terrain pathfinding. Local half-speed/six-direction sides
 proposals do not write another long-term route. Task-owned placement and existing
 bounded two-member cooperation remain authoritative.
 
+## Search geometry fast path, step1 — 2026-10-28
+
+The isolated candidate now compares raw squared distance for the seven search-local
+strict Length<64 goal/body checks. floor(sqrt(S))<R iff S<R*R for the integer raw
+threshold R=64*2^32; exact64 is still legal.156-range, candidate order, budgets,
+movement collision, state writes and snapshot10 are unchanged.
+
+10031 numerical assertions and the existing1418 requester,88 recovery-entry and15
+observation assertions pass. Two independent cold CLI processes per frozen input
+retain every first tick:442 peaks11.1928/13.8318ms,369 peaks15.3547/9.2373ms,
+368 peaks13.0607/12.5484ms. All six complete24/24 plus90 stable ticks, with every
+frame hash/event identical tofa3348f, including per-frame restore. These frozen
+local gates pass; prior overruns remain historical failures. Full-from-start24,
+Godot,300/500 and production/host migration are still unvalidated. PR155 stays draft;
+overall movement closeout is NOT achieved. Step2 AABB filtering is not applied yet.
+
 ## Requester admission/execution repair — 2026-10-28: local pass, overall FAIL
 
 Per-search reuse is now implemented only in the isolated candidate. Stable bodies,

@@ -43,9 +43,9 @@ internal static class RouteYielding
             // Only the concrete body/claim obstructing this candidate may be the second participant.
             var obstacles = world.Bodies.Values.Where(body => body.Id != root.Id
                 && (CrowdGeometry.Overlap(root.Position, point, 31, body.Position, body.Position, 31)
-                    || (body.Position - point).Length < 64)).Select(body => body.Id)
+                    || RouteYieldGeometry.GoalOverlap(body.Position, point))).Select(body => body.Id)
                 .Concat(claims.Where(claim => claim.Task == root.Task && claim.Member != root.Id
-                    && (claim.Point - point).Length < 64).Select(claim => claim.Member)).Distinct().ToArray();
+                    && RouteYieldGeometry.GoalOverlap(claim.Point, point)).Select(claim => claim.Member)).Distinct().ToArray();
             if (obstacles.Length != 1 || !Available(world.Bodies[obstacles[0]])) continue;
             var second = world.Bodies[obstacles[0]];
             if (!secondaryCandidates.TryGetValue(second.Id, out var alternatives))

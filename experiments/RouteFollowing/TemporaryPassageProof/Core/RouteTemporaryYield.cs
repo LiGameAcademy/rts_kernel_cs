@@ -25,7 +25,7 @@ internal static class RouteTemporaryYield
         foreach (var target in candidates.Concat(helpers.Select(body => body.Position)).Distinct())
         {
             var obstacles = world.Bodies.Values.Where(body => body.Id != root.Id
-                && (Blocked(root.Position, target, body.Position) || (body.Position - target).Length < 64)).ToArray();
+                && (Blocked(root.Position, target, body.Position) || RouteYieldGeometry.GoalOverlap(body.Position, target))).ToArray();
             if (obstacles.Length != 1 || !helpers.Any(body => body.Id == obstacles[0].Id)) continue;
             var helper = obstacles[0];
             foreach (var alternative in RoutePlanning.Candidates(world, helper.Position, 156))

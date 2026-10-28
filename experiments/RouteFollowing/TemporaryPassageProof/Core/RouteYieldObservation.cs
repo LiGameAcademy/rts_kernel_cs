@@ -52,7 +52,7 @@ internal sealed class RouteYieldObservation
     internal bool BodyAtGoal(ulong member, FixedVector2 target, ulong relocated, FixedVector2 replacement)
     {
         foreach (var body in _bodies)
-            if (body.Id != member && (Position(body, relocated, replacement) - target).Length < 64) return true;
+            if (body.Id != member && RouteYieldGeometry.GoalOverlap(Position(body, relocated, replacement), target)) return true;
         return false;
     }
 
@@ -74,7 +74,7 @@ internal sealed class RouteYieldObservation
         {
             if (body.Id == member) continue;
             var point = Position(body, relocated, replacement);
-            if ((point - target).Length < 64 || CrowdGeometry.Overlap(from, target, 31, point, point, 31)) return true;
+            if (RouteYieldGeometry.GoalOverlap(point, target) || CrowdGeometry.Overlap(from, target, 31, point, point, 31)) return true;
         }
         return false;
     }
