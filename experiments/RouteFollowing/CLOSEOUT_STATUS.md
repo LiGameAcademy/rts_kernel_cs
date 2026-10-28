@@ -11,6 +11,15 @@ bounded two-member cooperation remain authoritative.
 
 ## Requester admission/execution repair — 2026-10-28: local pass, overall FAIL
 
+Recovery-entry follow-up: normal Following motion with explicit empty contacts and
+no pending search no longer spends a fresh round. The original442 world now reaches
+24/24 at655 plus90 stable;23 starts actual24→11 cooperation520 instead of wasting
+its round515. Two cold CLI state/event transcripts agree; frame49241.5750/45.5744ms
+remain30Hz failures.368 remains24/24 at827 with unchanged transcript;36924/24 at646.
+Stop/commands/append/map/restore and new scheduler boundaries pass. Only isolated
+candidate RouteRecovery changes, format10 unchanged. No aggregate/host takeover;
+the separate per-search reuse optimization has not yet been applied here.
+
 Only isolated TemporaryPassageProof changes, now candidate format10. In the442
 world,22 moved during helper clearance and invalidated its forecast; the forecast
 also missed nonparticipant1. Full-body admission plus an executable connection to

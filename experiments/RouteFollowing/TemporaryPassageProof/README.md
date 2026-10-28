@@ -10,6 +10,22 @@ requester as group acceptance.
 
 ## Requester connection follow-up — 2026-10-28
 
+Recovery-entry follow-up: a Following member with explicitly empty recorded contacts
+and no pending recovery is filtered before scheduling a new round. Normal motion
+first supplies the next actual rejection. Existing pending searches, Waiting members
+and historical missing contacts retain their old eligibility. Counters, thresholds
+and snapshot format10 are unchanged. This rule is isolated in the candidate's own
+RouteRecovery override; ordinary Core8 and production are untouched.
+
+The original442 world now completes24/24 at655 plus90 stable ticks:23 retains its
+round at515, then starts24→11 at520 and completes that cooperation545. Two cold
+CLI runs agree on every state/event but retain frame492 peaks41.5750/45.5744ms,
+so30Hz and overall acceptance still FAIL. The368 world remains827 with its prior
+state/event transcript;369 improves to646, also24/24 plus90 stable ticks. Their
+cold peaks29.8609/31.6324ms do not erase the442 overruns. Requester command/restore
+boundaries and `--recovery-entry-boundaries` pass. Performance work is a separate
+next change; no full-from-start or host/Godot takeover is implied.
+
 The442/22 admission forecast was not the executed movement:22 drifted while8/2
 were clearing, then encountered2 again after opening. The old clearance test also
 missed nonparticipant1 on the predicted tail. Admission now checks the predicted

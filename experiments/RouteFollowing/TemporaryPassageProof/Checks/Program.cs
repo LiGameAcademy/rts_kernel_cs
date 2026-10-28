@@ -4,9 +4,13 @@ using System.Text;
 using System.Text.Json;
 using Rts.Movement.Prototype;
 
-if (args is ["--requester-boundaries"])
+if (args is [var boundaryMode] && boundaryMode is "--requester-boundaries" or "--recovery-entry-boundaries")
 {
-    try { RequesterConnectionChecks.Run(); }
+    try
+    {
+        if (boundaryMode == "--requester-boundaries") RequesterConnectionChecks.Run();
+        else RecoveryEntryChecks.Run();
+    }
     catch (Exception error)
     {
         Console.Error.WriteLine(error);
