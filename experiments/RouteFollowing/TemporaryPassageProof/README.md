@@ -8,6 +8,24 @@ snapshot remains8; only this candidate uses10. Production movement14 and combat1
 are unchanged. Do not merge or interpret a generated `passed` field for an individual
 requester as group acceptance.
 
+## Search geometry fast path, step2 — 2026-10-28
+
+Search-only capsule calls now reject strictly disjoint expanded bounding boxes
+using Int128 additions, otherwise invoking the original exact CrowdGeometry.Overlap.
+Touching boxes, search ordering/budget and final movement safety remain unchanged;
+there is no cross-frame cache or new serialized state. The helper is27 lines.
+
+The geometry suite passes10104 assertions; a standalone friend-assembly comparison
+passes40010 original-exact-versus-prefilter cases without widening a public API.
+Existing1418 requester,88 recovery-entry and15 observation assertions pass again.
+Two independent cold CLI processes per full frozen input retain all first ticks:
+442 peaks13.1254/16.1560ms,369 peaks12.4116/11.8867ms,368 peaks8.8325/7.8931ms.
+All six complete24/24 plus90 stable ticks, every frame hash/event equalsfa3348f
+and step1, including per-frame restore. No overruns; frozen local gates pass.
+Twelve current cold samples across both changes do not erase prior failures or
+replace Godot/full-from-start24/300/500 validation. Overall closeout remains pending;
+production/host are untouched and PR155 remains draft. No merge/tag or new lab window.
+
 ## Search geometry fast path, step1 — 2026-10-28
 
 The isolated candidate now compares raw squared distance for the seven search-local

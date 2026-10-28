@@ -136,5 +136,5 @@ internal static class RouteTemporaryYield
     }
 
     private static bool Blocked(FixedVector2 from, FixedVector2 to, FixedVector2 body) =>
-        CrowdGeometry.Overlap(from, to, 31, body, body, 31);
+        RouteYieldGeometry.Overlap(from, to, 31, body, body, 31);
 }

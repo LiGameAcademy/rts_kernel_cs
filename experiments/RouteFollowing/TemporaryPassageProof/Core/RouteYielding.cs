@@ -42,7 +42,7 @@ internal static class RouteYielding
             if (!world.Navigation.CanStandAt(point, 31) || (point - root.Position).Length < 1) continue;
             // Only the concrete body/claim obstructing this candidate may be the second participant.
             var obstacles = world.Bodies.Values.Where(body => body.Id != root.Id
-                && (CrowdGeometry.Overlap(root.Position, point, 31, body.Position, body.Position, 31)
+                && (RouteYieldGeometry.Overlap(root.Position, point, 31, body.Position, body.Position, 31)
                     || RouteYieldGeometry.GoalOverlap(body.Position, point))).Select(body => body.Id)
                 .Concat(claims.Where(claim => claim.Task == root.Task && claim.Member != root.Id
                     && RouteYieldGeometry.GoalOverlap(claim.Point, point)).Select(claim => claim.Member)).Distinct().ToArray();

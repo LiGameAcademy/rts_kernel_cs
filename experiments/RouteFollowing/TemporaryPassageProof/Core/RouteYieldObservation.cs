@@ -62,7 +62,7 @@ internal sealed class RouteYieldObservation
         {
             if (body.Id == member) continue;
             var point = Position(body, relocated, replacement);
-            if (CrowdGeometry.Overlap(from, target, 31, point, point, 31)) return true;
+            if (RouteYieldGeometry.Overlap(from, target, 31, point, point, 31)) return true;
         }
         return false;
     }
@@ -74,7 +74,7 @@ internal sealed class RouteYieldObservation
         {
             if (body.Id == member) continue;
             var point = Position(body, relocated, replacement);
-            if (RouteYieldGeometry.GoalOverlap(point, target) || CrowdGeometry.Overlap(from, target, 31, point, point, 31)) return true;
+            if (RouteYieldGeometry.GoalOverlap(point, target) || RouteYieldGeometry.Overlap(from, target, 31, point, point, 31)) return true;
         }
         return false;
     }
@@ -88,7 +88,7 @@ internal sealed class RouteYieldObservation
             var index = Array.IndexOf(members, body.Id);
             var point = index < 0 ? body.Position : targets[index];
             for (var segment = 1; segment < passage.Trace.Count; segment++)
-                if (CrowdGeometry.Overlap(passage.Trace[segment - 1], passage.Trace[segment], 31, point, point, 31)) return false;
+                if (RouteYieldGeometry.Overlap(passage.Trace[segment - 1], passage.Trace[segment], 31, point, point, 31)) return false;
         }
         return true;
     }

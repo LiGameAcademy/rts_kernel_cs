@@ -59,8 +59,8 @@ internal static class RoutePlacements
             || members.Distinct().Count() != members.Length || members.Contains(requester.Id) || requester.Blocker != members[^1]
             || members.Any(id => !world.Bodies.TryGetValue(id, out var body) || !RouteYielding.CanParticipate(body, task.Id))) return false;
         var root = world.Bodies[members[^1]];
-        if (!CrowdGeometry.Overlap(requester.Position, requester.Endpoint, 31, root.Position, root.Position, 31)
-            || CrowdGeometry.Overlap(requester.Position, requester.Endpoint, 31, goals[^1], goals[^1], 31)) return false;
+        if (!RouteYieldGeometry.Overlap(requester.Position, requester.Endpoint, 31, root.Position, root.Position, 31)
+            || RouteYieldGeometry.Overlap(requester.Position, requester.Endpoint, 31, goals[^1], goals[^1], 31)) return false;
         var claims = observation.Claims;
         for (var i = 0; i < members.Length; i++)
         {
