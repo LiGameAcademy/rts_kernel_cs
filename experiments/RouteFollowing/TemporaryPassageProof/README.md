@@ -10,6 +10,23 @@ requester as group acceptance.
 
 ## Requester connection follow-up — 2026-10-28
 
+Search-local reuse follow-up: one RouteYieldObservation captures stable bodies and
+lazy claims for Settled/Waiting/Temporary searches. It memoizes only the original
+distance, terrain and static-straight results for identical raw inputs. At most two
+helper projections are checked afresh in original body order; no projected-body
+result or search context survives a candidate/search boundary. Candidate ordering,
+budget, fixed rounding and collision predicates are unchanged.
+
+Compared with the recovery-entry commitc8adbd1, every state/event transcript matches
+for all three complete frozen inputs, including per-frame restore.442 still reaches
+24/24 at655 plus90 stable;492 allocation falls from1952256 to about578000 bytes.
+Its two final cold CLI peaks are11.8566/35.6695ms; the second remains over33.333ms.
+369 retains24/24 at646 but its true first tick is47.0709ms;368 reaches827 with
+23.9960ms peak. An earlier no-distance-cache candidate's36.9403ms is also retained.
+88 recovery-entry,1418 requester and15 projection/map/restore assertions pass.
+Functional frozen gates pass; performance and overall closeout still FAIL. No
+aggregate from-start24, cold Godot,300/500 or host migration follows these failures.
+
 Recovery-entry follow-up: a Following member with explicitly empty recorded contacts
 and no pending recovery is filtered before scheduling a new round. Normal motion
 first supplies the next actual rejection. Existing pending searches, Waiting members

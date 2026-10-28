@@ -11,6 +11,16 @@ bounded two-member cooperation remain authoritative.
 
 ## Requester admission/execution repair — 2026-10-28: local pass, overall FAIL
 
+Per-search reuse is now implemented only in the isolated candidate. Stable bodies,
+lazy task claims and distance/terrain/straight observations are reused within one
+search; projected helper-body predicates remain fresh, with original ordering and
+budgets. Three frozen state/event transcripts equal the recovery-entry baseline.
+All complete24/24 plus90 stable:442at655,369at646,368at827.492allocation drops from
+1952256 to about578000bytes, but two final442 cold peaks11.8566/35.6695ms and369's
+actual first47.0709ms retain30Hz failure. The earlier36.9403ms candidate is retained.
+88+1418+15 boundary assertions pass. Snapshot10 and stable/production/host unchanged.
+Stop at this performance gate; no further algorithm patch or aggregate takeover.
+
 Recovery-entry follow-up: normal Following motion with explicit empty contacts and
 no pending search no longer spends a fresh round. The original442 world now reaches
 24/24 at655 plus90 stable;23 starts actual24→11 cooperation520 instead of wasting

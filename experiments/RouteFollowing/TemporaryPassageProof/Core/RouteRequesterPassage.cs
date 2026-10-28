@@ -21,19 +21,6 @@ internal static class RouteRequesterPassage
         return new(target, trace, reachTarget);
     }
 
-    internal static bool Clear(RequesterPassage passage, ulong requester,
-        IReadOnlyDictionary<ulong, FixedVector2> positions)
-    {
-        if (passage.ViaVacatedBody && passage.Trace[^1] != passage.Target) return false;
-        foreach (var (id, point) in positions)
-        {
-            if (id == requester) continue;
-            for (var index = 1; index < passage.Trace.Count; index++)
-                if (CrowdGeometry.Overlap(passage.Trace[index - 1], passage.Trace[index], 31, point, point, 31)) return false;
-        }
-        return true;
-    }
-
     internal static bool Hold(RouteWorld world, Walker body) => Connection(world, body) is { Phase: TemporaryYieldPhase.Outward };
 
     internal static bool TryTarget(RouteWorld world, Walker body, out FixedVector2 target)

@@ -3,7 +3,7 @@ namespace Rts.Movement.Prototype;
 /// <summary>Bounded temporary clearance without replacing task-owned final goals.</summary>
 internal static class RouteTemporaryYield
 {
-    internal static bool TryStart(RouteWorld world, Walker requester, ref int work)
+    internal static bool TryStart(RouteWorld world, Walker requester, RouteYieldObservation observation, ref int work)
     {
         if (requester.Recoveries >= RouteSettings.RecoveryLimit || requester.Blocker is not { } rootId
             || world.Routes[requester.Task].Yield is not null) return false;
@@ -17,7 +17,7 @@ internal static class RouteTemporaryYield
             ? RouteRequesterPassage.Predict(world, requester with { Velocity = default }, root.Position, reachTarget: true) : null;
         var candidates = RoutePlanning.Candidates(world, root.Position, 156).ToArray();
         foreach (var target in candidates)
-            if (TryAdmit(world, requester, direct, connection, [root.Id], [target])) return true;
+            if (TryAdmit(world, requester, observation, direct, connection, [root.Id], [target])) return true;
         // Existing occupied body centres are semantic hand-off positions, not extra angular samples.
         // Moving the one obstructing body first can expose a narrow passage between packed neighbours.
         var helpers = world.Bodies.Values.Where(body => body.Id != requester.Id && body.Id != root.Id
@@ -31,29 +31,29 @@ internal static class RouteTemporaryYield
             foreach (var alternative in RoutePlanning.Candidates(world, helper.Position, 156))
             {
                 if (++work > 2048) return false;
-                if (TryAdmit(world, requester, direct, connection, [helper.Id, root.Id], [alternative, target])) return true;
+                if (TryAdmit(world, requester, observation, direct, connection, [helper.Id, root.Id], [alternative, target])) return true;
             }
         }
         return false;
     }
 
-    private static bool TryAdmit(RouteWorld world, Walker requester, RequesterPassage direct, RequesterPassage? connection,
+    private static bool TryAdmit(RouteWorld world, Walker requester, RouteYieldObservation observation,
+        RequesterPassage direct, RequesterPassage? connection,
         ulong[] members, FixedVector2[] targets)
     {
-        var positions = world.Bodies.Values.ToDictionary(body => body.Id, body => body.Position);
         for (var index = 0; index < members.Length; index++)
         {
             var body = world.Bodies[members[index]];
             var target = targets[index];
-            if ((target - body.Position).Length is var distance && (distance < 1 || distance > 156)
-                || !world.Navigation.CanStandAt(target, 31)
-                || StraightMovePath.TryFind(world.Navigation, body.Position, target, 1) is null
-                || positions.Any(other => other.Key != body.Id
-                    && ((other.Value - target).Length < 64 || Blocked(body.Position, target, other.Value)))) return false;
-            positions[body.Id] = target;
+            var relocated = index == 0 ? 0 : members[0];
+            var replacement = index == 0 ? default : targets[0];
+            if (observation.Distance(body, target) is var distance && (distance < 1 || distance > 156)
+                || !observation.CanStand(target)
+                || !observation.CanTravel(body, target)
+                || observation.BodyAtGoalOrOnLeg(body.Id, body.Position, target, relocated, replacement)) return false;
         }
-        var selected = RouteRequesterPassage.Clear(direct, requester.Id, positions) ? direct
-            : connection is not null && RouteRequesterPassage.Clear(connection, requester.Id, positions) ? connection : null;
+        var selected = observation.Clear(direct, requester.Id, members, targets) ? direct
+            : connection is not null && observation.Clear(connection, requester.Id, members, targets) ? connection : null;
         if (selected is null) return false;
         var task = world.Routes[requester.Task];
         var origins = members.Select(id => world.Bodies[id].Position).ToArray();

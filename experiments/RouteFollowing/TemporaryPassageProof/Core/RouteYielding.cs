@@ -17,12 +17,14 @@ internal static class RouteYielding
 
     internal static bool TryStart(RouteWorld world, Walker requester, ref int work)
     {
-        return work < 2048 && (TryStart(world, requester, allowWaiting: false, ref work)
-            || work < 2048 && TryStart(world, requester, allowWaiting: true, ref work)
-            || work < 2048 && RouteTemporaryYield.TryStart(world, requester, ref work));
+        if (work >= 2048) return false;
+        var observation = new RouteYieldObservation(world);
+        return TryStart(world, requester, observation, allowWaiting: false, ref work)
+            || work < 2048 && TryStart(world, requester, observation, allowWaiting: true, ref work)
+            || work < 2048 && RouteTemporaryYield.TryStart(world, requester, observation, ref work);
     }
 
-    private static bool TryStart(RouteWorld world, Walker requester, bool allowWaiting, ref int work)
+    private static bool TryStart(RouteWorld world, Walker requester, RouteYieldObservation observation, bool allowWaiting, ref int work)
     {
         if (requester.Recoveries >= RouteSettings.RecoveryLimit || requester.Blocker is not { } id
             || world.Routes[requester.Task].Yield is not null) return false;
@@ -32,8 +34,8 @@ internal static class RouteYielding
         if (!Available(root)) return false;
         var candidates = RoutePlanning.Candidates(world, root.Preference, 156).ToArray();
         foreach (var point in candidates)
-            if (RoutePlacements.TryBeginYield(world, requester, [root.Id], [point])) return true;
-        var claims = RoutePlacements.Claims(world.Bodies.Values);
+            if (RoutePlacements.TryBeginYield(world, requester, observation, [root.Id], [point])) return true;
+        var claims = observation.Claims;
         var secondaryCandidates = new Dictionary<ulong, FixedVector2[]>();
         foreach (var point in candidates)
         {
@@ -52,7 +54,7 @@ internal static class RouteYielding
             {
                 // A local proof has a fixed cap; this is not unbounded joint traffic search.
                 if (++work > 2048) return false;
-                if (RoutePlacements.TryBeginYield(world, requester, [second.Id, root.Id], [alternative, point])) return true;
+                if (RoutePlacements.TryBeginYield(world, requester, observation, [second.Id, root.Id], [alternative, point])) return true;
             }
         }
         return false;
