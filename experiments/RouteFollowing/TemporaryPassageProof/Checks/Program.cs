@@ -4,6 +4,13 @@ using System.Text;
 using System.Text.Json;
 using Rts.Movement.Prototype;
 
+if (args is ["--settled-yield-boundaries"])
+{
+    try { SettledYieldChecks.Run(); }
+    catch (Exception error) { Console.Error.WriteLine(error); Environment.ExitCode = 1; }
+    return;
+}
+
 if (args is ["--reference-leg"])
 {
     ReferenceLegChecks.Run();
