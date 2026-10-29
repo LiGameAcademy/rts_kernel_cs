@@ -1,6 +1,6 @@
 namespace Rts.Movement.Prototype;
 
-/// <summary>A member follows one terrain reference ending at its own task-owned goal.</summary>
+/// <summary>A member follows its task-owned goal; recovery may route around currently settled bodies.</summary>
 internal static class RouteNavigation
 {
     internal static RouteTask Reference(Walker body) => body.Navigation is { } reference
@@ -8,23 +8,23 @@ internal static class RouteNavigation
             reference.MapRevision, reference.Corners)
         : throw new InvalidOperationException("Member reference has not been prepared.");
 
-    internal static Walker Prepare(RouteWorld world, Walker body, bool rebuild = false, bool allowShared = true)
+    internal static Walker Prepare(RouteWorld world, Walker body, bool rebuild = false, bool allowShared = true, bool avoidSettled = false)
     {
         var prior = body.Navigation;
         if (!rebuild && prior is not null && prior.MapRevision == world.Revision && prior.Goal == body.Endpoint)
             return body;
         var blockers = world.Bodies.Values.Where(other => other.Id != body.Id
-            && RoutePlacements.IsFixed(other) && (other.Task != body.Task || other.Task == 0)).ToArray();
+            && RoutePlacements.IsFixed(other) && (avoidSettled || other.Task != body.Task || other.Task == 0)).ToArray();
         var version = (prior?.Version ?? 0) + 1;
         IReadOnlyList<FixedVector2> points;
         IReadOnlyList<int> corners;
-        var kind = MemberReferenceKind.Direct;
+        var kind = avoidSettled ? MemberReferenceKind.Independent : MemberReferenceKind.Direct;
         if (RoutePlanning.TryDirect(world, body.Position, body.Endpoint, blockers) is { } direct)
         {
             points = direct;
             corners = [];
         }
-        else if (allowShared && TryShared(world, body, blockers, out points))
+        else if (allowShared && !avoidSettled && TryShared(world, body, blockers, out points))
         {
             corners = RouteReference.FindCorners(points);
             kind = MemberReferenceKind.SharedSuffix;
@@ -49,6 +49,14 @@ internal static class RouteNavigation
     {
         var body = Prepare(world, source);
         if (body.Navigation is null) return (body, body.Position, 4);
+        if (body.Navigation.Kind == MemberReferenceKind.Independent)
+        {
+            // A completed yield can open a direct leg before the old detour reaches its next corner.
+            // This is only a motion proposal: moving peers still go through timed collision resolution.
+            var fixedBodies = world.Bodies.Values.Where(other => other.Id != body.Id && RoutePlacements.IsFixed(other)).ToArray();
+            if (RoutePlanning.TryDirect(world, body.Position, body.Endpoint, fixedBodies) is not null)
+                body = Prepare(world, body, rebuild: true, allowShared: false);
+        }
         var selected = SelectTarget(world, body);
         if (StraightMovePath.TryFind(world.Navigation, selected.Body.Position, selected.Target, 1) is not null)
             return (selected.Body, selected.Target, 4);
@@ -66,12 +74,16 @@ internal static class RouteNavigation
         var cursor = Math.Min(body.Cursor, route.Points.Count - 1);
         while (cursor < route.Points.Count - 1 && body.Position == route.Points[cursor]) cursor++;
         var target = route.Points[cursor];
-        // Visibility may skip terrain waypoints, but never relies on another body's predicted departure.
+        var blockers = body.Navigation!.Kind == MemberReferenceKind.Independent
+            ? world.Bodies.Values.Where(other => other.Id != body.Id && RoutePlacements.IsFixed(other)).ToArray()
+            : [];
+        // An independent recovery reference must not shortcut through the bodies it routed around.
+        // Read their current positions: departing bodies never become permanent route obstacles.
         for (var i = cursor; i < route.Points.Count; i++)
         {
             if (SquaredDistance.Between(body.Position, route.Points[i]).Raw > (Int128)192 * 192 * SimScalar.Scale * SimScalar.Scale)
                 break;
-            if (StraightMovePath.TryFind(world.Navigation, body.Position, route.Points[i], 1) is null) continue;
+            if (RoutePlanning.TryDirect(world, body.Position, route.Points[i], blockers) is null) continue;
             cursor = i;
             target = route.Points[i];
         }

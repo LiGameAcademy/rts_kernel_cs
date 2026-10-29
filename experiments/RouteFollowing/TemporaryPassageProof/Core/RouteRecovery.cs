@@ -45,7 +45,8 @@ internal static class RouteRecovery
                 return;
             }
         }
-        var prepared = RouteNavigation.Prepare(world, waiting, rebuild: true);
+        // Exhausted cooperation must not regenerate the same terrain-only route through settled peers.
+        var prepared = RouteNavigation.Prepare(world, waiting, rebuild: true, allowShared: false, avoidSettled: true);
         var unchanged = SameReference(waiting.Navigation, prepared.Navigation);
         if (unchanged) prepared = waiting; // No new geometry: retain cursor, version and signed progress.
         world.Bodies[waiting.Id] = prepared with

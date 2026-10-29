@@ -4,6 +4,18 @@ using System.Text;
 using System.Text.Json;
 using Rts.Movement.Prototype;
 
+if (args is ["--fixed-body-reference"])
+{
+    FixedBodyReferenceChecks.Run();
+    return;
+}
+
+if (args is ["--fixed-body-route", var routeInput, var routeId])
+{
+    FixedBodyRouteAudit.Run(routeInput, ulong.Parse(routeId));
+    return;
+}
+
 if (args is ["--settled-yield-boundaries"])
 {
     try { SettledYieldChecks.Run(); }
