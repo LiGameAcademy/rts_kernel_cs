@@ -1,5 +1,40 @@
 # Temporary passage proof — automatic24 pass, release pending, 2026-10-29
 
+## Fixed-body recovery reference — 2026-10-29 (2ad0cea)
+
+This supersedes the unresolved original20 functional result below, not the release
+status. Existing eight-neighbour A* is retained. Recovery can plan around currently
+settled same-task bodies; independent lookahead uses the same fixed-body predicate.
+When a safe direct leg opens, the obsolete detour is released. Moving peers still
+use timed motion resolution. The exact goal-cell-to-endpoint leg is also checked.
+No new authority fields, snapshot format, cooperation size or search budget.
+
+Original full-world20 and265 parties now finish24/24 at1117/564, plus90 stable ticks.
+Final frozen-run peaks168.4501/129.9896ms still FAIL30Hz; earlier faster samples are
+retained rather than substituted. The intermediate variant without direct release
+failed member7 at817. Geometry success alone did not establish execution success.
+
+Twelve cold processes (CLI Release/Godot Debug;24/300/500; two each) retain20712
+frames/1580 overruns. All corresponding per-frame state/event streams agree.24
+narrow577, same125, return248 finish and stay stable90; maximum13.5907ms. Stop,
+replacement, rejection, append, map, restore, settled-yield and requester boundaries
+pass. New `--fixed-body-reference` covers detour visibility and exact final legs.
+
+300 fresh/restore both complete300, but obstacle fails1 at661.500 fresh/restore/
+obstacle fail409/217/1 at500/695/667. Tests stop at first failure, so partial counts
+are not final arrival ratios. Worst500 Godot sample976.7496ms includes250ms thread
+CPU,38,271,456 allocated bytes and11.405ms GC pause; JIT0. Real work is present,
+but counters alone do not attribute all remaining wall time to scheduling or a
+specific function. All first rounds remain in the gate. No500 same-frame spawn work.
+
+Full-world1 before recovery has contacts12/17; existing bounded cooperation rejects
+both entries, and the fixed-body route query also fails. This does not prove all
+continuous or multi-body solutions impossible. Preserve those inputs before choosing
+the next minimal change. Production, host and the interactive black-box build are
+unchanged; PR155 remains draft. Godot probe stderr has sandbox log/certificate
+errors, retained separately; this is not a clean-log host launch acceptance.
+Internal evidence: V002_FIXED_REFERENCE_2026_10_29.md / fixed_reference_2026_10_29.
+
 ## Settled gathering repair — 2026-10-29 (74f3adc)
 
 This supersedes the unresolved265 execution/admission result below, not the release
