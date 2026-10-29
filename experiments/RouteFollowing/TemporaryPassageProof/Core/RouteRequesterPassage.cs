@@ -21,7 +21,15 @@ internal static class RouteRequesterPassage
         return new(target, trace, reachTarget);
     }
 
-    internal static bool Hold(RouteWorld world, Walker body) => Connection(world, body) is { Phase: TemporaryYieldPhase.Outward };
+    internal static bool Hold(RouteWorld world, Walker body)
+    {
+        if (!world.Routes.TryGetValue(body.Task, out var route)
+            || route.Yield is not { } plan || plan.Requester != body.Id) return false;
+        // Admission predicts from this pose after helpers reach their goals. Preserve
+        // that pose (including passage side) until the actual outward legs finish.
+        return plan.Temporary is null || plan.Temporary is
+            { HasRequesterConnection: true, Phase: TemporaryYieldPhase.Outward };
+    }
 
     internal static bool TryTarget(RouteWorld world, Walker body, out FixedVector2 target)
     {

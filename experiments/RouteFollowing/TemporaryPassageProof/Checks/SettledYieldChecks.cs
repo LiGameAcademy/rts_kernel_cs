@@ -12,6 +12,7 @@ internal static class SettledYieldChecks
         Advance(world);
         Check(world.Routes[task].Yield is { Requester: 265, Temporary: null }, "Automatic contact chooses permanent cooperation");
         var seed = world.Save();
+        AwaitHelpers(RouteWorld.Load(seed), task);
         foreach (var id in new ulong[] { 265, 275 })
         {
             var stopped = RouteWorld.Load(seed);
@@ -57,6 +58,23 @@ internal static class SettledYieldChecks
         world.Step();
         restored.Step();
         Check(world.Hash() == restored.Hash() && world.Events.SequenceEqual(restored.Events), "Each frame restores identically");
+    }
+
+    private static void AwaitHelpers(RouteWorld world, ulong task)
+    {
+        var plan = world.Routes[task].Yield!;
+        var original = world.Bodies[plan.Requester];
+        for (var tick = 0; tick < 90; tick++)
+        {
+            Advance(world);
+            if (world.Events.Any(e => e.Id == original.Id && e.Kind == "yield_finished")) return;
+            Check(world.Routes[task].Yield is not null, "Helpers finish rather than expire");
+            var body = world.Bodies[original.Id];
+            Check(body.Position == original.Position && body.Facing == original.Facing
+                && body.Passage == original.Passage, "Requester preserves the admitted pose while helpers move");
+            Check(body.Recoveries == original.Recoveries, "Cooperative waiting is not another failed recovery");
+        }
+        throw new InvalidOperationException("Permanent helpers did not finish");
     }
 
     private static void Check(bool condition, string message)

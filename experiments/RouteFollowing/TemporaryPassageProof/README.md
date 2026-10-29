@@ -382,3 +382,11 @@ Store each cold run separately. Historical evidence is
 documented in V002_TEMPORARY_PASSAGE_PROOF_2026_10_27.md; it includes raw failures,
 CPU observations, source snapshots and checksum manifests. No performance fix or
 larger traffic algorithm was attempted in this batch.
+
+### 2026-10-29 永久协作请求者等待（#154）
+
+永久计划与临时连接共用请求者等待入口：助手顺序出发期间保留请求者位置、方向和通过侧，实际全部到位后才放行。没有新增权威字段，不改快照格式、恢复次数或90帧计划期限。
+
+完整500单位原冻结世界217/frame595与409/frame393实际执行，其24人小组分别646/670帧完成并稳定90帧；初始读档副本逐帧状态/事件一致。与诊断仅针对单个请求者的653/844不同，本实现对所有永久计划一致生效。settled-yield-boundaries新增等待姿态及计数断言，原Stop/接管/非法替换/追加/地图/逐帧读档和requester-boundaries通过。构建零警告零错误，自审完成。
+
+性能仍FAIL：217峰233.7899ms/11超时；409峰83.1860ms/7超时，首轮保留。只完成第一项功能修复，不能据此接管生产或宣布收口。下一批处理恢复后的有界可达换点及搜索复用。
