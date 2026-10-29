@@ -4,6 +4,12 @@ using System.Text;
 using System.Text.Json;
 using Rts.Movement.Prototype;
 
+if (args is ["--reference-leg"])
+{
+    ReferenceLegChecks.Run();
+    return;
+}
+
 if (args is ["--permanent-yield-admission"])
 {
     PermanentYieldAdmissionChecks.Run();

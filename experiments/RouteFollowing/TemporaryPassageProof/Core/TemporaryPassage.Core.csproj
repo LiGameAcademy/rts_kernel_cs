@@ -5,7 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../../../src/Rts.Kernel/Rts.Kernel.csproj" />
-    <Compile Include="../../Core/*.cs" Exclude="../../Core/RouteMotion.cs;../../Core/RouteSnapshotValidation.cs;../../Core/RouteState.cs;../../Core/RouteWorld.cs;../../Core/RouteYieldCorridors.cs;../../Core/RouteYielding.cs;../../Core/RouteTemporaryYield.cs;../../Core/RouteRecovery.cs;../../Core/RoutePlacements.cs" Link="Baseline/%(Filename)%(Extension)" />
+    <Compile Include="../../Core/*.cs" Exclude="../../Core/RouteMotion.cs;../../Core/RouteSnapshotValidation.cs;../../Core/RouteState.cs;../../Core/RouteWorld.cs;../../Core/RouteYieldCorridors.cs;../../Core/RouteYielding.cs;../../Core/RouteTemporaryYield.cs;../../Core/RouteRecovery.cs;../../Core/RoutePlacements.cs;../../Core/RouteNavigation.cs" Link="Baseline/%(Filename)%(Extension)" />
     <InternalsVisibleTo Include="Checks" />
   </ItemGroup>
 </Project>
