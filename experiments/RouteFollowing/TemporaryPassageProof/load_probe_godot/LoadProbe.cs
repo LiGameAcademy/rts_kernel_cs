@@ -9,6 +9,11 @@ public partial class LoadProbe : Node
         try
         {
             var args = OS.GetCmdlineUserArgs();
+            if (args is ["--full24", var fullFolder])
+            {
+                GetTree().Quit(Full24Checks.Run(fullFolder, line => GD.Print(line)) ? 0 : 1);
+                return;
+            }
             if (args is not ["--multi-group", var count, var folder])
                 throw new ArgumentException("Expected --multi-group 300|500 <new evidence folder>");
             GetTree().Quit(MultiGroupChecks.Run(int.Parse(count), folder, line => GD.Print(line)) ? 0 : 1);

@@ -1,5 +1,51 @@
 # Temporary passage proof — automatic24 pass, release pending, 2026-10-29
 
+## Three-gap follow-up — 2026-10-29: partial repair, acceptance FAIL
+
+This section supersedes the earlier all16-command limit and automatic24 PASS claims
+for the current candidate. Production and the user's interactive build are unchanged.
+
+-563a2a8: pending Move/Stop capacity and snapshot validation share32 entries. All21
+ groups/500 members are accepted together, still applied one group per tick.
+ Overflow and full-queue restore checks pass; no command splitting workaround.
+-85efdad attempted to require requester clearance before permanent goal yielding.
+ It rejected the old275-only plan but did not complete265, and regressed narrow24
+ (member14 failed).365c762 reverts that guard. The explicit
+ `--permanent-yield-admission` check remains an unresolved regression, not a passing
+ CI assertion. Rejecting a useless plan alone did not create executable cooperation.
+-5f09efa: a terrain-blocked current reference leg is rebuilt once from the actual
+ body position using existing direct/independent routing, without retrying the same
+ shared suffix. Goals, recovery counts and wait counters remain unchanged.
+ The original20 fixture now gets a legal leg, but its party fails on member1 at450;
+ actual party completion is NOT proved. Final265 fixture still fails265 at493.
+
+The final12 cold processes cover CLI Release/Godot Debug, populations24/300/500,
+ two runs each. Every recorded hash/event agrees across runtimes;24 additionally
+ checks a freshly restored continuation each frame. Large cases compare an initial
+ restored copy every frame. All16415 measured frames and767 overruns are retained.
+ Preparation is separate and verified not to alter authority.
+
+24 narrow completes520 (previously779), same-direction125, roundtrip248, each with90
+ stable ticks. Both Godot runs and CLI runB pass; CLI runA has44.239ms at tick353 and
+ stops after narrow. Its remaining scenarios are NOT_RUN, not inferred passing.
+ Stop/new-command/queue/map/restore checks pass, including1418 requester-boundary
+ assertions. These do not waive the unresolved permanent-yield admission test.
+
+300 fresh completes300 at713, but restore replacement fails265/493 and obstacle
+ replacement fails217/468.500 fresh fails433/496, restore265/473, obstacle217/466.
+ Tests stop at first failure; partial completion counts are not final arrival ratios.
+ Worst recorded peaks: CLI30063.7054ms,50049.2128ms; Godot30095.7898ms,500199.211ms.
+ The500199.211ms sample has171.875ms threadCPU and0.799ms GC pause; this cannot be
+ dismissed as scheduling alone. Counters do not establish an exact function hotspot.
+
+No new traffic algorithm, larger search window/budget, performance waiver, discarded
+ first round, production migration or same-frame500 spawning work. Draft PR155 stays
+ open. Internal evidence:V002_THREE_GAPS_2026_10_29.md and three_gaps_2026_10_29.
+ Reproduce `Checks.dll --command-capacity`, `--reference-leg`, `--requester-boundaries`,
+ `--gap-frozen <full-world.json> <subject> <folder>`, `--full-24 <folder>` or
+ `--multi-group 300|500 <folder>`. Dedicated headless load_probe_godot accepts
+ `--full24 <folder>` or the same `--multi-group` args, without rebuilding the UI lab.
+
 Refs #154 and draft PR #155. Author: Codex.
 
 This is an isolated execution experiment awaiting black-box/release gates. It does not replace the normal
