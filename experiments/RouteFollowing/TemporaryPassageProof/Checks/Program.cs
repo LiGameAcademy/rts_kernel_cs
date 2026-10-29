@@ -4,6 +4,25 @@ using System.Text;
 using System.Text.Json;
 using Rts.Movement.Prototype;
 
+if (args is ["--permanent-yield-admission"])
+{
+    PermanentYieldAdmissionChecks.Run();
+    return;
+}
+
+if (args is ["--gap-search", var searchInput, var searchId])
+{
+    GroupGapDiagnostics.Run(searchInput, ulong.Parse(searchId));
+    return;
+}
+
+if (args is ["--gap-frozen", var inputFile, var subjectText, var gapFolder])
+{
+    try { Environment.ExitCode = FrozenGapChecks.Run(inputFile, ulong.Parse(subjectText), gapFolder) ? 0 : 1; }
+    catch (Exception error) { Console.Error.WriteLine(error); Environment.ExitCode = 1; }
+    return;
+}
+
 if (args is ["--command-capacity"])
 {
     try { CommandCapacityChecks.Run(); }
