@@ -47,11 +47,17 @@ internal static class RouteRecovery
         }
         // Exhausted cooperation must not regenerate the same terrain-only route through settled peers.
         var prepared = RouteNavigation.Prepare(world, waiting, rebuild: true, allowShared: false, avoidSettled: true);
+        var reassigned = false;
+        if (prepared.Navigation is null && RoutePlacements.TryRecoveryGoal(world, waiting, out var replacement))
+        {
+            prepared = replacement;
+            reassigned = true;
+        }
         var unchanged = SameReference(waiting.Navigation, prepared.Navigation);
         if (unchanged) prepared = waiting; // No new geometry: retain cursor, version and signed progress.
         world.Bodies[waiting.Id] = prepared with
             { Recovery = null, Recoveries = attempts, RetryAtWait = waiting.WaitTicks + RouteSettings.WaitBeforeRetry };
-        world.Publish(waiting.Id, "retry", prepared.Navigation is null ? "member_route_unavailable"
+        world.Publish(waiting.Id, "retry", reassigned ? "member_goal_reassigned" : prepared.Navigation is null ? "member_route_unavailable"
             : unchanged ? "no_recovery_candidate" : "member_reference_replaced");
     }
 

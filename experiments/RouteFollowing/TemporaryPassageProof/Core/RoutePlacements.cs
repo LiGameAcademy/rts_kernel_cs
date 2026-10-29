@@ -92,6 +92,31 @@ internal static class RoutePlacements
         return true;
     }
 
+    internal static bool TryRecoveryGoal(RouteWorld world, Walker source, out Walker prepared)
+    {
+        prepared = source;
+        if (source.Task == 0 || source.Phase is not (WalkPhase.Following or WalkPhase.Waiting)
+            || world.Bodies[source.Id] != source || world.Routes[source.Task].Yield is not null) return false;
+        var claims = Claims(world.Bodies.Values);
+        var fixedBodies = world.Bodies.Values.Where(body => body.Id != source.Id && IsFixed(body)).ToArray();
+        foreach (var point in RoutePlanning.Candidates(world, source.Preference, 156))
+        {
+            if (point == source.Endpoint || !world.Navigation.CanStandAt(point, RouteSettings.Radius)
+                || claims.Any(claim => claim.Task == source.Task && claim.Member != source.Id && (claim.Point - point).Length < 64)
+                || fixedBodies.Any(body => (body.Position - point).Length < 64)) continue;
+            var candidate = RouteNavigation.Prepare(world, source with { Endpoint = point },
+                rebuild: true, allowShared: false, avoidSettled: true);
+            if (candidate.Navigation is null) continue;
+            // Claims derive from Endpoint: publish the goal and its proved reference
+            // in one authoritative replacement, retaining command and recovery history.
+            prepared = candidate with { Recovery = null, BlockingContacts = null, PlacementCheckedRevision = -1 };
+            world.Bodies[source.Id] = prepared;
+            world.Publish(source.Id, "goal_reassigned", "recovery_route_unavailable");
+            return true;
+        }
+        return false;
+    }
+
     internal static void Refresh(RouteWorld world)
     {
         var claims = Claims(world.Bodies.Values);

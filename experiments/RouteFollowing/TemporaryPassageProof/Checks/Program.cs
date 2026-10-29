@@ -4,6 +4,12 @@ using System.Text;
 using System.Text.Json;
 using Rts.Movement.Prototype;
 
+if (args is ["--recovery-goal"])
+{
+    RecoveryGoalChecks.Run();
+    return;
+}
+
 if (args is ["--fixed-body-reference"])
 {
     FixedBodyReferenceChecks.Run();
