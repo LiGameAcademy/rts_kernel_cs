@@ -4,6 +4,20 @@ using System.Text;
 using System.Text.Json;
 using Rts.Movement.Prototype;
 
+if (args is ["--multi-audit", var inputs, var auditFolder])
+{
+    try { MultiGroupFailureAudit.Run(inputs, auditFolder); }
+    catch (Exception error) { Console.Error.WriteLine(error); Environment.ExitCode = 1; }
+    return;
+}
+
+if (args is ["--multi-group", var countText, var multiFolder])
+{
+    try { Environment.ExitCode = MultiGroupChecks.Run(int.Parse(countText), multiFolder, Console.WriteLine) ? 0 : 1; }
+    catch (Exception error) { Console.Error.WriteLine(error); Environment.ExitCode = 1; }
+    return;
+}
+
 if (args is ["--full-24", var evidenceFolder])
 {
     try { Environment.ExitCode = Full24Checks.Run(evidenceFolder, Console.WriteLine) ? 0 : 1; }

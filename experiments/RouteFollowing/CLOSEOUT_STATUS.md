@@ -9,6 +9,41 @@ suffix or use existing terrain pathfinding. Local half-speed/six-direction sides
 proposals do not write another long-term route. Task-owned placement and existing
 bounded two-member cooperation remain authoritative.
 
+## 300/500 multi-group gate —2026-10-29: FAIL (no algorithm change)
+
+A separate headless Godot load probe leaves the interactive24-unit lab untouched.
+CLI Release and Godot Debug each ran two cold processes per population.300 bodies
+form13 groups of at most24 on an existing128x128 map;500 bodies require21 groups.
+All commands are submitted together; the candidate still applies one group per tick.
+
+-300 fresh: all300 finish at frame713 and remain stable90 ticks. CLI peaks58.6834/
+  89.8979ms; Godot173.9437/216.9268ms. The30Hz gate FAILS.
+-300 moving snapshot at frame30, then same-goal replacement: first failure is265
+  at493. With one real obstacle edit before replacement, first failure is20 at444.
+  Checks stop at the first failure;35/12 completions are not final arrival ratios.
+  Live worlds without restoring reproduce both failures and every intervening hash/event.
+-500: all four cold runs reject groups17–21 because Move/Stop and snapshot validation
+  cap pending commands at16. The admitted prefix is preserved but not stepped.
+  No500 movement/performance PASS and no split-across-frames workaround.
+-All6720 measured300-unit ticks,383 overruns and four500 admission observations
+  are retained. Four300-unit runs agree on every hash/event. Setup, preparation,
+  restore and obstacle edit costs are separate. Timing includes submissions on tick0.
+
+Minimum gaps: command queue capacity/validation; permanent goal-yield admission
+must prove actual requester clearance (moving275 left270 blocking265); a current
+shared-reference leg can become terrain-inaccessible while Follow retains it
+(20 before retries127/243/351). CPU evidence also includes real computation costs,
+not only GC/scheduling. No movement rules, budgets, snapshots, host or thresholds
+changed; performance causes are not fully attributed by thread counters alone.
+
+Reproduce: `Checks.dll --multi-group 300|500 <new-folder>`. Build the dedicated
+`TemporaryPassageProof/load_probe_godot/LoadProbe.csproj` in Debug; run Godot4.7.2
+mono headless with process-local DOTNET_ROLL_FORWARD=LatestMajor and the same args.
+`Checks.dll --multi-audit <cli-300-a-folder> <new-folder>` reproduces live/restore
+failures and records diagnostic phase costs, not replacement performance samples.
+Evidence: internal V002_MULTIGROUP_FAILURE_2026_10_29.md. Draft PR155/#154 stay open;
+no production migration, release, merge or tag.500 same-frame spawning stays deferred.
+
 ## Full24 CLI and Godot acceptance — 2026-10-29: automatic local PASS
 
 The latest isolated candidate is now tested from frame0, not only from frozen
