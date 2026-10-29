@@ -32,6 +32,8 @@ public sealed record RouteSnapshot(int Format, int Width, int Height, byte[] Fla
 public static class RouteSettings
 {
     public const int SnapshotFormat = 10;
+    // A500-body world needs21 small-group commands, with bounded room for subsequent control input.
+    public const int CommandCapacity = 32;
     public const int TickRate = 30;
     public const int WaitBeforeRetry = 90;
     public const int RecoveryLimit = 3;

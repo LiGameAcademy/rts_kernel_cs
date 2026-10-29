@@ -6,7 +6,7 @@ internal static class RouteSnapshotValidation
     {
         if (state.Format != RouteSettings.SnapshotFormat || state.Frame < 0 || state.EventSequence < 0 || state.MapRevision < 0 || state.PlacementRevision < 0
             || state.Units is null || state.Tasks is null || state.Commands is null || state.Flags is null
-            || state.Units.Length > 500 || state.Commands.Length > 16) throw new InvalidDataException("Invalid experimental snapshot.");
+            || state.Units.Length > 500 || state.Commands.Length > RouteSettings.CommandCapacity) throw new InvalidDataException("Invalid experimental snapshot.");
         var ids = state.Units.Select(body => body.Id).ToHashSet();
         var tasks = state.Tasks.Select(task => task.Id).ToHashSet();
         if (ids.Count != state.Units.Length || tasks.Count != state.Tasks.Length

@@ -4,6 +4,13 @@ using System.Text;
 using System.Text.Json;
 using Rts.Movement.Prototype;
 
+if (args is ["--command-capacity"])
+{
+    try { CommandCapacityChecks.Run(); }
+    catch (Exception error) { Console.Error.WriteLine(error); Environment.ExitCode = 1; }
+    return;
+}
+
 if (args is ["--multi-audit", var inputs, var auditFolder])
 {
     try { MultiGroupFailureAudit.Run(inputs, auditFolder); }

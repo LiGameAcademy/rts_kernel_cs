@@ -55,7 +55,7 @@ public sealed class RouteWorld
     {
         var ids = members.Order().ToArray();
         if (ids.Length is < 1 or > 24 || ids.Distinct().Count() != ids.Length || ids.Any(id => !Bodies.ContainsKey(id))
-            || !Navigation.TryWorldToCell(goal, out _) || _commands.Count >= 16
+            || !Navigation.TryWorldToCell(goal, out _) || _commands.Count >= RouteSettings.CommandCapacity
             || ids.Any(id => Bodies[id].Pending.Count >= 8)) return false;
         _commands.Enqueue(new(false, ids, goal, append));
         return true;
@@ -64,7 +64,7 @@ public sealed class RouteWorld
     public bool Stop(IEnumerable<ulong> members)
     {
         var ids = members.Distinct().Order().ToArray();
-        if (ids.Length == 0 || ids.Any(id => !Bodies.ContainsKey(id)) || _commands.Count >= 16) return false;
+        if (ids.Length == 0 || ids.Any(id => !Bodies.ContainsKey(id)) || _commands.Count >= RouteSettings.CommandCapacity) return false;
         _commands.Enqueue(new(true, ids, default, false));
         return true;
     }
