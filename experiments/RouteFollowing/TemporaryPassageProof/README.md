@@ -1,5 +1,38 @@
 # Temporary passage proof — automatic24 pass, release pending, 2026-10-29
 
+## Settled gathering repair — 2026-10-29 (74f3adc)
+
+This supersedes the unresolved265 execution/admission result below, not the release
+gate. The original265 full-world fixture completes its24-member party at564 and
+stays stable90 frames. Its44.9547ms peak/10 overruns still FAIL30Hz. All first frames
+and failed prototypes are retained.
+
+Permanent goal yielding now checks32 net progress (or arrival) through the existing
+local proposals before committing a static gathering placement. This read-only
+bounded prediction applies only to Direct references with unplanned same-task peers
+all Settled. Applying static reasoning to active peers regressed narrow14 and is
+not retained. Existing sidestep directions may retry at the existing half speed.
+No extra direction, search point, participant or pair budget; prediction adds work
+and is not a guarantee of subsequent dynamic execution. Formats remain unchanged.
+
+The original275-only admission regression now passes. Automatic265/275 Stop,
+replacement, append, rejection, map and per-step-restore checks pass, together with
+the existing1418 requester-boundary assertions.
+
+Two CLI Release and two Godot Debug cold processes pass24 narrow659 (previous520,
+slower by139), same-direction125, roundtrip248, each plus90 stable ticks. All four
+1302-frame hash/event streams agree, including freshly restored continuations.
+Total5208 frames, maximum12.8115ms, no overrun in these four samples. Narrow/return
+trajectories intentionally change; golden output was not rewritten.
+
+The20 original fixture still FAILS at434: a legal terrain reference is blocked by
+settled11, and11/18 bounded recovery searches find no candidate while peers remain
+active. No new300/500 complete matrix after this failure. Prior load failures and
+production/host gates remain open; no interactive build replacement or merge/tag.
+Evidence: internal V002_SETTLED_YIELD_2026_10_29.md. Reproduce
+`--permanent-yield-admission`, `--settled-yield-boundaries`, `--requester-boundaries`,
+`--gap-frozen <original-full-world.json> 265|20 <folder>` and `--full-24 <folder>`.
+
 ## Three-gap follow-up — 2026-10-29: partial repair, acceptance FAIL
 
 This section supersedes the earlier all16-command limit and automatic24 PASS claims
