@@ -52,7 +52,7 @@ internal static class RoutePlacements
     }
 
     internal static bool TryBeginYield(RouteWorld world, Walker requester, RouteYieldObservation observation,
-        RequesterPassage passage, ulong[] members, FixedVector2[] goals)
+        ulong[] members, FixedVector2[] goals)
     {
         var task = world.Routes[requester.Task];
         if (requester.Recoveries >= RouteSettings.RecoveryLimit || task.Yield is not null || members.Length is < 1 or > 2 || goals.Length != members.Length
@@ -76,8 +76,6 @@ internal static class RoutePlacements
                 || !observation.CanTravel(body, goal)
                 || observation.BodyOnLeg(body.Id, body.Position, goal, relocated, replacement)) return false;
         }
-        // A helper leaving the geometric line is not enough: other contacts may still block the real turn/step.
-        if (!observation.Clear(passage, requester.Id, members, goals)) return false;
         // All reservations are validated before any authoritative goal changes.
         for (var i = 0; i < members.Length; i++)
         {

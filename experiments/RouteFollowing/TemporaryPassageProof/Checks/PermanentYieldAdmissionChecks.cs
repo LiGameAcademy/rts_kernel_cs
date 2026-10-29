@@ -11,9 +11,7 @@ internal static class PermanentYieldAdmissionChecks
         var world = RouteWorld.Load(reader.ReadToEnd());
         var before = world.Save();
         var requester = world.Bodies[265] with { Blocker = 275, Recovery = null };
-        var (_, target, _) = RouteNavigation.Follow(world, requester);
-        var passage = RouteRequesterPassage.Predict(world, requester, target, reachTarget: false);
-        var accepted = RoutePlacements.TryBeginYield(world, requester, new RouteYieldObservation(world), passage,
+        var accepted = RoutePlacements.TryBeginYield(world, requester, new RouteYieldObservation(world),
             [275], [FixedVector2.FromRaw(14224931684352, 8177617731584)]);
         if (accepted || world.Save() != before)
             throw new InvalidOperationException("Invalid partial clearance changed goals or consumed recovery");
