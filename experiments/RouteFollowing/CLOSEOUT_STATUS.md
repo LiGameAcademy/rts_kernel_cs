@@ -9,6 +9,41 @@ suffix or use existing terrain pathfinding. Local half-speed/six-direction sides
 proposals do not write another long-term route. Task-owned placement and existing
 bounded two-member cooperation remain authoritative.
 
+## Full24 CLI and Godot acceptance — 2026-10-29: automatic local PASS
+
+The latest isolated candidate is now tested from frame0, not only from frozen
+failures. New Full24Checks is shared by CLI and an explicitly selected Godot build.
+All three cases contain24 units. Narrow passage completes at779, open same-direction
+at125, and four target reversals at31/62/93/124 complete at248. Each then remains
+stable90 ticks. Commands, bodies, reserved goals and per-frame restore are checked.
+
+Two cold CLI Release processes peak12.4802/22.1881ms; two cold Godot Debug processes
+peak12.0182/11.6237ms. Every state hash and event agrees across all1422 ticks per
+process (5688 total), all first ticks retained, no33.333ms overrun. Preparation is
+separate and authority-unchanged:2143.1239/1904.0554ms CLI and2218.6993/1573.3464ms
+Godot. Existing placement/command/map/queue boundaries pass in both runtimes;
+1418 requester,88 recovery,15 observation and10104 geometry assertions also pass.
+
+The first two Godot launches failed before any logic tick because the new diagnostic
+assumed Assembly.Location was a file path. Those failures and sandbox certificate
+errors are retained. The probe now reports the loaded module MVID, matched against
+the built candidate; the two measured runs use normal user permissions and clean
+stderr. This fixes the test entry only; simulation code and preparation did not change.
+
+Default Godot builds still use Core8. Select the candidate explicitly:
+`dotnet build experiments/RouteFollowing/godot_probe/RouteFollowing.Probe.csproj -c Debug -p:UseTemporaryPassageProof=true`
+Then use process-local DOTNET_ROLL_FORWARD=LatestMajor and Godot user arguments
+`--full-24 <evidence-folder>` for automation, or no user arguments for the interactive
+lab. The candidate prints snapshot10 and module identity; default builds reject the
+full24 switch rather than silently running the older core. CLI uses
+`Checks.dll --full-24 <evidence-folder>`. Failed cases stop the suite and return1.
+
+The interactive controls remain4=narrow24,5=open24,R=repeated target changes,
+Space=Stop,Shift+right-click=append,F2=route overlay,F5/F9=save/restore. Black-box
+acceptance is pending. No production/host migration,300/500 matrix,merge or tag;
+movement/0.0.2 is not fully closed. Internal evidence:
+V002_FULL24_CLI_GODOT_ACCEPTANCE_2026_10_29.md.
+
 ## Search geometry fast path, step2 — 2026-10-28
 
 Search-only capsule calls now reject strictly disjoint expanded bounding boxes

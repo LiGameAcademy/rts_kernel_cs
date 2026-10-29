@@ -28,6 +28,27 @@ public partial class RouteFollowingProbe : Node2D
     public override void _Ready()
     {
         var arguments = OS.GetCmdlineUserArgs();
+#if TEMPORARY_PASSAGE_PROOF
+        if (DisplayServer.GetName() != "headless")
+            DisplayServer.WindowSetTitle("RTS24单位移动候选 · 临时通行 · 格式10");
+        // Godot may load assemblies from memory; module identity remains available without a file path.
+        GD.Print($"[Route candidate] format={RouteSettings.SnapshotFormat}; "
+            + $"module={typeof(RouteWorld).Assembly.ManifestModule.ModuleVersionId}");
+        if (arguments is ["--full-24", var evidenceFolder])
+        {
+            SetProcess(false);
+            try { GetTree().Quit(Full24Checks.Run(evidenceFolder, line => GD.Print(line)) ? 0 : 1); }
+            catch (Exception error) { GD.PushError(error.ToString()); GetTree().Quit(1); }
+            return;
+        }
+#else
+        if (arguments.Contains("--full-24"))
+        {
+            GD.PushError("Full24 acceptance requires -p:UseTemporaryPassageProof=true; the default build uses the older core.");
+            GetTree().Quit(1);
+            return;
+        }
+#endif
         _capture = arguments.Contains("--capture");
         _font = new SystemFont { FontNames = ["Microsoft YaHei UI", "Arial"] };
         if (arguments.Contains("--self-test") || arguments.Contains("--member-acceptance") || arguments.Contains("--recovery-gate") || arguments.Contains("--closeout-gates"))
@@ -188,7 +209,11 @@ public partial class RouteFollowingProbe : Node2D
         Text(24, "统一路线参考实验    1 双人跟随  2 迎面相遇  3 Stop挡路  4 窄路24人  5 空地24人", 19);
         Text(50, "左键点选/拖框 | A全选 | 右键移动 | Shift+右键追加 | Space停止 | F2路线 | F5/F9存读档", 16);
         Text(74, $"P暂停 / N单步 | R五次往返   场景{_scenario}  帧{_world.Frame}  活动{_world.Units.Count(body => body.Task != 0)}  失败{_world.Units.Count(body => body.Phase == WalkPhase.Failed)}  峰值{_peak:F2}ms  {_message}", 15);
+#if TEMPORARY_PASSAGE_PROOF
+        Text(97, "独立候选·格式10·待黑盒验收；青线=参考路线，橙色=等待，红色=失败；推进32 / 等待90帧 / 恢复3轮", 14);
+#else
         Text(97, "尚未通过24人拥挤验收；青线=参考路线，橙色=等待，红色=失败；参数：推进32 / 等待90帧 / 重试3轮", 14);
+#endif
         var flags = _world.ReadFlags();
         for (var y = 0; y < _world.Height; y++)
         for (var x = 0; x < _world.Width; x++)

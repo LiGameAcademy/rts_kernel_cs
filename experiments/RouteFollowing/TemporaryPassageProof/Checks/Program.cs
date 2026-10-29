@@ -4,6 +4,13 @@ using System.Text;
 using System.Text.Json;
 using Rts.Movement.Prototype;
 
+if (args is ["--full-24", var evidenceFolder])
+{
+    try { Environment.ExitCode = Full24Checks.Run(evidenceFolder, Console.WriteLine) ? 0 : 1; }
+    catch (Exception error) { Console.Error.WriteLine(error); Environment.ExitCode = 1; }
+    return;
+}
+
 if (args is [var boundaryMode] && boundaryMode is "--requester-boundaries" or "--recovery-entry-boundaries" or "--yield-observation-boundaries" or "--yield-geometry-boundaries")
 {
     try

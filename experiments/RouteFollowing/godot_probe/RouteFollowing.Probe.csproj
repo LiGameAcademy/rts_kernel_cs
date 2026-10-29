@@ -4,7 +4,12 @@
     <EmbeddedResource Include="../Checks/Fixtures/connection-before-150.json" LogicalName="connection-before-150.json" />
     <EmbeddedResource Include="../Checks/Fixtures/connection-before-150.expected.json" LogicalName="connection-before-150.expected.json" />
     <EmbeddedResource Include="../Checks/Fixtures/connection-before-251.json" LogicalName="connection-before-251.json" />
-    <EmbeddedResource Include="../Checks/Fixtures/connection-before-251.expected.json" LogicalName="connection-before-251.expected.json" /><ProjectReference Include="../Core/Rts.Movement.Prototype.csproj" /><Compile Include="../Checks/RouteCheckSuite.cs" Link="RouteCheckSuite.cs" /><Compile Include="../Checks/RouteBoundaryChecks.cs" Link="RouteBoundaryChecks.cs" /></ItemGroup>
+    <EmbeddedResource Include="../Checks/Fixtures/connection-before-251.expected.json" LogicalName="connection-before-251.expected.json" />
+    <ProjectReference Include="../Core/Rts.Movement.Prototype.csproj" Condition="'$(UseTemporaryPassageProof)' != 'true'" />
+    <ProjectReference Include="../TemporaryPassageProof/Core/TemporaryPassage.Core.csproj" Condition="'$(UseTemporaryPassageProof)' == 'true'" />
+    <Compile Include="../Checks/RouteCheckSuite.cs" Link="RouteCheckSuite.cs" />
+    <Compile Include="../Checks/RouteBoundaryChecks.cs" Link="RouteBoundaryChecks.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="../Checks/RouteYieldChecks.cs" Link="RouteYieldChecks.cs" />
@@ -37,5 +42,11 @@
   <ItemGroup>
     <Compile Include="../../../tests/Rts.Kernel.Tests/FrameSpikeLog.cs" Link="FrameSpikeLog.cs" />
     <Compile Include="../../../tests/Rts.Kernel.Tests/ThreadWorkObservation.cs" Link="ThreadWorkObservation.cs" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(UseTemporaryPassageProof)' == 'true'">
+    <DefineConstants>$(DefineConstants);TEMPORARY_PASSAGE_PROOF</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(UseTemporaryPassageProof)' == 'true'">
+    <Compile Include="../TemporaryPassageProof/Acceptance/Full24Checks.cs" Link="Full24Checks.cs" />
   </ItemGroup>
 </Project>
