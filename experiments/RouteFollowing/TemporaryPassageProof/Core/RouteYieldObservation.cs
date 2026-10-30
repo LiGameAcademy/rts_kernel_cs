@@ -9,6 +9,10 @@ internal sealed class RouteYieldObservation
     private readonly Dictionary<(ulong Member, FixedVector2 Target), bool> _straight = [];
     private readonly Dictionary<(ulong Member, FixedVector2 Target), SimScalar> _distance = [];
     private RouteGoalClaim[]? _claims;
+    private RouteYieldTrial? _trial;
+    private RouteYieldBodies? _nearby;
+    private readonly HashSet<Layout> _layouts = [];
+    private readonly record struct Layout(Walker Requester, ulong First, ulong Second, FixedVector2 A, FixedVector2 B);
     internal IReadOnlyList<RouteGoalClaim> Claims => _claims ??= RoutePlacements.Claims(_bodies);
 
     internal RouteYieldObservation(RouteWorld world)
@@ -16,6 +20,13 @@ internal sealed class RouteYieldObservation
         _bodies = world.Bodies.Values.ToArray();
         _navigation = world.Navigation;
     }
+
+    internal bool FirstVisit(Walker requester, ulong[] members, FixedVector2[] targets) =>
+        _layouts.Add(new(requester, members[0], members.Length == 2 ? members[1] : 0,
+            targets[0], targets.Length == 2 ? targets[1] : default));
+
+    internal bool CanAdvance(RouteWorld world, Walker source, ulong[] members, FixedVector2[] targets) =>
+        (_trial ??= new(_bodies)).CanAdvance(world, source, members, targets);
 
     internal bool CanStand(FixedVector2 target)
     {
@@ -51,17 +62,15 @@ internal sealed class RouteYieldObservation
 
     internal bool BodyAtGoal(ulong member, FixedVector2 target, ulong relocated, FixedVector2 replacement)
     {
-        foreach (var body in _bodies)
-            if (body.Id != member && RouteYieldGeometry.GoalOverlap(Position(body, relocated, replacement), target)) return true;
+        foreach (var point in ProjectedPositions(member, target, target, relocated, replacement))
+            if (RouteYieldGeometry.GoalOverlap(point, target)) return true;
         return false;
     }
 
     internal bool BodyOnLeg(ulong member, FixedVector2 from, FixedVector2 target, ulong relocated, FixedVector2 replacement)
     {
-        foreach (var body in _bodies)
+        foreach (var point in ProjectedPositions(member, from, target, relocated, replacement))
         {
-            if (body.Id == member) continue;
-            var point = Position(body, relocated, replacement);
             if (RouteYieldGeometry.Overlap(from, target, 31, point, point, 31)) return true;
         }
         return false;
@@ -70,10 +79,8 @@ internal sealed class RouteYieldObservation
     internal bool BodyAtGoalOrOnLeg(ulong member, FixedVector2 from, FixedVector2 target,
         ulong relocated, FixedVector2 replacement)
     {
-        foreach (var body in _bodies)
+        foreach (var point in ProjectedPositions(member, from, target, relocated, replacement))
         {
-            if (body.Id == member) continue;
-            var point = Position(body, relocated, replacement);
             if (RouteYieldGeometry.GoalOverlap(point, target) || RouteYieldGeometry.Overlap(from, target, 31, point, point, 31)) return true;
         }
         return false;
@@ -93,6 +100,18 @@ internal sealed class RouteYieldObservation
         return true;
     }
 
-    private static FixedVector2 Position(Walker body, ulong relocated, FixedVector2 replacement) =>
-        body.Id == relocated ? replacement : body.Position;
+    internal ulong[] Obstacles(ulong member, FixedVector2 from, FixedVector2 target) =>
+        (_nearby ??= new(_bodies)).Near(from, target).Where(body => body.Id != member
+            && (RouteYieldGeometry.GoalOverlap(body.Position, target)
+                || RouteYieldGeometry.Overlap(from, target, 31, body.Position, body.Position, 31)))
+            .Select(body => body.Id).Order().ToArray();
+
+    private IEnumerable<FixedVector2> ProjectedPositions(ulong member, FixedVector2 from, FixedVector2 target,
+        ulong relocated, FixedVector2 replacement)
+    {
+        foreach (var body in (_nearby ??= new(_bodies)).Near(from, target))
+            if (body.Id != member && body.Id != relocated) yield return body.Position;
+        // The helper may have moved into the query from a distant original bucket.
+        if (relocated != 0 && relocated != member) yield return replacement;
+    }
 }

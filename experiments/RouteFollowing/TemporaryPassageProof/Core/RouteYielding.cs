@@ -34,16 +34,14 @@ internal static class RouteYielding
         if (!Available(root)) return false;
         var candidates = RoutePlanning.Candidates(world, root.Preference, 156).ToArray();
         foreach (var point in candidates)
-            if (RoutePlacements.TryBeginYield(world, requester, observation, [root.Id], [point])) return true;
+            if (TryPlacement(world, requester, observation, [root.Id], [point])) return true;
         var claims = observation.Claims;
         var secondaryCandidates = new Dictionary<ulong, FixedVector2[]>();
         foreach (var point in candidates)
         {
             if (!world.Navigation.CanStandAt(point, 31) || (point - root.Position).Length < 1) continue;
             // Only the concrete body/claim obstructing this candidate may be the second participant.
-            var obstacles = world.Bodies.Values.Where(body => body.Id != root.Id
-                && (RouteYieldGeometry.Overlap(root.Position, point, 31, body.Position, body.Position, 31)
-                    || RouteYieldGeometry.GoalOverlap(body.Position, point))).Select(body => body.Id)
+            var obstacles = observation.Obstacles(root.Id, root.Position, point)
                 .Concat(claims.Where(claim => claim.Task == root.Task && claim.Member != root.Id
                     && RouteYieldGeometry.GoalOverlap(claim.Point, point)).Select(claim => claim.Member)).Distinct().ToArray();
             if (obstacles.Length != 1 || !Available(world.Bodies[obstacles[0]])) continue;
@@ -54,11 +52,18 @@ internal static class RouteYielding
             {
                 // A local proof has a fixed cap; this is not unbounded joint traffic search.
                 if (++work > 2048) return false;
-                if (RoutePlacements.TryBeginYield(world, requester, observation, [second.Id, root.Id], [alternative, point])) return true;
+                if (TryPlacement(world, requester, observation, [second.Id, root.Id], [alternative, point])) return true;
             }
         }
         return false;
     }
+
+    private static bool TryPlacement(RouteWorld world, Walker requester, RouteYieldObservation observation,
+        ulong[] members, FixedVector2[] goals) =>
+        // Successful admission ends this search; repeated layouts are necessarily
+        // prior rejections. The caller still charges the original pair-work count.
+        observation.FirstVisit(requester, members, goals)
+            && RoutePlacements.TryBeginYield(world, requester, observation, members, goals);
 
     internal static void Reconcile(RouteWorld world)
     {

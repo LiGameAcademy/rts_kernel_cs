@@ -3,25 +3,23 @@ namespace Rts.Movement.Prototype;
 /// <summary>Rejects static gathering placements that leave no progress through existing local proposals.</summary>
 internal static class RouteYieldClearance
 {
-    internal static bool AllowsPlacement(RouteWorld world, Walker source, ulong[] members, FixedVector2[] targets)
+    internal static bool AllowsPlacement(RouteWorld world, Walker source, ulong[] members, FixedVector2[] targets,
+        RouteYieldObservation? observation = null)
     {
         // A fixed-target, stationary-body proof cannot reject moving peers or terrain detours.
         // Those cases retain the existing timed execution and cooperation rules.
         if (source.Navigation is not { Kind: MemberReferenceKind.Direct }
             || world.Bodies.Values.Any(body => body.Task == source.Task && body.Id != source.Id
                 && !members.Contains(body.Id) && body.Phase != WalkPhase.Settled)) return true;
-        return CanAdvance(world, source, members, targets);
+        return observation is null ? CanAdvance(world, source, members, targets)
+            : observation.CanAdvance(world, source, members, targets);
     }
 
     internal static bool CanAdvance(RouteWorld world, Walker source, ulong[] members, FixedVector2[] targets)
+        => new RouteYieldTrial(world.Bodies.Values).CanAdvance(world, source, members, targets);
+
+    internal static bool Simulate(RouteWorld world, Walker source, CrowdReservations reservations)
     {
-        var reservations = new CrowdReservations(64);
-        foreach (var other in world.Bodies.Values)
-        {
-            var index = Array.IndexOf(members, other.Id);
-            var position = index < 0 ? other.Position : targets[index];
-            reservations.Put(CrowdBody.Stationary(new(other.Id), RouteSettings.Radius, position));
-        }
         var corridors = new RouteYieldCorridors(world);
         var (body, target, _) = RouteNavigation.Follow(world, source);
         for (var tick = 0; tick < RouteSettings.WaitBeforeRetry; tick++)

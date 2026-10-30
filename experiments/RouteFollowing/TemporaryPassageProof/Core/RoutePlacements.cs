@@ -76,7 +76,7 @@ internal static class RoutePlacements
                 || !observation.CanTravel(body, goal)
                 || observation.BodyOnLeg(body.Id, body.Position, goal, relocated, replacement)) return false;
         }
-        if (!RouteYieldClearance.AllowsPlacement(world, requester, members, goals)) return false;
+        if (!RouteYieldClearance.AllowsPlacement(world, requester, members, goals, observation)) return false;
         // All reservations are validated before any authoritative goal changes.
         for (var i = 0; i < members.Length; i++)
         {
