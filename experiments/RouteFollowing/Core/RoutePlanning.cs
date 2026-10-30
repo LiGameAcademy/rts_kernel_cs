@@ -52,54 +52,15 @@ internal static class RoutePlanning
         return true;
     }
 
-    internal static (Walker Body, FixedVector2 Target, int Quarter) Follow(RouteWorld world, Walker body, RouteTask route)
+    internal static IReadOnlyList<FixedVector2>? TryDirect(RouteWorld world, FixedVector2 from,
+        FixedVector2 to, IReadOnlyList<Walker> blockers)
     {
-        var offset = RouteContraction.Offset(body);
-        var sameVersion = body.RouteVersion == route.Version;
-        var cursor = sameVersion ? body.Cursor : route.Points.Select((point, index) => (point, index))
-            .OrderBy(item => (item.point + offset - body.Position).Length).ThenBy(item => item.index)
-            .First().index;
-        while (cursor < route.Points.Count - 1)
-        {
-            var close = WithinRoundedRange(SquaredDistance.Between(body.Position, route.Points[cursor] + offset), 9);
-            var passed = cursor > 0 && !route.Corners.Contains(cursor)
-                && RouteReference.Project(body.Position, route.Points[cursor - 1] + offset,
-                    route.Points[cursor] + offset) >= (route.Points[cursor] - route.Points[cursor - 1]).Length;
-            if (!close && !passed) break;
-            cursor++;
-        }
-        var best = cursor;
-        var target = route.Points[Math.Min(cursor, route.Points.Count - 1)] + offset;
-        var selectedQuarter = body.TransitQuarters;
-        // Look ahead on the shared reference, never on the previous connection's bend list.
-        for (var i = cursor; i < route.Points.Count; i++)
-        {
-            for (var quarter = body.TransitQuarters; quarter >= 0; quarter--)
-            {
-                var candidate = route.Points[i] + body.Offset * SimScalar.FromRatio(quarter, 4);
-                if (!WithinRoundedRange(SquaredDistance.Between(candidate, body.Position), 192)) continue;
-                if (StraightMovePath.TryFind(world.Navigation, body.Position, candidate, 1) is null) continue;
-                best = i;
-                target = candidate;
-                selectedQuarter = quarter;
-                break;
-            }
-            // A reference bend represents a corridor decision, including a temporary body
-            // avoided by the latest retry. Static visibility cannot erase that decision.
-            if (route.Corners.Contains(i)) break;
-        }
-        if (best == route.Points.Count - 1 || WithinRoundedRange(SquaredDistance.Between(body.Position, body.Preference), 200))
-            target = body.Endpoint;
-        body = body with { Cursor = best, RouteVersion = route.Version };
-        return (body, target, selectedQuarter);
+        var direct = StraightMovePath.TryFind(world.Navigation, from, to, 1);
+        if (direct is null || blockers.Any(body => CrowdGeometry.Overlap(from, to, 31, body.Position, body.Position, 31)))
+            return null;
+        return new FixedVector2[] { from, to };
     }
 
-    private static bool WithinRoundedRange(SquaredDistance distance, int radius)
-    {
-        // Length floors the root in Raw units: floor(sqrt(D)) <= R iff D < (R + 1)^2.
-        // Preserve Length's checked Int64 conversion even outside the admitted world range.
-        if (distance.Raw >= ((Int128)1 << 126)) throw new OverflowException();
-        var exclusive = (Int128)radius * SimScalar.Scale + 1;
-        return distance.Raw < checked(exclusive * exclusive);
-    }
+    internal static (Walker Body, FixedVector2 Target, int Quarter) Follow(RouteWorld world, Walker body, RouteTask route)
+        => RouteNavigation.Follow(world, body);
 }

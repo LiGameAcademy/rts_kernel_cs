@@ -4,7 +4,12 @@
     <EmbeddedResource Include="../Checks/Fixtures/connection-before-150.json" LogicalName="connection-before-150.json" />
     <EmbeddedResource Include="../Checks/Fixtures/connection-before-150.expected.json" LogicalName="connection-before-150.expected.json" />
     <EmbeddedResource Include="../Checks/Fixtures/connection-before-251.json" LogicalName="connection-before-251.json" />
-    <EmbeddedResource Include="../Checks/Fixtures/connection-before-251.expected.json" LogicalName="connection-before-251.expected.json" /><ProjectReference Include="../Core/Rts.Movement.Prototype.csproj" /><Compile Include="../Checks/RouteCheckSuite.cs" Link="RouteCheckSuite.cs" /><Compile Include="../Checks/RouteBoundaryChecks.cs" Link="RouteBoundaryChecks.cs" /></ItemGroup>
+    <EmbeddedResource Include="../Checks/Fixtures/connection-before-251.expected.json" LogicalName="connection-before-251.expected.json" />
+    <ProjectReference Include="../Core/Rts.Movement.Prototype.csproj" Condition="'$(UseTemporaryPassageProof)' != 'true'" />
+    <ProjectReference Include="../TemporaryPassageProof/Core/TemporaryPassage.Core.csproj" Condition="'$(UseTemporaryPassageProof)' == 'true'" />
+    <Compile Include="../Checks/RouteCheckSuite.cs" Link="RouteCheckSuite.cs" />
+    <Compile Include="../Checks/RouteBoundaryChecks.cs" Link="RouteBoundaryChecks.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Include="../Checks/RouteYieldChecks.cs" Link="RouteYieldChecks.cs" />
@@ -22,5 +27,26 @@
     <Compile Include="../Checks/RouteInwardChecks.cs" Link="RouteInwardChecks.cs" />
     <EmbeddedResource Include="../Checks/Fixtures/narrow-entry-47.json" LogicalName="narrow-entry-47.json" />
     <EmbeddedResource Include="../Checks/Fixtures/narrow-entry-120.json" LogicalName="narrow-entry-120.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Checks/RouteMemberChecks.cs" Link="RouteMemberChecks.cs" />
+    <Compile Include="../Checks/RouteCloseoutChecks.cs" Link="RouteCloseoutChecks.cs" />
+    <EmbeddedResource Include="../Checks/Fixtures/closeout-before-151.json" LogicalName="closeout-before-151.json" />
+    <EmbeddedResource Include="../Checks/Fixtures/closeout-before-259.json" LogicalName="closeout-before-259.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Checks/RouteRecoveryChecks.cs" Link="RouteRecoveryChecks.cs" />
+    <Compile Include="../Checks/RecoveryClock.cs" Link="RecoveryClock.cs" />
+    <EmbeddedResource Include="../Checks/Fixtures/recovery-blockers-before-388.json" LogicalName="recovery-blockers-before-388.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../../tests/Rts.Kernel.Tests/FrameSpikeLog.cs" Link="FrameSpikeLog.cs" />
+    <Compile Include="../../../tests/Rts.Kernel.Tests/ThreadWorkObservation.cs" Link="ThreadWorkObservation.cs" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(UseTemporaryPassageProof)' == 'true'">
+    <DefineConstants>$(DefineConstants);TEMPORARY_PASSAGE_PROOF</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(UseTemporaryPassageProof)' == 'true'">
+    <Compile Include="../TemporaryPassageProof/Acceptance/Full24Checks.cs" Link="Full24Checks.cs" />
   </ItemGroup>
 </Project>

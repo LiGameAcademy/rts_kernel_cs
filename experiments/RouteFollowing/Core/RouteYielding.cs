@@ -6,18 +6,34 @@ internal static class RouteYielding
     internal static bool Eligible(Walker body, ulong task) => body.Task == task
         && body.Phase == WalkPhase.Settled && body.Pending.Count == 0;
 
+    internal static bool CanParticipate(Walker body, ulong task) => body.Task == task
+        && body.Phase is WalkPhase.Settled or WalkPhase.Waiting && body.Pending.Count == 0;
+
     internal static bool TryStart(RouteWorld world, Walker requester)
+    {
+        var work = 0;
+        return TryStart(world, requester, ref work);
+    }
+
+    internal static bool TryStart(RouteWorld world, Walker requester, ref int work)
+    {
+        return work < 2048 && (TryStart(world, requester, allowWaiting: false, ref work)
+            || work < 2048 && TryStart(world, requester, allowWaiting: true, ref work));
+    }
+
+    private static bool TryStart(RouteWorld world, Walker requester, bool allowWaiting, ref int work)
     {
         if (requester.Recoveries >= RouteSettings.RecoveryLimit || requester.Blocker is not { } id
             || world.Routes[requester.Task].Yield is not null) return false;
         var root = world.Bodies[id];
-        if (!Eligible(root, requester.Task)) return false;
+        bool Available(Walker body) => body.Id != requester.Id
+            && (Eligible(body, requester.Task) || allowWaiting && CanParticipate(body, requester.Task));
+        if (!Available(root)) return false;
         var candidates = RoutePlanning.Candidates(world, root.Preference, 156).ToArray();
         foreach (var point in candidates)
             if (RoutePlacements.TryBeginYield(world, requester, [root.Id], [point])) return true;
         var claims = RoutePlacements.Claims(world.Bodies.Values);
         var secondaryCandidates = new Dictionary<ulong, FixedVector2[]>();
-        var work = 0;
         foreach (var point in candidates)
         {
             if (!world.Navigation.CanStandAt(point, 31) || (point - root.Position).Length < 1) continue;
@@ -27,7 +43,7 @@ internal static class RouteYielding
                     || (body.Position - point).Length < 64)).Select(body => body.Id)
                 .Concat(claims.Where(claim => claim.Task == root.Task && claim.Member != root.Id
                     && (claim.Point - point).Length < 64).Select(claim => claim.Member)).Distinct().ToArray();
-            if (obstacles.Length != 1 || !Eligible(world.Bodies[obstacles[0]], root.Task)) continue;
+            if (obstacles.Length != 1 || !Available(world.Bodies[obstacles[0]])) continue;
             var second = world.Bodies[obstacles[0]];
             if (!secondaryCandidates.TryGetValue(second.Id, out var alternatives))
                 secondaryCandidates.Add(second.Id, alternatives = RoutePlanning.Candidates(world, second.Preference, 156).ToArray());
@@ -47,7 +63,9 @@ internal static class RouteYielding
         {
             var plan = source.Yield!;
             var valid = world.Bodies.TryGetValue(plan.Requester, out var requester)
-                && requester.Task == source.Id && requester.Phase is WalkPhase.Following or WalkPhase.Waiting
+                && requester.Task == source.Id
+                && (requester.Phase is WalkPhase.Following or WalkPhase.Waiting
+                    || requester.Phase == WalkPhase.Settled && requester.Pending.Count == 0)
                 && plan.MapRevision == world.Revision && world.Frame - plan.StartedAt < 90
                 && plan.Members.All(id => world.Bodies[id].Task == source.Id && world.Bodies[id].Pending.Count == 0);
             if (!valid)
@@ -80,7 +98,7 @@ internal static class RouteYielding
             var body = world.Bodies[id];
             if (body.Task != task.Id) continue; // Stop/new orders already own this body.
             world.Bodies[id] = body with { Phase = body.Position == body.Endpoint ? WalkPhase.Settled : WalkPhase.Following,
-                Connection = null, Blocker = null, Velocity = default };
+                Connection = null, Blocker = null, Velocity = default, Recovery = null, BlockingContacts = null };
         }
         world.Routes[task.Id] = task with { Yield = null };
         world.Publish(task.Yield.Requester, "yield_cancelled");

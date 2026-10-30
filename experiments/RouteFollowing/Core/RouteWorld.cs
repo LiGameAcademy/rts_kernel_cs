@@ -82,6 +82,8 @@ public sealed class RouteWorld
         Navigation = candidate;
         Revision++;
         PlacementRevision++;
+        foreach (var body in Bodies.Values.Where(body => body.Recovery is not null || body.BlockingContacts is not null).ToArray())
+            Bodies[body.Id] = body with { Recovery = null, BlockingContacts = null };
         return true;
     }
 
@@ -111,7 +113,7 @@ public sealed class RouteWorld
                 if (body.Phase == WalkPhase.Settled && (allSettled || body.Pending.Count > 0))
                 {
                     Bodies[body.Id] = body with { Task = 0, Phase = WalkPhase.Idle, Velocity = default, Blocker = null, TransitQuarters = 4,
-                        Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1 };
+                        Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1, Navigation = null, Passage = null, Recovery = null, BlockingContacts = [] };
                     Publish(body.Id, "completed");
                 }
         }
@@ -130,24 +132,28 @@ public sealed class RouteWorld
                 var body = Bodies[id];
                 Bodies[id] = body with { Task = 0, Phase = WalkPhase.Stopped, Pending = [], Velocity = default,
                     Blocker = null, WaitTicks = 0, Recoveries = 0, RecentGroup = 0, Connection = null, TransitQuarters = 4,
-                    Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1 };
+                    Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1, Navigation = null, Passage = null, Recovery = null, BlockingContacts = [] };
                 Publish(id, "stopped");
             }
             return;
         }
         var members = command.Members.Select(id => Bodies[id]).ToArray();
-        if (!RoutePlacements.TryAssign(this, members, command.Goal, out var anchor, out var goals)
-            || !RoutePlanning.TryRoute(this, RoutePlanning.Centre(members), anchor, [], out var points, out var corners))
+        if (!RoutePlacements.TryAssign(this, members, command.Goal, out var anchor, out var goals))
         {
             foreach (var id in command.Members) Publish(id, "rejected", "no_complete_group_placement");
             return;
+        }
+        // A group's mathematical centre is not a member and need not be navigable.
+        if (!RoutePlanning.TryRoute(this, RoutePlanning.Centre(members), anchor, [], out var points, out var corners))
+        {
+            points = new FixedVector2[] { anchor, anchor };
+            corners = [];
         }
         var taskId = NextTask++;
         Routes.Add(taskId, new(taskId, anchor, points, 1, Revision, corners));
         foreach (var body in members)
         {
-            // Transit offsets preserve current relative placement; final slot preferences
-            // are a separate concern and must not make members cross at march start.
+            // Offset remains intent metadata; free movement does not chase it in transit.
             var intent = new QueuedGoal(taskId, goals[body.Id], body.Position - RoutePlanning.Centre(members));
             Bodies[body.Id] = command.Append && body.Task != 0
                 ? body with { Pending = body.Pending.Append(intent).ToArray() }
@@ -161,7 +167,7 @@ public sealed class RouteWorld
         Task = intent.Task, Offset = intent.Offset,
         Cursor = 0, Phase = WalkPhase.Following, WaitTicks = 0, RetryAtWait = 90, Recoveries = 0,
         Progress = 0, ProgressCursor = 0, ProgressVersion = 0, RouteVersion = 0, Blocker = null, Velocity = default,
-        RecentGroup = body.Task != 0 ? body.Task : body.RecentGroup, Connection = null, TransitQuarters = 4
+        BlockingContacts = null, Recovery = null, RecentGroup = body.Task != 0 ? body.Task : body.RecentGroup, Connection = null, TransitQuarters = 4, Navigation = null, Passage = null
     }, intent.Preference);
 
     internal void Publish(ulong id, string kind, string detail = "") =>
@@ -170,7 +176,11 @@ public sealed class RouteWorld
     private static RouteYieldPlan? CopyYield(RouteYieldPlan? plan) => plan is null ? null
         : plan with { Members = plan.Members.ToArray() };
     private static Walker Copy(Walker body) => body with { Pending = body.Pending.ToArray(),
-        Connection = body.Connection is { } connection ? connection with { Points = connection.Points.ToArray() } : null };
+        BlockingContacts = body.BlockingContacts?.ToArray(),
+        Recovery = body.Recovery is { } probe ? probe with { Candidates = probe.Candidates.ToArray() } : null,
+        Connection = body.Connection is { } connection ? connection with { Points = connection.Points.ToArray() } : null,
+        Navigation = body.Navigation is { } reference ? reference with
+            { Points = reference.Points.ToArray(), Corners = reference.Corners.ToArray() } : null };
     public string Save() => JsonSerializer.Serialize(new RouteSnapshot(RouteSettings.SnapshotFormat, Width, Height, Flags.ToArray(), Frame,
         _nextUnit, NextTask, _eventSequence, Revision, Bodies.Values.Select(Copy).ToArray(),
         Routes.Values.Select(route => route with { Points = route.Points.ToArray(), Corners = route.Corners.ToArray(), Yield = CopyYield(route.Yield) }).ToArray(), _commands.ToArray(), PlacementRevision));

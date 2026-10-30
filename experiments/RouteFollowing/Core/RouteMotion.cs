@@ -1,145 +1,79 @@
 namespace Rts.Movement.Prototype;
 
-/// <summary>Time-aligned safety arbitration never supplies a new authoritative route.</summary>
+/// <summary>All proposals read frame-start bodies; only accepted timed reservations may commit positions.</summary>
 internal static class RouteMotion
 {
-    private sealed record Proposal(Walker Body, MovementStep Step, bool Final, int Quarter);
-
     internal static void Advance(RouteWorld world)
     {
-        RetryOne(world);
+        RouteRecovery.Advance(world);
+        var corridors = new RouteYieldCorridors(world);
         var reservations = new CrowdReservations(64);
         foreach (var body in world.Bodies.Values)
             reservations.Put(CrowdBody.Stationary(new(body.Id), 31, body.Position));
-        var proposals = new List<Proposal>();
+        var proposals = new List<MotionProposal>();
         foreach (var source in world.Bodies.Values.Where(body => body.Task != 0
-            && body.Phase is WalkPhase.Following or WalkPhase.Waiting or WalkPhase.Yielding).ToArray())
+            && body.Phase is WalkPhase.Following or WalkPhase.Waiting or WalkPhase.Yielding))
         {
-            var route = world.Routes[source.Task];
-            var cached = source.Connection is { } connection && connection.Version == route.Version
-                && connection.Next < connection.Points.Count ? connection : null;
-            var (body, target, quarter) = source.Phase == WalkPhase.Yielding ? (source, source.Endpoint, source.TransitQuarters)
-                : cached is null ? RoutePlanning.Follow(world, source with { Connection = null }, route)
-                : (source, cached.Target, cached.TransitQuarters);
-            var direct = cached?.Points ?? StraightMovePath.TryFind(world.Navigation, body.Position, target, 1);
-            if (direct is null)
-            {
-                // A connection is bounded and tied only to this reference point.
-                direct = Connection(world, body.Position, target);
-            }
-            var step = direct is null
-                ? new MovementStep(body.Position, body.Facing, 0, [body.Position, body.Position], Times: [0, 1])
-                : MovementStepper.Compute(new(new(body.Id), 0, body.Position, body.Velocity, body.Facing),
-                    new(new(target, RouteSettings.Speed, 1, RouteSettings.Motion), direct, cached?.Next ?? 0), 30, null);
-            var final = target == body.Endpoint;
-            proposals.Add(new(body, step, final, quarter));
-            reservations.Put(new(new(body.Id), 31, step.Trace, step.Times));
+            var (body, target, _) = source.Phase == WalkPhase.Yielding
+                ? (source, source.Endpoint, 4) : RouteNavigation.Follow(world, source);
+            body = body with { Passage = RouteMotionCandidates.RetainPassage(world, body) };
+            var step = RouteMotionCandidates.Compute(world, body, target, RouteSettings.Speed);
+            proposals.Add(new(body, target, step));
+            reservations.Put(corridors.FirstConflict(body, step.Trace) is null
+                ? new(new(body.Id), 31, step.Trace, step.Times)
+                : CrowdBody.Stationary(new(body.Id), 31, body.Position));
         }
-        var held = CrowdMotionResolver.Resolve(reservations, proposals.Select(item => new EntityId(item.Body.Id)).ToArray());
-        foreach (var proposal in proposals)
+        var ordered = proposals.OrderByDescending(item => item.Body.WaitTicks).ThenBy(item => item.Body.Id).ToArray();
+        var held = CrowdMotionResolver.Resolve(reservations, ordered.Select(item => new EntityId(item.Body.Id)).ToArray());
+        var selected = new List<(MotionProposal Proposal, MovementStep Step, ulong? Blocker, PassageState? Passage)>();
+        var alternatives = 0;
+        foreach (var proposal in ordered)
         {
-            var body = proposal.Body;
             var step = proposal.Step;
-            var quarter = proposal.Quarter;
-            var original = new CrowdBody(new(body.Id), 31, step.Trace, step.Times);
-            var blocked = held.Contains(new(body.Id));
-            // Revalidate an ephemeral hold against current reservations, never use it to choose a detour.
-            if (blocked && reservations.FirstMotionConflict(original) is null)
+            var body = proposal.Body;
+            // A clear body query cannot restore a proposal denied by the active corridor.
+            var blocker = corridors.FirstConflict(body, step.Trace)
+                ?? (held.Contains(new(body.Id))
+                    ? reservations.FirstMotionConflict(new(new(body.Id), 31, step.Trace, step.Times))?.Value : null);
+            var passage = body.Passage;
+            // A cancelled proposal whose dependencies are now safe may resume immediately.
+            if (blocker is { } id && alternatives++ < 16
+                && RouteMotionCandidates.TryAlternative(world, proposal, id, reservations, corridors, out var alternative, out passage))
             {
-                reservations.Put(original);
-                blocked = false;
-            }
-            var moved = !blocked && step.Position != body.Position;
-            var blocker = blocked ? reservations.FirstMotionConflict(original) : null;
-            if (blocked && !proposal.Final && RouteContraction.TryStep(world, body, quarter, blocker, reservations,
-                out var inwardBody, out var inwardStep))
-            {
-                body = inwardBody;
-                step = inwardStep;
-                quarter = body.TransitQuarters;
-                blocked = false;
+                step = alternative;
                 blocker = null;
-                moved = true;
             }
-            var updated = body with { Position = blocked ? body.Position : step.Position, Facing = step.Facing,
-                TransitQuarters = moved ? quarter : body.TransitQuarters,
-                Velocity = moved ? (step.Position - body.Position) * 30 : default,
-                Phase = body.Phase == WalkPhase.Yielding ? WalkPhase.Yielding : moved ? WalkPhase.Following : WalkPhase.Waiting, Blocker = blocker?.Value,
-                WaitTicks = body.WaitTicks + (moved ? 0 : 1),
-                Connection = blocked || step.NextWaypoint >= (body.Connection?.Points.Count ?? 0) ? null
-                    : body.Connection! with { Next = step.NextWaypoint } };
-            if (body.Phase != WalkPhase.Yielding) updated = RouteProgress.Measure(body, updated, world.Routes[body.Task]);
-            if (!blocked && proposal.Final && step.Position == body.Endpoint)
-                updated = updated with { Phase = WalkPhase.Settled, Velocity = default, Blocker = null };
-            world.Bodies[body.Id] = updated;
+            if (blocker is null) reservations.Put(new(new(body.Id), 31, step.Trace, step.Times));
+            else passage = body.Passage?.Blocker == blocker ? body.Passage : null;
+            selected.Add((proposal, step, blocker, passage));
+        }
+        // Selection may update reservations, but authority remains untouched until every choice is fixed.
+        foreach (var (proposal, step, blocker, passage) in selected)
+        {
+            var proposed = new CrowdBody(new(proposal.Body.Id), 31, proposal.Step.Trace, proposal.Step.Times);
+            var contacts = blocker is null ? Array.Empty<ulong>() : reservations.MotionConflicts(proposed).Select(id => id.Value).ToArray();
+            Commit(world, proposal, step, blocker, passage, contacts);
         }
     }
 
-    private static IReadOnlyList<FixedVector2>? Connection(RouteWorld world, FixedVector2 from, FixedVector2 to)
+    private static void Commit(RouteWorld world, MotionProposal proposal, MovementStep step,
+        ulong? blocker, PassageState? passage, ulong[] contacts)
     {
-        if ((from - to).Length > 256 || !world.Navigation.TryWorldToCell(from, out var start)
-            || !world.Navigation.TryWorldToCell(to, out var goal)) return null;
-        var left = Math.Max(0, start.X - 8);
-        var top = Math.Max(0, start.Y - 8);
-        var area = new GridArea(left, top, Math.Min(world.Width - left, start.X + 9 - left),
-            Math.Min(world.Height - top, start.Y + 9 - top));
-        var path = GridPathfinder.FindPathCore(world.Navigation.Grid, start, goal,
-            RouteSettings.ShortConnectionNodes, 0, cell => world.Navigation.CanOccupy(cell, 1),
-            (a, b) => world.Navigation.CanTraverse(a, b, 1), area);
-        if (path.Status != PathStatus.Found) return null;
-        var points = new List<FixedVector2> { from };
-        points.AddRange(path.Cells.Skip(1).Select(world.Navigation.CellCenter));
-        if (points[^1] != to) points.Add(to);
-        return points.ToArray();
-    }
-
-    private static void RetryOne(RouteWorld world)
-    {
-        var waiting = world.Bodies.Values.Where(body => body.Task != 0 && body.Phase is WalkPhase.Waiting or WalkPhase.Following
-            && world.Routes[body.Task].Yield is null
-            && (body.WaitTicks >= body.RetryAtWait || world.Routes[body.Task].MapRevision != world.Revision))
-            .OrderBy(body => body.Id).FirstOrDefault();
-        if (waiting is null) return;
-        if (RouteYielding.TryStart(world, waiting)) return;
-        var task = world.Routes[waiting.Task];
-        var blockers = world.Bodies.Values.Where(body => body.Task != task.Id && body.Id != waiting.Id
-            && (body.Phase is WalkPhase.Stopped or WalkPhase.Idle or WalkPhase.Settled
-                || body.Id == waiting.Blocker)).ToArray();
-        if (waiting.Blocker is { } blockedBy && world.Bodies[blockedBy].Task == task.Id)
+        var body = proposal.Body;
+        var moved = blocker is null && step.Position != body.Position;
+        var updated = body with
         {
-            var (following, target, quarter) = RoutePlanning.Follow(world, waiting, task);
-            var local = RouteConnections.Find(world, following, target, quarter);
-            var attempts = waiting.Recoveries + 1;
-            if (attempts > RouteSettings.RecoveryLimit)
-            {
-                world.Bodies[waiting.Id] = waiting with { Task = 0, Phase = WalkPhase.Failed,
-                    Velocity = default, Blocker = null, Connection = null, TransitQuarters = 4, Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1 };
-                world.Publish(waiting.Id, "failed", "no_connection_progress");
-            }
-            else
-            {
-                world.Bodies[waiting.Id] = following with
-                {
-                    Connection = local, Cursor = local?.Cursor ?? following.Cursor,
-                    RetryAtWait = waiting.WaitTicks + 90, Recoveries = attempts
-                };
-                world.Publish(waiting.Id, "retry", local is null ? "connection_wait" : "bounded_reference_connection");
-            }
-            return;
-        }
-        var recoveries = waiting.Recoveries + 1;
-        if (recoveries > RouteSettings.RecoveryLimit)
-        {
-            world.Bodies[waiting.Id] = waiting with { Task = 0, Phase = WalkPhase.Failed,
-                Velocity = default, Blocker = null, Connection = null, TransitQuarters = 4,
-                Progress = 0, ProgressCursor = 0, ProgressVersion = 0, PlacementCheckedRevision = -1 };
-            world.Publish(waiting.Id, "failed", "no_reference_progress");
-            return;
-        }
-        var found = RoutePlanning.TryRoute(world, waiting.Position, task.Anchor, blockers, out var points, out var corners);
-        world.Bodies[waiting.Id] = waiting with { Recoveries = recoveries, RetryAtWait = waiting.WaitTicks + 90 };
-        if (found) world.Routes[task.Id] = task with { Points = points, Corners = corners,
-            Version = task.Version + 1, MapRevision = world.Revision };
-        world.Publish(waiting.Id, "retry", found ? "reference_replaced" : "no_route_this_round");
+            Position = blocker is null ? step.Position : body.Position,
+            Facing = step.Facing,
+            Velocity = moved ? (step.Position - body.Position) * RouteSettings.TickRate : default,
+            Phase = body.Phase == WalkPhase.Yielding ? WalkPhase.Yielding : moved ? WalkPhase.Following : WalkPhase.Waiting,
+            Blocker = blocker, BlockingContacts = contacts, Passage = passage, Connection = null, TransitQuarters = 4,
+            WaitTicks = body.WaitTicks + (moved ? 0 : 1)
+        };
+        if (body.Phase != WalkPhase.Yielding && body.Navigation is not null)
+            updated = RouteProgress.Measure(body, updated, RouteNavigation.Reference(body));
+        if (blocker is null && step.Position == body.Endpoint)
+            updated = updated with { Phase = WalkPhase.Settled, Velocity = default, Blocker = null, Passage = null, Recovery = null, BlockingContacts = [] };
+        world.Bodies[body.Id] = updated;
     }
 }

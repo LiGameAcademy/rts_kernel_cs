@@ -11,4 +11,16 @@
     <EmbeddedResource Include="Fixtures/yield-single-329.json" LogicalName="yield-single-329.json" />
     <EmbeddedResource Include="Fixtures/yield-pair-444.json" LogicalName="yield-pair-444.json" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Fixtures/closeout-before-151.json" LogicalName="closeout-before-151.json" />
+    <EmbeddedResource Include="Fixtures/closeout-before-259.json" LogicalName="closeout-before-259.json" />
+  </ItemGroup>
+  <ItemGroup><EmbeddedResource Include="Fixtures/passage-cancel-before-476.json" LogicalName="passage-cancel-before-476.json" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="Fixtures/gathering-before-268.json" LogicalName="gathering-before-268.json" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="Fixtures/gathering-before-357.json" LogicalName="gathering-before-357.json" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="Fixtures/recovery-blockers-before-388.json" LogicalName="recovery-blockers-before-388.json" /></ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../../tests/Rts.Kernel.Tests/FrameSpikeLog.cs" Link="FrameSpikeLog.cs" />
+    <Compile Include="../../../tests/Rts.Kernel.Tests/ThreadWorkObservation.cs" Link="ThreadWorkObservation.cs" />
+  </ItemGroup>
 </Project>

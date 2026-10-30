@@ -1,0 +1,18 @@
+<Project Sdk="Godot.NET.Sdk/4.7.2">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Core/TemporaryPassage.Core.csproj" />
+    <Compile Include="../Acceptance/MultiGroupChecks.cs" Link="MultiGroupChecks.cs" />
+    <Compile Include="../Acceptance/Full24Checks.cs" Link="Full24Checks.cs" />
+    <Compile Include="../../Checks/RoutePlacementChecks.cs" Link="RoutePlacementChecks.cs" />
+    <Compile Include="../../Checks/RouteBoundaryChecks.cs" Link="RouteBoundaryChecks.cs" />
+    <Compile Include="../../../../tests/Rts.Kernel.Tests/FrameSpikeLog.cs" Link="FrameSpikeLog.cs" />
+    <Compile Include="../../../../tests/Rts.Kernel.Tests/ThreadWorkObservation.cs" Link="ThreadWorkObservation.cs" />
+  </ItemGroup>
+</Project>

@@ -42,7 +42,7 @@ internal static class RouteConnections
         return null;
     }
 
-    private static bool ClearOfBodies(FixedVector2 from, FixedVector2 to, Walker[] others)
+    internal static bool ClearOfBodies(FixedVector2 from, FixedVector2 to, IReadOnlyList<Walker> others)
     {
         // The swept segment box expanded by both radii contains every possible collision.
         // Strict separation only: contact on the box boundary still uses the exact predicate.

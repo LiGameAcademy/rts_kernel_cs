@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><AssemblyName>Checks</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Core/TemporaryPassage.Core.csproj" />
+    <EmbeddedResource Include="Fixtures/*.json" LogicalName="%(Filename)%(Extension)" />
+    <Compile Include="../../../../tests/Rts.Kernel.Tests/FrameSpikeLog.cs" Link="FrameSpikeLog.cs" />
+    <Compile Include="../../../../tests/Rts.Kernel.Tests/ThreadWorkObservation.cs" Link="ThreadWorkObservation.cs" />
+    <Compile Include="../Acceptance/Full24Checks.cs" Link="Full24Checks.cs" />
+    <Compile Include="../Acceptance/MultiGroupChecks.cs" Link="MultiGroupChecks.cs" />
+    <Compile Include="../../Checks/RoutePlacementChecks.cs" Link="RoutePlacementChecks.cs" />
+    <Compile Include="../../Checks/RouteBoundaryChecks.cs" Link="RouteBoundaryChecks.cs" />
+  </ItemGroup>
+</Project>

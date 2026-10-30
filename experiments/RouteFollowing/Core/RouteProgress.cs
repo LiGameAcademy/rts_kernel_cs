@@ -21,7 +21,7 @@ internal static class RouteProgress
         }
         moved = moved with { Progress = progress, ProgressCursor = end, ProgressVersion = route.Version };
         if (progress >= RouteSettings.ProgressThreshold)
-            moved = moved with { Progress = 0, WaitTicks = 0, RetryAtWait = 90, Recoveries = 0 };
+            moved = moved with { Progress = 0, WaitTicks = 0, RetryAtWait = 90, Recoveries = 0, Recovery = null };
         return moved;
     }
 }

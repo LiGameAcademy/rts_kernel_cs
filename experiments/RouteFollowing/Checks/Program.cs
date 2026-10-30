@@ -3,7 +3,18 @@ using System.Text.Json;
 
 try
 {
-    if (args.Contains("--yield-checks"))
+    if (args.Contains("--recovery-boundaries")) RouteRecoveryBoundaries.Run();
+    else if (args.Contains("--recovery-gate")) RouteRecoveryChecks.Frozen(Console.WriteLine);
+    else if (args.Contains("--yield-boundaries-only")) { RouteYieldBoundaries.Run(); Console.WriteLine("yield_boundaries_only=PASS"); }
+    else if (args.Contains("--active-yield-checks")) RouteActiveYieldChecks.Run(Console.WriteLine);
+    else if (args.Contains("--gathering-audit")) RouteGatheringAudit.Run(Console.WriteLine);
+    else if (args.Contains("--member-acceptance")) Environment.ExitCode = RouteMemberChecks.Run(Console.WriteLine) ? 0 : 1;
+    else if (args.Contains("--corridor-checks")) RouteYieldCorridorChecks.Run();
+    else if (args.Contains("--lifecycle-checks")) RouteLifecycleChecks.Run();
+    else if (args.Contains("--closeout-failure-audit")) RouteCloseoutFailureAudit.Run(Console.WriteLine);
+    else if (args.Contains("--closeout-gates")) Environment.ExitCode = RouteCloseoutChecks.Run(Console.WriteLine) ? 0 : 1;
+    else if (args.Contains("--navigation-checks")) RouteNavigationChecks.Run();
+    else if (args.Contains("--yield-checks"))
     {
         var untouched = RouteYieldChecks.Load("yield-single-329.json");
         var before = untouched.Save();

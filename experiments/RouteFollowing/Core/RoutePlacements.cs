@@ -55,8 +55,8 @@ internal static class RoutePlacements
     {
         var task = world.Routes[requester.Task];
         if (requester.Recoveries >= RouteSettings.RecoveryLimit || task.Yield is not null || members.Length is < 1 or > 2 || goals.Length != members.Length
-            || members.Distinct().Count() != members.Length || requester.Blocker != members[^1]
-            || members.Any(id => !world.Bodies.TryGetValue(id, out var body) || !RouteYielding.Eligible(body, task.Id))) return false;
+            || members.Distinct().Count() != members.Length || members.Contains(requester.Id) || requester.Blocker != members[^1]
+            || members.Any(id => !world.Bodies.TryGetValue(id, out var body) || !RouteYielding.CanParticipate(body, task.Id))) return false;
         var root = world.Bodies[members[^1]];
         if (!CrowdGeometry.Overlap(requester.Position, requester.Endpoint, 31, root.Position, root.Position, 31)
             || CrowdGeometry.Overlap(requester.Position, requester.Endpoint, 31, goals[^1], goals[^1], 31)) return false;
@@ -81,10 +81,11 @@ internal static class RoutePlacements
         {
             var body = world.Bodies[members[i]];
             world.Bodies[body.Id] = body with { Endpoint = goals[i], Connection = null, Blocker = null, Velocity = default,
+                Navigation = null, Passage = null, Recovery = null, BlockingContacts = [], Progress = 0, ProgressCursor = 0, ProgressVersion = 0,
                 Phase = i == 0 ? WalkPhase.Yielding : WalkPhase.Settled, PlacementCheckedRevision = -1 };
         }
         world.Routes[task.Id] = task with { Yield = new(requester.Id, members.ToArray(), 0, world.Revision, world.Frame) };
-        world.Bodies[requester.Id] = requester with { RetryAtWait = requester.WaitTicks + 90, Recoveries = requester.Recoveries + 1 };
+        world.Bodies[requester.Id] = requester with { Recovery = null, RetryAtWait = requester.WaitTicks + 90, Recoveries = requester.Recoveries + 1 };
         world.Publish(requester.Id, "yield_started", string.Join(",", members));
         world.Publish(members[0], "yield_leg_started");
         return true;
@@ -121,7 +122,7 @@ internal static class RoutePlacements
                 // members see this claim before choosing another replacement.
                 var index = Array.FindIndex(claims, claim => claim.Task == body.Task && claim.Member == body.Id);
                 claims[index] = new(body.Task, body.Id, point);
-                body = body with { Endpoint = point, Connection = null };
+                body = body with { Endpoint = point, Connection = null, Recovery = null, BlockingContacts = null };
                 found = true;
                 break;
             }

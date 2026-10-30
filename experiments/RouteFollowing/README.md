@@ -1,5 +1,14 @@
 # Route-following experiment (not a production replacement)
 
+**2026-10-25 closeout candidate:** member-owned terrain references replace the mandatory
+shared centre line. Experimental format is now **7**; runtime loading rejects format6.
+The earlier sections below describe the retained historical format6 experiment.
+The four frozen executed gates now **PASS** with remaining-helper corridor protection
+(d40233e); aggregate acceptance still **FAILS** at 17/24 in the narrow scenario
+and retains over-budget samples. Do not integrate or merge this candidate.
+See [current status](CLOSEOUT_STATUS.md).
+
+
 A deterministic C# experiment for one reference route per task, per-member following,
 current-frame temporal collision safety, explicit waiting and bounded recovery.
 Godot is an input/rendering host only. The production `RtsMatch`, snapshot v14 and
@@ -161,6 +170,14 @@ can incur cold initialization and is not the prepared match-start path.
 Both complete suites still return failure code 1. This performance-only change
 does not repair passage behavior, integrate the host, change 30Hz, or authorize
 merging/tagging 0.0.2. Stop, new orders, append, yielding and restore regressions pass.
+
+## Current member-reference acceptance
+
+Use `--member-acceptance` with the CLI or Godot process. This runs the current
+member-reference frozen gates, normal scenarios and command/restore boundaries.
+`--corridor-checks` runs the CLI permission boundaries. The legacy centre-line
+`--self-test` and golden expectations remain unchanged and separate. Production
+is not replaced. Set `RTS_CLOSEOUT_EVIDENCE` to retain failure input/output snapshots.
 
 ## Run
 

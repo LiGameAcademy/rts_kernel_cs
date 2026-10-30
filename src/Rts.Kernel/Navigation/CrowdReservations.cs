@@ -64,6 +64,15 @@ internal sealed class CrowdReservations(SimScalar bucketSize)
 
     internal CrowdBody Read(EntityId id) => _bodies[id];
 
+    // Recovery needs every actual contact, not the smallest ID used by the resolver.
+    // Reuse the same spatial buckets and timed predicate; this query does not alter reservations.
+    internal EntityId[] MotionConflicts(CrowdBody body)
+    {
+        Query(Bounds(body.Trace, body.Radius));
+        return _query.Where(other => other != body.Id && TimedCrowdGeometry.Overlap(body, _bodies[other]))
+            .Order().ToArray();
+    }
+
     internal EntityId? FirstMotionConflict(CrowdBody body)
     {
         Query(Bounds(body.Trace, body.Radius));
